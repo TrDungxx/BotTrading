@@ -1,17 +1,340 @@
-import React, { useState } from 'react';
-import { Bell, CreditCard, Key, Lock, Save, Shield, User } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, CreditCard, Key, Lock, Save, Shield, User, Camera, Globe, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
+import { apiRequest, ApiError } from '../utils/api';
+
+interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  fullName?: string;
+  avatar?: string;
+  timezone: string;
+  language: string;
+  type: number;
+  status: number;
+  approved: number;
+  createdAt: string;
+  lastLogin?: string;
+}
+
+interface NotificationSettings {
+  emailNotifications: {
+    botActivity: boolean;
+    marketAlerts: boolean;
+    securityAlerts: boolean;
+    newsletter: boolean;
+  };
+  pushNotifications: {
+    tradingSignals: boolean;
+    priceAlerts: boolean;
+  };
+}
+
+interface ApiKey {
+  id: number;
+  name: string;
+  exchange: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  lastUsed?: string;
+}
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { language, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'api' | 'notifications' | 'payment'>('profile');
   
-  // Form states
-  const [name, setName] = useState(user?.name || '');
-  const [email, setEmail] = useState(user?.email || '');
-  const [timezone, setTimezone] = useState('UTC');
-  const [language, setLanguage] = useState('en');
+  // Loading states
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Profile form states
+  const [profileData, setProfileData] = useState<UserProfile>({
+    id: user?.id || 0,
+    username: user?.username || '',
+    email: user?.email || '',
+    fullName: '',
+    avatar: user?.avatar,
+    timezone: 'UTC',
+    language: language,
+    type: user?.type || 3,
+    status: user?.status || 1,
+    approved: user?.approved || 1,
+    createdAt: '',
+    lastLogin: ''
+  });
+  
+  // Security form states
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  
+  // Notification settings
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    emailNotifications: {
+      botActivity: true,
+      marketAlerts: true,
+      securityAlerts: true,
+      newsletter: false
+    },
+    pushNotifications: {
+      tradingSignals: true,
+      priceAlerts: true
+    }
+  });
+  
+  // API Keys
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [showAddApiKey, setShowAddApiKey] = useState(false);
+  
+  // Load user profile data
+  useEffect(() => {
+    loadUserProfile();
+    loadNotificationSettings();
+    loadApiKeys();
+  }, []);
+
+  const loadUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setIsLoading(true);
+      // In real implementation, this would be an API call
+      // const response = await apiRequest('/user/profile');
+      
+      // For now, use mock data based on current user
+      setProfileData({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.username, // Mock full name
+        avatar: user.avatar,
+        timezone: 'UTC',
+        language: language,
+        type: user.type,
+        status: user.status,
+        approved: user.approved,
+        createdAt: '2024-01-15T08:00:00Z', // Mock creation date
+        lastLogin: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+      setMessage({ type: 'error', text: 'Failed to load profile data' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadNotificationSettings = async () => {
+    try {
+      // Mock API call - in real implementation:
+      // const response = await apiRequest('/user/notification-settings');
+      // setNotificationSettings(response.data);
+    } catch (error) {
+      console.error('Failed to load notification settings:', error);
+    }
+  };
+
+  const loadApiKeys = async () => {
+    try {
+      // Mock API call - in real implementation:
+      // const response = await apiRequest('/user/api-keys');
+      
+      // Mock data
+      setApiKeys([
+        {
+          id: 1,
+          name: 'Binance Main',
+          exchange: 'Binance',
+          status: 'active',
+          createdAt: '2024-02-01T10:00:00Z',
+          lastUsed: '2024-03-15T14:30:00Z'
+        },
+        {
+          id: 2,
+          name: 'Coinbase Pro',
+          exchange: 'Coinbase',
+          status: 'inactive',
+          createdAt: '2024-01-20T15:30:00Z',
+          lastUsed: '2024-03-10T09:15:00Z'
+        }
+      ]);
+    } catch (error) {
+      console.error('Failed to load API keys:', error);
+    }
+  };
+
+  const handleProfileSave = async () => {
+    try {
+      setIsSaving(true);
+      setMessage(null);
+      
+      // Validate required fields
+      if (!profileData.username || !profileData.email) {
+        setMessage({ type: 'error', text: 'Username and email are required' });
+        return;
+      }
+      
+      // In real implementation:
+      // await apiRequest('/user/profile', {
+      //   method: 'PUT',
+      //   body: JSON.stringify({
+      //     username: profileData.username,
+      //     email: profileData.email,
+      //     fullName: profileData.fullName,
+      //     timezone: profileData.timezone,
+      //     language: profileData.language
+      //   })
+      // });
+      
+      // Update language context if changed
+      if (profileData.language !== language) {
+        setLanguage(profileData.language as 'en' | 'vi');
+      }
+      
+      setMessage({ type: 'success', text: 'Profile updated successfully' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+      
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+      setMessage({ type: 'error', text: 'Failed to update profile' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    try {
+      setIsSaving(true);
+      setMessage(null);
+      
+      // Validate passwords
+      if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+        setMessage({ type: 'error', text: 'All password fields are required' });
+        return;
+      }
+      
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        setMessage({ type: 'error', text: 'New passwords do not match' });
+        return;
+      }
+      
+      if (passwordData.newPassword.length < 8) {
+        setMessage({ type: 'error', text: 'New password must be at least 8 characters long' });
+        return;
+      }
+      
+      // In real implementation:
+      // await apiRequest('/user/change-password', {
+      //   method: 'POST',
+      //   body: JSON.stringify({
+      //     currentPassword: passwordData.currentPassword,
+      //     newPassword: passwordData.newPassword
+      //   })
+      // });
+      
+      // Clear password fields
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      
+      setMessage({ type: 'success', text: 'Password updated successfully' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+      
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      if (error instanceof ApiError && error.status === 401) {
+        setMessage({ type: 'error', text: 'Current password is incorrect' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to update password' });
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNotificationSave = async () => {
+    try {
+      setIsSaving(true);
+      setMessage(null);
+      
+      // In real implementation:
+      // await apiRequest('/user/notification-settings', {
+      //   method: 'PUT',
+      //   body: JSON.stringify(notificationSettings)
+      // });
+      
+      setMessage({ type: 'success', text: 'Notification settings updated successfully' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+      
+    } catch (error) {
+      console.error('Failed to save notification settings:', error);
+      setMessage({ type: 'error', text: 'Failed to update notification settings' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteApiKey = async (keyId: number) => {
+    try {
+      // In real implementation:
+      // await apiRequest(`/user/api-keys/${keyId}`, { method: 'DELETE' });
+      
+      setApiKeys(prev => prev.filter(key => key.id !== keyId));
+      setMessage({ type: 'success', text: 'API key deleted successfully' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setMessage(null), 3000);
+      
+    } catch (error) {
+      console.error('Failed to delete API key:', error);
+      setMessage({ type: 'error', text: 'Failed to delete API key' });
+    }
+  };
+
+  const getUserTypeLabel = (type: number) => {
+    switch (type) {
+      case 1: return 'Administrator';
+      case 2: return 'Moderator';
+      case 3: return 'User';
+      default: return 'Unknown';
+    }
+  };
+
+  const getUserStatusLabel = (status: number) => {
+    return status === 1 ? 'Active' : 'Suspended';
+  };
+
+  const getApprovalStatusLabel = (approved: number) => {
+    switch (approved) {
+      case 0: return 'Pending Approval';
+      case 1: return 'Approved';
+      case 2: return 'Rejected';
+      default: return 'Unknown';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -23,6 +346,24 @@ export default function Settings() {
           <FormattedMessage id="settings.subtitle" />
         </p>
       </div>
+
+      {/* Global message */}
+      {message && (
+        <div className={`flex items-center gap-3 p-4 rounded-lg ${
+          message.type === 'success' 
+            ? 'bg-success-500/10 border border-success-500/20' 
+            : 'bg-danger-500/10 border border-danger-500/20'
+        }`}>
+          {message.type === 'success' ? (
+            <CheckCircle className="h-5 w-5 text-success-500 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
+          )}
+          <p className={`text-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
+            {message.text}
+          </p>
+        </div>
+      )}
       
       <div className="flex flex-col md:flex-row gap-6">
         {/* Sidebar */}
@@ -98,31 +439,80 @@ export default function Settings() {
                 </h2>
                 
                 <div className="space-y-6">
+                  {/* Account Status Info */}
+                  <div className="bg-dark-700/30 rounded-lg p-4">
+                    <h3 className="text-sm font-medium mb-3">Account Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-dark-400">Account Type:</span>
+                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                          profileData.type === 1 ? 'bg-danger-500/10 text-danger-500' :
+                          profileData.type === 2 ? 'bg-warning-300/10 text-warning-300' :
+                          'bg-primary-500/10 text-primary-500'
+                        }`}>
+                          {getUserTypeLabel(profileData.type)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-dark-400">Status:</span>
+                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                          profileData.status === 1 ? 'bg-success-500/10 text-success-500' : 'bg-danger-500/10 text-danger-500'
+                        }`}>
+                          {getUserStatusLabel(profileData.status)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-dark-400">Approval:</span>
+                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                          profileData.approved === 1 ? 'bg-success-500/10 text-success-500' :
+                          profileData.approved === 0 ? 'bg-warning-300/10 text-warning-300' :
+                          'bg-danger-500/10 text-danger-500'
+                        }`}>
+                          {getApprovalStatusLabel(profileData.approved)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-6">
                     <div className="sm:w-32">
                       <div className="aspect-square rounded-full bg-dark-700 overflow-hidden">
                         <img
-                          src={user?.avatar || "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150"}
+                          src={profileData.avatar || "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150"}
                           alt="Profile"
                           className="h-full w-full object-cover"
                         />
                       </div>
-                      <button className="mt-2 text-xs text-primary-500 hover:text-primary-400 w-full text-center">
+                      <button className="mt-2 text-xs text-primary-500 hover:text-primary-400 w-full text-center flex items-center justify-center">
+                        <Camera className="mr-1 h-3 w-3" />
                         <FormattedMessage id="settings.changePhoto" />
                       </button>
                     </div>
                     
                     <div className="flex-1 space-y-4">
                       <div>
-                        <label htmlFor="name" className="form-label">
+                        <label htmlFor="username" className="form-label">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          id="username"
+                          className="form-input"
+                          value={profileData.username}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, username: e.target.value }))}
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="fullName" className="form-label">
                           <FormattedMessage id="settings.name" />
                         </label>
                         <input
                           type="text"
-                          id="name"
+                          id="fullName"
                           className="form-input"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
+                          value={profileData.fullName || ''}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, fullName: e.target.value }))}
                         />
                       </div>
                       
@@ -134,8 +524,8 @@ export default function Settings() {
                           type="email"
                           id="email"
                           className="form-input"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          value={profileData.email}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                         />
                       </div>
                       
@@ -144,44 +534,56 @@ export default function Settings() {
                           <label htmlFor="timezone" className="form-label">
                             <FormattedMessage id="settings.timezone" />
                           </label>
-                          <select
-                            id="timezone"
-                            className="form-select"
-                            value={timezone}
-                            onChange={(e) => setTimezone(e.target.value)}
-                          >
-                            <option value="UTC">UTC</option>
-                            <option value="EST">Eastern Time (ET)</option>
-                            <option value="CST">Central Time (CT)</option>
-                            <option value="MST">Mountain Time (MT)</option>
-                            <option value="PST">Pacific Time (PT)</option>
-                          </select>
+                          <div className="relative">
+                            <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-dark-400" />
+                            <select
+                              id="timezone"
+                              className="form-select pl-10"
+                              value={profileData.timezone}
+                              onChange={(e) => setProfileData(prev => ({ ...prev, timezone: e.target.value }))}
+                            >
+                              <option value="UTC">UTC</option>
+                              <option value="EST">Eastern Time (ET)</option>
+                              <option value="CST">Central Time (CT)</option>
+                              <option value="MST">Mountain Time (MT)</option>
+                              <option value="PST">Pacific Time (PT)</option>
+                              <option value="GMT+7">GMT+7 (Vietnam)</option>
+                            </select>
+                          </div>
                         </div>
                         
                         <div>
                           <label htmlFor="language" className="form-label">
                             <FormattedMessage id="settings.language" />
                           </label>
-                          <select
-                            id="language"
-                            className="form-select"
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                          >
-                            <option value="en">English</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <option value="de">German</option>
-                            <option value="ja">Japanese</option>
-                          </select>
+                          <div className="relative">
+                            <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-dark-400" />
+                            <select
+                              id="language"
+                              className="form-select pl-10"
+                              value={profileData.language}
+                              onChange={(e) => setProfileData(prev => ({ ...prev, language: e.target.value }))}
+                            >
+                              <option value="en">English</option>
+                              <option value="vi">Tiếng Việt</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <button className="btn btn-primary">
-                      <Save className="mr-2 h-4 w-4" />
+                    <button 
+                      onClick={handleProfileSave}
+                      disabled={isSaving}
+                      className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
                       <FormattedMessage id="settings.saveChanges" />
                     </button>
                   </div>
@@ -210,6 +612,8 @@ export default function Settings() {
                           id="current-password"
                           className="form-input"
                           placeholder="••••••••"
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
                         />
                       </div>
                       
@@ -222,6 +626,8 @@ export default function Settings() {
                           id="new-password"
                           className="form-input"
                           placeholder="••••••••"
+                          value={passwordData.newPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
                         />
                       </div>
                       
@@ -234,12 +640,22 @@ export default function Settings() {
                           id="confirm-password"
                           className="form-input"
                           placeholder="••••••••"
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                         />
                       </div>
                     </div>
                     
-                    <button className="btn btn-primary mt-4">
-                      <Lock className="mr-2 h-4 w-4" />
+                    <button 
+                      onClick={handlePasswordChange}
+                      disabled={isSaving}
+                      className="btn btn-primary mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      ) : (
+                        <Lock className="mr-2 h-4 w-4" />
+                      )}
                       <FormattedMessage id="settings.updatePassword" />
                     </button>
                   </div>
@@ -294,22 +710,42 @@ export default function Settings() {
                     API keys allow you to connect your exchange accounts and automate your trading strategies.
                   </p>
                   
-                  <div className="card bg-dark-700 p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium">Binance API Key</p>
-                        <p className="text-xs text-dark-400">Connected 30 days ago • Last used 2 hours ago</p>
+                  <div className="space-y-4">
+                    {apiKeys.map((apiKey) => (
+                      <div key={apiKey.id} className="card bg-dark-700 p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium">{apiKey.name}</p>
+                            <p className="text-xs text-dark-400">
+                              {apiKey.exchange} • Created {new Date(apiKey.createdAt).toLocaleDateString()}
+                              {apiKey.lastUsed && ` • Last used ${new Date(apiKey.lastUsed).toLocaleDateString()}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              apiKey.status === 'active' 
+                                ? 'bg-success-500/10 text-success-500' 
+                                : 'bg-dark-600 text-dark-300'
+                            }`}>
+                              {apiKey.status}
+                            </span>
+                            <button className="btn btn-outline py-1 px-3 text-xs">Edit</button>
+                            <button 
+                              onClick={() => handleDeleteApiKey(apiKey.id)}
+                              className="btn btn-outline py-1 px-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button className="btn btn-outline py-1 px-3 text-xs">Edit</button>
-                        <button className="btn btn-outline py-1 px-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10">
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                   
-                  <button className="btn btn-primary">
+                  <button 
+                    onClick={() => setShowAddApiKey(true)}
+                    className="btn btn-primary"
+                  >
                     <Key className="mr-2 h-4 w-4" />
                     Connect New API Key
                   </button>
@@ -328,49 +764,39 @@ export default function Settings() {
                     <h3 className="text-base font-medium mb-4">Email Notifications</h3>
                     
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Bot Activity</p>
-                          <p className="text-xs text-dark-400">Get notified when your bots complete trades</p>
+                      {Object.entries(notificationSettings.emailNotifications).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {key === 'botActivity' && 'Bot Activity'}
+                              {key === 'marketAlerts' && 'Market Alerts'}
+                              {key === 'securityAlerts' && 'Security Alerts'}
+                              {key === 'newsletter' && 'Newsletter'}
+                            </p>
+                            <p className="text-xs text-dark-400">
+                              {key === 'botActivity' && 'Get notified when your bots complete trades'}
+                              {key === 'marketAlerts' && 'Get notified about significant market movements'}
+                              {key === 'securityAlerts' && 'Get notified about security events on your account'}
+                              {key === 'newsletter' && 'Receive our weekly newsletter with updates and tips'}
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="sr-only peer" 
+                              checked={value}
+                              onChange={(e) => setNotificationSettings(prev => ({
+                                ...prev,
+                                emailNotifications: {
+                                  ...prev.emailNotifications,
+                                  [key]: e.target.checked
+                                }
+                              }))}
+                            />
+                            <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+                          </label>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Market Alerts</p>
-                          <p className="text-xs text-dark-400">Get notified about significant market movements</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Security Alerts</p>
-                          <p className="text-xs text-dark-400">Get notified about security events on your account</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Newsletter</p>
-                          <p className="text-xs text-dark-400">Receive our weekly newsletter with updates and tips</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
+                      ))}
                     </div>
                   </div>
                   
@@ -378,33 +804,49 @@ export default function Settings() {
                     <h3 className="text-base font-medium mb-4">Push Notifications</h3>
                     
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Trading Signals</p>
-                          <p className="text-xs text-dark-400">Get notified about new trading signals</p>
+                      {Object.entries(notificationSettings.pushNotifications).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {key === 'tradingSignals' && 'Trading Signals'}
+                              {key === 'priceAlerts' && 'Price Alerts'}
+                            </p>
+                            <p className="text-xs text-dark-400">
+                              {key === 'tradingSignals' && 'Get notified about new trading signals'}
+                              {key === 'priceAlerts' && 'Get notified when prices hit your target levels'}
+                            </p>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="sr-only peer" 
+                              checked={value}
+                              onChange={(e) => setNotificationSettings(prev => ({
+                                ...prev,
+                                pushNotifications: {
+                                  ...prev.pushNotifications,
+                                  [key]: e.target.checked
+                                }
+                              }))}
+                            />
+                            <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+                          </label>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Price Alerts</p>
-                          <p className="text-xs text-dark-400">Get notified when prices hit your target levels</p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" className="sr-only peer" defaultChecked />
-                          <div className="w-11 h-6 bg-dark-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
-                        </label>
-                      </div>
+                      ))}
                     </div>
                   </div>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <button className="btn btn-primary">
-                      <Save className="mr-2 h-4 w-4" />
+                    <button 
+                      onClick={handleNotificationSave}
+                      disabled={isSaving}
+                      className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
                       <FormattedMessage id="settings.saveChanges" />
                     </button>
                   </div>

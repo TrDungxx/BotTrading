@@ -1,6 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2 } from 'lucide-react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
+import TradingViewChart from '../TradingViewChart';
+// Generate mock candlestick data
+const generateCandlestickData = (days: number) => {
+  const data = [];
+  let date = new Date();
+  date.setDate(date.getDate() - days);
+  
+  let price = 38000;
+  
+  for (let i = 0; i < days * 24; i++) {
+    const open = price + (Math.random() - 0.5) * 200;
+    const high = open + Math.random() * 100;
+    const low = open - Math.random() * 100;
+    const close = (high + low) / 2;
+    
+    date.setHours(date.getHours() + 1);
+    
+    data.push({
+      time: Math.floor(date.getTime() / 1000),
+      open,
+      high,
+      low,
+      close,
+    });
+    
+    price = close;
+  }
+  
+  return data;
+};
 
 // Mock data for the orderbook
 const generateOrderbook = () => {
@@ -334,11 +364,8 @@ export default function TradingTerminal() {
               </button>
             </div>
           </div>
-          <div className="flex-1 bg-dark-800 flex items-center justify-center">
-            <div className="text-dark-400 text-center">
-              <BarChart className="h-16 w-16 mx-auto mb-4 opacity-50" />
-              <p>Chart placeholder - Trading view would be integrated here</p>
-            </div>
+          <div className="flex-1">
+            <TradingViewChart data={generateCandlestickData(7)} />
           </div>
         </div>
         

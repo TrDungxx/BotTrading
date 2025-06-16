@@ -1,25 +1,63 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, BarChart3, Bot, Briefcase, LayoutDashboard, Lock, ShoppingBag, X } from 'lucide-react';
+import { Activity, BarChart3, Bot, Briefcase, LayoutDashboard, Lock, ShoppingBag, History, X, Shield, LineChart, Users, Settings as SettingsIcon, Building2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FormattedMessage } from 'react-intl';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   open: boolean;
   setOpen: (open: boolean) => void;
 }
 
+// Base navigation - available to all authenticated users
 const navigation = [
-  { name: <FormattedMessage id="nav.dashboard" />, href: '/', icon: LayoutDashboard },
-  { name: <FormattedMessage id="nav.tradingBots" />, href: '/bots', icon: Bot },
-  { name: <FormattedMessage id="nav.portfolio" />, href: '/portfolio', icon: Briefcase },
-  { name: <FormattedMessage id="nav.tradingTerminal" />, href: '/terminal', icon: Activity },
-  { name: <FormattedMessage id="nav.marketAnalysis" />, href: '/market', icon: BarChart3 },
-  { name: <FormattedMessage id="nav.marketplace" />, href: '/marketplace', icon: ShoppingBag },
+  //{ name: <FormattedMessage id="nav.dashboard" />, href: '/', icon: LayoutDashboard },
+  //{ name: <FormattedMessage id="nav.marketAnalysis" />, href: '/market', icon: BarChart3 },
+  //{ name: <FormattedMessage id="nav.marketplace" />, href: '/marketplace', icon: ShoppingBag },
+];
+
+// Authenticated user navigation - only for logged in users
+const authenticatedNavigation = [
+  //{ name: <FormattedMessage id="nav.tradingBots" />, href: '/bots', icon: Bot },
+  //{ name: <FormattedMessage id="nav.portfolio" />, href: '/portfolio', icon: Briefcase },
+  //{ name: <FormattedMessage id="nav.tradingTerminal" />, href: '/terminal', icon: Activity },
+  { name: "Config Bot", href: '/config-bot', icon: SettingsIcon },
+  { name: "Indicators", href: '/indicators', icon: LineChart },
+  { name: "Binance Accounts", href: '/binance-accounts', icon: Building2 },
+  { name: <FormattedMessage id="nav.orderHistory" />, href: '/history', icon: History },
   { name: <FormattedMessage id="nav.settings" />, href: '/settings', icon: Lock },
 ];
 
+// Admin navigation - chỉ hiển thị cho type 1
+const adminNavigation = [
+  { name: "Admin Dashboard", href: '/admin', icon: Shield },
+  //{ name: "User Management", href: '/admin/users', icon: Users },
+  //{ name: "System Settings", href: '/admin/settings', icon: SettingsIcon },
+];
+
+
+
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
+  const { user, isGuestMode, isAuthenticated } = useAuth();
+  
+  // Xác định navigation items dựa trên authentication status và user type
+  let finalNavigation = [...navigation];
+  
+  if (isAuthenticated && user) {
+    // Add authenticated user navigation
+    finalNavigation = [...finalNavigation, ...authenticatedNavigation];
+    
+    // Type 1 (Admin) - có quyền cao nhất, thấy tất cả
+    if ([1, 2, 99].includes(user.type)) {
+  finalNavigation = [...finalNavigation, ...adminNavigation];
+}
+   
+    // Type 3 (User) - chỉ thấy navigation cơ bản + authenticated navigation
+  } else if (isGuestMode) {
+    // Guest mode - chỉ có basic navigation
+    finalNavigation = navigation;
+  }
   
   return (
     <>
@@ -57,7 +95,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         </div>
         
         <nav className="mt-4 px-2 space-y-1">
-          {navigation.map((item) => {
+          {finalNavigation.map((item) => {
             const isActive = location.pathname === item.href;
             return (
               <Link
@@ -99,7 +137,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         
         <div className="flex flex-1 flex-col overflow-y-auto">
           <nav className="mt-4 px-3 space-y-1">
-            {navigation.map((item) => {
+            {finalNavigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -124,19 +162,58 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
             })}
           </nav>
           
+          {/* User info section */}
           <div className="mt-auto p-4">
+            {isAuthenticated && user && (
+              <div className="mb-4 p-3 bg-dark-700/50 rounded-lg">
+                <div className="flex items-center gap-x-3">
+                  <div className="h-10 w-10 rounded-full bg-dark-600 flex items-center justify-center">
+                    <span className="text-sm font-medium">{user.username?.[0]?.toUpperCase()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-dark-200 truncate">{user.username}</p>
+                    <p className="text-xs text-dark-400">
+  {user.type === 1
+    ? 'Admin'
+    : [2, 99].includes(user.type)
+    ? 'SuperAdmin'
+    : 'User'}
+</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {isGuestMode && (
+              <div className="mb-4 p-3 bg-warning-300/10 rounded-lg border border-warning-300/20">
+                <div className="flex items-center gap-x-3">
+                  <div className="h-10 w-10 rounded-full bg-warning-300/20 flex items-center justify-center">
+                    <span className="text-sm font-medium text-warning-300">G</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-warning-300">Guest Mode</p>
+                    <p className="text-xs text-warning-300/80">Limited Access</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="rounded-md bg-dark-700/50 p-3">
               <div className="flex items-center gap-x-3">
-                <div className="h-10 w-10 rounded-full bg-dark-600 flex items-center justify-center">
+                <div className="h-10 w-10 rounded-md bg-dark-600 flex items-center justify-center">
                   <Bot className="h-5 w-5 text-primary-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-dark-300">Upgrade to Pro</p>
-                  <p className="text-xs text-dark-400">Get advanced features</p>
+                  <p className="text-xs font-medium text-dark-300">
+                    {isAuthenticated ? 'Upgrade to Pro' : 'Sign up for Pro'}
+                  </p>
+                  <p className="text-xs text-dark-400">
+                    {isAuthenticated ? 'Get advanced features' : 'Get full access'}
+                  </p>
                 </div>
               </div>
               <button className="mt-3 w-full rounded-md bg-primary-500 py-1.5 text-xs font-medium text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-800">
-                Upgrade Now
+                {isAuthenticated ? 'Upgrade Now' : 'Sign Up'}
               </button>
             </div>
           </div>

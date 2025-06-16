@@ -107,3 +107,67 @@
     @apply bg-dark-600 text-dark-200;
   }
 }
+@layer utilities {
+  /* 📱 Responsive fix cho bảng trên iPhone 13 trở xuống */
+  @media (max-width: 480px) {
+    table {
+      min-width: 100% !important;
+    }
+
+    table th,
+    table td {
+      padding-left: 0.5rem !important;
+      padding-right: 0.5rem !important;
+      font-size: 0.75rem !important;
+      white-space: normal !important;
+    }
+
+    .badge {
+      font-size: 0.65rem !important;
+      padding: 0.25rem 0.4rem !important;
+    }
+
+    .btn {
+      font-size: 0.75rem !important;
+      padding-left: 0.75rem !important;
+      padding-right: 0.75rem !important;
+    }
+
+    .form-input,
+    .form-select {
+      font-size: 0.75rem !important;
+      padding-left: 0.75rem !important;
+      padding-right: 0.75rem !important;
+    }
+
+    .card {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+}
+
+@layer utilities {
+  @media (max-width: 480px) {
+    .configbot-table {
+      min-width: 100% !important;
+      table-layout: auto !important;
+    }
+
+    .configbot-table th,
+    .configbot-table td {
+      padding: 0.5rem !important;
+      font-size: 0.75rem !important;
+    }
+
+    .configbot-table td {
+      white-space: nowrap !important;
+    }
+
+    .configbot-table td.break-words {
+      white-space: normal !important;
+    }
+  }
+}
+
+

@@ -4,7 +4,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import { useAuth } from '../../context/AuthContext';
 
-export default function AppLayout() {
+export default function GuestLayout() {
   const { isAuthenticated, isGuestMode } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   
@@ -20,9 +20,14 @@ export default function AppLayout() {
     return () => window.removeEventListener('resize', handleResize);
   }, [sidebarOpen]);
   
-  // Chỉ cho phép truy cập nếu đã authenticated (không cho phép guest mode truy cập protected routes)
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  // Redirect authenticated users to main app
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  
+  // Allow guest mode access
+  if (!isGuestMode) {
+    return <Navigate to="/login\" replace />;
   }
   
   return (
@@ -33,6 +38,23 @@ export default function AppLayout() {
         <Header setSidebarOpen={setSidebarOpen} />
         <main className="flex-1 p-4 lg:p-6 mt-16 lg:ml-64">
           <div className="container mx-auto max-w-7xl">
+            {/* Guest mode banner */}
+            <div className="mb-6 p-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-warning-300">Guest Mode</h3>
+                  <p className="text-xs text-warning-300/80 mt-1">
+                    You're viewing in guest mode with limited access. Sign in for full features.
+                  </p>
+                </div>
+                <a
+                  href="/login"
+                  className="btn btn-primary py-2 px-4 text-sm"
+                >
+                  Sign In
+                </a>
+              </div>
+            </div>
             <Outlet />
           </div>
         </main>
