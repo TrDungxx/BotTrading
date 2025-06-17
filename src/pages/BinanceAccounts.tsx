@@ -168,22 +168,35 @@ const handleUpdateAccount = async () => {
       Description: formData.Description || null
     };
 
-    console.log('📝 Payload update gửi đi:', payload);
-    await binanceAccountApi.updateAccount(editingAccount.id, payload);
-    setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
+    if (user?.role === 'user') {
+      await binanceAccountApi.updateMyAccount(editingAccount.id, payload);
+    } else {
+      await binanceAccountApi.updateAccount(editingAccount.id, payload);
+    }
 
-    // ✅ Sửa tại đây:
-    fetchAccounts(); // hoặc loadAccounts() nếu bạn đã định nghĩa
+    setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
+    fetchAccounts();
     setIsFormOpen(false);
     setEditingAccount(null);
     resetForm();
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Lỗi khi cập nhật account:', error);
+
+    // ✅ Xử lý lỗi token hết hạn
+    if (error?.response?.status === 401) {
+      setMessage({ type: 'error', text: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+      logout(); // Gọi từ useAuth
+      return;
+    }
+
     setMessage({ type: 'error', text: 'Cập nhật tài khoản thất bại' });
   } finally {
     setIsSaving(false);
   }
 };
+
+
+
 
   const handleEdit = (account: BinanceAccount) => {
     setEditingAccount(account);
