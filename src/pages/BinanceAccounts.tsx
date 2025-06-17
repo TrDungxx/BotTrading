@@ -39,9 +39,11 @@ export default function BinanceAccounts() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 const { user } = useAuth(); // lấy thông tin user hiện tại
 const getAccounts = () => {
-  return user?.role === 'admin'
-    ? binanceAccountApi.getListAccounts()
-    : binanceAccountApi.getMyAccounts();
+  if (user?.role === 'admin' || user?.role === 'superadmin') {
+    return binanceAccountApi.getListAccounts(); // ✅ API cho admin/superadmin
+  } else {
+    return binanceAccountApi.getMyAccounts();   // ✅ API cho user thường
+  }
 };
 
   const [formData, setFormData] = useState<BinanceAccountForm>({
@@ -62,8 +64,7 @@ const getAccounts = () => {
   const fetchAccounts = async () => {
   setIsLoading(true);
   try {
-    const response = await getAccounts(); // ✅ gọi theo role
-
+    const response = await getAccounts();
     const raw = response?.Data?.accounts || [];
     setAccounts(raw);
   } catch (error) {
@@ -73,6 +74,7 @@ const getAccounts = () => {
     setIsLoading(false);
   }
 };
+
 
 
 

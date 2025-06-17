@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowDown, ArrowUp, Search, Filter, Calendar, RefreshCw, Plus, Edit, Trash2, Save, XCircle, AlertTriangle } from 'lucide-react';
 import { FormattedMessage, FormattedNumber, FormattedDate } from 'react-intl';
 import { orderHistoryApi, ApiError, API_BASE_URL } from '../utils/api';
-
+import { useAuth } from '../context/AuthContext';
 interface Order {
   orderId: string;
   symbol: string;
@@ -64,7 +64,7 @@ export default function OrderHistory() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
-  
+  const { user } = useAuth();
   // Use ref to prevent double calls
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -99,7 +99,12 @@ const SHOW_ADD_ORDER=false;
 
     console.log(`📡 Fetching orders for page ${pageNum}...`);
 
-    const response = await orderHistoryApi.getAllOrderHistory(pageNum, 20);
+    let response;
+if (user?.role === 'user') {
+  response = await orderHistoryApi.getMyOrderHistory(); // ✅ API dành cho user
+} else {
+  response = await orderHistoryApi.getAllOrderHistory(pageNum, 20); // ✅ chỉ cho admin
+}
 
     if (response.Data && Array.isArray(response.Data.orders)) {
       const orders = response.Data.orders;

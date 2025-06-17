@@ -272,17 +272,41 @@ export const accountApi = {
 };
 // -------------------- Indicator API --------------------
 export const indicatorApi = {
-  getAllIndicatorConfigs: () =>
-    apiRequest('/m-sys/indicators', { method: 'GET' }),
 
 getPublicActiveIndicators: () =>
   apiRequest('/m-sys/indicators/public-active', { method: 'GET' }),
+
+getMyActiveIndicators: () =>
+  apiRequest('/m-sys/indicators/my-active', { method: 'GET' }),
+
+
+//----------------- Admin Indicator API --------------------
+
+  getAllIndicatorConfigs: () =>
+    apiRequest('/m-sys/indicators', { method: 'GET' }),
+
+getIndicatorConfigById: (id: number) =>
+  apiRequest(`/m-sys/indicators/getById?id=${id}`, { method: 'GET' }),
+
+createIndicatorConfig: (payload: any) =>
+  apiRequest('/m-sys/indicators/create', { method: 'POST', body: payload }),
+
+updateIndicatorConfig: (payload: any) =>
+  apiRequest('/m-sys/indicators/update', { method: 'PUT', body: payload }),
+
+getActiveIndicators: () =>
+  apiRequest('/m-sys/indicators/active/all', { method: 'GET' }),
 
 getIndicatorStats: () =>
   apiRequest('/m-sys/indicators/stats', { method: 'GET' }),
 
 toggleIndicatorStatus: (id: number) =>
   apiRequest('/m-sys/indicators/toggle-status', { method: 'PUT', body: { id } }),
+
+//----------------- SuperAdmin Indicator API --------------------
+
+deleteIndicatorConfig: (id: number) =>
+  apiRequest(`/m-sys/indicators/delete?id=${id}`, { method: 'DELETE' }),
 
 bulkUpdateIndicators: (payload: any) =>
   apiRequest('/m-sys/indicators/bulk-update', { method: 'PUT', body: payload }),

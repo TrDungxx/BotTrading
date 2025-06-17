@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { indicatorApi } from '../utils/api';
-
+import { useAuth } from '../context/AuthContext';
 interface Indicator {
   id: number;
   Name: string;
@@ -23,6 +23,10 @@ export default function Indicators() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingIndicator, setEditingIndicator] = useState<Indicator | null>(null);
   const [deletingIndicator, setDeletingIndicator] = useState<Indicator | null>(null);
+  const { user } = useAuth();
+  const [tvPopupOpen, setTvPopupOpen] = useState(false);
+const [selectedIndicator, setSelectedIndicator] = useState<any | null>(null);
+const [messageContent, setMessageContent] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Omit<Indicator, 'id' | 'create_time' | 'update_time'>>({
     Name: '',
@@ -40,7 +44,12 @@ export default function Indicators() {
     console.log('✅ Mapped indicators:', indicators);
   const fetchIndicators = async () => {
     try {
-      const response = await indicatorApi.getAllIndicatorConfigs();
+      let response;
+if (user?.role === 'admin' || user?.role === 'superadmin') {
+  response = await indicatorApi.getAllIndicatorConfigs(); // Admin xem tất cả
+} else {
+  response = await indicatorApi.getMyActiveIndicators(); // User chỉ xem indicator được gán cho họ
+}
       const rawIndicators = response?.Data?.indicators ?? [];
 
 
@@ -161,6 +170,43 @@ const loadIndicators = async () => {
     console.error('❌ Lỗi khi fetch indicators:', err);
   }
 };
+const openTvPopup = (indicator: any) => {
+  setSelectedIndicator(indicator);
+  setMessageContent(null); // reset nếu có message trước
+  setTvPopupOpen(true);
+};
+const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
+  let message = {
+    indicatorMessage: {
+      strategy: type.includes("exit") ? "Road sys" : "Ai sys",
+      indicator: type.includes("exit") ? "z-Trend-1" : selectedIndicator?.Name || "Unknown",
+      type: type === 'long' ? 'long' : type === 'short' ? 'short' : 'exit',
+      action: type === 'short' || type === 'exit_short' ? 'SELL entry' : 'BUY entry',
+      position: type === 'short' || type === 'exit_short' ? 'SELL' : 'BUY',
+      general: {
+        ticker: "{{ticker}}",
+        exchange: "{{exchange}}",
+        interval: "{{interval}}",
+        time: "{{time}} ",
+        timenow: "{{timenow}}"
+      },
+      symbolData: {
+        volume: "{{volume}}",
+        high: "{{high}}",
+        open: "{{open}}",
+        close: "{{close}}"
+      },
+      currency: {
+        quote: "{{syminfo.currency}}",
+        base: "{{syminfo.basecurrency}}"
+      }
+    }
+  };
+
+  setMessageContent(JSON.stringify(message, null, 2));
+};
+
+
 
   return (
     <div className="space-y-6">
@@ -248,6 +294,12 @@ const loadIndicators = async () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex justify-end space-x-2">
+                      <button
+    className="text-dark-400 hover:text-yellow-500"
+    onClick={() => openTvPopup(indicator)}
+  >
+    📈
+  </button>
                       <button
                         className="text-dark-400 hover:text-primary-500"
                         onClick={() => handleEdit(indicator)}
@@ -453,6 +505,38 @@ const loadIndicators = async () => {
           </div>
         </div>
       )}
+
+
+      {tvPopupOpen && selectedIndicator && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div className="bg-white dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative">
+      <button
+        onClick={() => setTvPopupOpen(false)}
+        className="absolute top-2 right-2 text-dark-400 hover:text-danger-500"
+      >
+        ✖
+      </button>
+
+      <h2 className="text-xl font-semibold mb-4 text-center">
+        Signal Preview: {selectedIndicator.Name}
+      </h2>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <button className="btn btn-primary" onClick={() => showStaticMessage('long')}>Long Message</button>
+        <button className="btn btn-primary" onClick={() => showStaticMessage('short')}>Short Message</button>
+        <button className="btn btn-primary" onClick={() => showStaticMessage('exit_long')}>Exit Long</button>
+        <button className="btn btn-primary" onClick={() => showStaticMessage('exit_short')}>Exit Short</button>
+      </div>
+
+      {messageContent && (
+        <pre className="text-sm bg-dark-700 text-white p-4 rounded overflow-auto max-h-60">
+          {messageContent}
+        </pre>
+      )}
+    </div>
+  </div>
+)}
+
     </div>
   );
 }
