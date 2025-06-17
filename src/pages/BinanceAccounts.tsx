@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Save, XCircle, AlertTriangle, CheckCircle, Building2 } from 'lucide-react';
 import { FormattedDate, FormattedTime } from 'react-intl';
 import { binanceAccountApi } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
+
 
 interface BinanceAccount {
   id: number;
@@ -35,6 +37,12 @@ export default function BinanceAccounts() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+const { user } = useAuth(); // lấy thông tin user hiện tại
+const getAccounts = () => {
+  return user?.role === 'admin'
+    ? binanceAccountApi.getListAccounts()
+    : binanceAccountApi.getMyAccounts();
+};
 
   const [formData, setFormData] = useState<BinanceAccountForm>({
      Name: '',
@@ -52,25 +60,22 @@ export default function BinanceAccounts() {
   }, []);
 
   const fetchAccounts = async () => {
-    setIsLoading(true);
-    try {
-  const response = await binanceAccountApi.getListAccounts();
-  console.log('🔥 Raw response:', response);
+  setIsLoading(true);
+  try {
+    const response = await getAccounts(); // ✅ gọi theo role
 
-  // nếu response = { data: { ResponseCode, Description, Data: { accounts: [...] } } }
-  const raw = response?.Data?.accounts || [];
-  setAccounts(raw);
-  console.log('✅ accounts:', accounts);
-console.log('✅ filteredAccounts:', filteredAccounts);
+    const raw = response?.Data?.accounts || [];
+    setAccounts(raw);
+  } catch (error) {
+    console.error('Failed to fetch Binance accounts:', error);
+    setMessage({ type: 'error', text: 'Lỗi khi tải danh sách tài khoản Binance' });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-  console.log('📦 Accounts trả về:', raw);
-} catch (error) {
-  console.error('Failed to fetch Binance accounts:', error);
-  setMessage({ type: 'error', text: 'Lỗi khi tải danh sách tài khoản Binance' });
-} finally {
-  setIsLoading(false);
-}
-  };
+
+
 
   useEffect(() => {
     if (message) {
@@ -100,17 +105,17 @@ const filteredAccounts = query
 
   const handleCreateAccount = async () => {
   const payload = {
-  Name: formData.Name?.trim(),
-  Email: formData.Email?.trim(),
-  ApiKey: formData.ApiKey?.trim(),
-  SecretKey: formData.SecretKey?.trim(),
-  Status: 1,
-  internalAccountId: 1,
-  BinanceId: null,
-  Description: "Test from frontend"
-};
+    Name: formData.Name?.trim(),
+    Email: formData.Email?.trim(),
+    ApiKey: formData.ApiKey?.trim(),
+    SecretKey: formData.SecretKey?.trim(),
+    Status: 1,
+    internalAccountId: 1,
+    BinanceId: null,
+    Description: 'Test from frontend'
+  };
 
-  // ✅ Thêm kiểm tra bắt buộc ở đây
+  // ✅ Kiểm tra bắt buộc
   if (!payload.Name || !payload.Email || !payload.ApiKey || !payload.SecretKey) {
     setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ các trường bắt buộc' });
     return;
@@ -118,8 +123,16 @@ const filteredAccounts = query
 
   try {
     console.log('📤 Payload gửi đi:', payload);
-    await binanceAccountApi.createAccount(payload);
-    fetchAccounts(); // hoặc load lại danh sách nếu có
+
+    // ✅ Gọi đúng API theo role
+    if (user?.role === 'admin') {
+      await binanceAccountApi.createAccount(payload);
+    } else {
+      await binanceAccountApi.createMyAccount(payload);
+    }
+
+    // ✅ Load lại danh sách sau khi tạo thành công
+    fetchAccounts();
     setMessage({ type: 'success', text: 'Tạo tài khoản Binance thành công' });
     setIsFormOpen(false);
     resetForm();
@@ -128,6 +141,7 @@ const filteredAccounts = query
     setMessage({ type: 'error', text: 'Tạo tài khoản Binance thất bại' });
   }
 };
+
 
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -222,13 +236,23 @@ const handleUpdateAccount = async () => {
   const getStatusLabel = (status: number) => {
     return status === 1 ? 'Active' : 'Inactive';
   };
- const confirmDelete = () => {
-    if (deletingAccount) {
-      setAccounts(accounts.filter(account => account.id !== deletingAccount.id));
-      setDeletingAccount(null);
-      setMessage({ type: 'success', text: 'Binance account deleted successfully' });
-    }
-  };
+ const confirmDelete = async () => {
+  if (!deletingAccount) return;
+
+  try {
+    await binanceAccountApi.deleteAccount(deletingAccount.id);
+    setMessage({ type: 'success', text: 'Binance account deleted successfully' });
+    await loadAccounts(); // load lại danh sách từ server
+  } catch (error) {
+    console.error('Delete failed:', error);
+    setMessage({ type: 'error', text: 'Failed to delete account' });
+  } finally {
+    setDeletingAccount(null); // đóng modal
+  }
+};
+
+
+
 
 
 
@@ -578,37 +602,29 @@ const handleUpdateAccount = async () => {
 
       {/* Delete Confirmation Modal */}
       {deletingAccount && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
-                <AlertTriangle className="h-6 w-6 text-danger-500" />
-              </div>
-              
-              <h3 className="text-lg font-medium text-center mb-2">Delete Binance Account</h3>
-              
-              <p className="text-dark-400 text-center mb-6">
-                Are you sure you want to delete the account "{deletingAccount.Name}"? This action cannot be undone.
-              </p>
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+    <div className="bg-white dark:bg-dark-800 rounded-lg shadow-lg w-full max-w-md p-6">
+      <div className="text-center">
+        <AlertTriangle className="w-10 h-10 text-danger-500 mx-auto mb-4" />
+        <h2 className="text-lg font-semibold mb-2">Delete Binance Account</h2>
+        <p className="text-dark-400 mb-6">
+          Are you sure you want to delete <strong>{deletingAccount.Name}</strong>? This action cannot be undone.
+        </p>
+      </div>
 
-              <div className="flex justify-center space-x-3">
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setDeletingAccount(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn bg-danger-500 hover:bg-danger-600 text-white"
-                  onClick={confirmDelete}
-                >
-                  Delete Account
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="flex justify-center gap-4">
+        <button className="btn btn-outline" onClick={() => setDeletingAccount(null)}>
+          Cancel
+        </button>
+        <button className="btn bg-danger-500 hover:bg-danger-600 text-white" onClick={confirmDelete}>
+          Confirm Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">

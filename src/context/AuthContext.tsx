@@ -48,20 +48,29 @@ const [isAuthenticating, setIsAuthenticating] = useState(true); // ✅ thêm
     try {
       const res = await authApi.getCurrentUser();
       const apiUser = res.Data?.user;
+      console.log("Mapped user:", apiUser); 
+console.log("Final user role:", apiUser.role);
 
       if (!apiUser) {
         throw new Error('❌ API không trả về thông tin user');
       }
 
       const mappedUser: User = {
-        id: apiUser.id,
-        username: apiUser.username || apiUser.Username || '',
-        email: apiUser.email || apiUser.Email || '',
-        status: apiUser.status ?? apiUser.Status ?? 1,
-        type: apiUser.type ?? apiUser.Type ?? 3,
-        role: mapRole(apiUser.Role ?? apiUser.role ?? 0),
-
-      };
+  id: apiUser.id,
+  username: apiUser.Username || apiUser.username || '',
+  email: apiUser.Email || apiUser.email || '',
+  status: apiUser.Status ?? apiUser.status ?? 1,
+  type: apiUser.Type ?? apiUser.type ?? 3,
+  approved: apiUser.Approved ?? apiUser.approved ?? 1,
+  avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+  role: mapRole(
+    apiUser.Role ??
+    apiUser.role ??
+    apiUser.Type ?? // phải có dòng này
+    apiUser.type ??
+    0
+  )
+}
 
       setUser(mappedUser);
     } catch (error) {
@@ -75,9 +84,9 @@ const [isAuthenticating, setIsAuthenticating] = useState(true); // ✅ thêm
   fetchUser();
 }, []);
 
-function mapRole(role: number): 'admin' | 'superadmin' | 'user' {
-  if ([2, 99].includes(role)) return 'superadmin';
-  if (role === 1) return 'admin';
+function mapRole(role: number | string): 'admin' | 'superadmin' | 'user' {
+  if (role === 'superadmin' || role === 2 || role === 99) return 'superadmin';
+  if (role === 'admin' || role === 1) return 'admin';
   return 'user';
 }
 
@@ -102,27 +111,22 @@ if (!data.user) {
       // Handle both lowercase and uppercase field names from API
       const apiUser = data.user;
       console.log('User:', data.user);
-console.log('Role raw:', data.user.Role);
-console.log('Mapped role:', mapRole(data.user.Role ?? 0));
+console.log('Role raw:', apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type);
+
+console.log('Mapped role:', mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0));
+
 
       const mappedUser: User = {
-        id: apiUser.id,
-        // Handle both 'username' and 'Username'
-        username: apiUser.Username || apiUser.Username || '',
-        // Handle both 'email' and 'Email'  
-        email: apiUser.Email || apiUser.Email || '',
-        // Handle both 'status' and 'Status'
-        status: apiUser.Status !== undefined ? apiUser.Status : apiUser.Status || 1,
-        // Handle both 'type' and 'Type' - QUAN TRỌNG: giữ nguyên type từ API
-        type: apiUser.Type !== undefined ? apiUser.Type : apiUser.Type || 3,
-        // Handle both 'approved' and 'Approved'
-        approved: apiUser.Approved !== undefined ? apiUser.Approved : apiUser.Approved || 1,
-        avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
-        // Map type sang role dựa trên type từ API
-        role: mapRole(apiUser.Role ?? apiUser.role ?? 0)
-        
+  id: apiUser.id,
+  username: apiUser.Username || apiUser.username || '',
+  email: apiUser.Email || apiUser.email || '',
+  status: apiUser.Status ?? apiUser.status ?? 1,
+  type: apiUser.Type ?? apiUser.type ?? 3,
+  approved: apiUser.Approved ?? apiUser.approved ?? 1,
+  avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+  role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0), 
+};
 
-      };
       
       console.log('Mapped user:', mappedUser); // Debug log
       console.log('User type from API:', apiUser.Type || apiUser.Type); // Debug log

@@ -348,20 +348,53 @@ export const binanceAccountApi = {
 };
 
 
-//------------------------------ ConfigBot API ---------------------------
+//------------------------------ ConfigBot User API ---------------------------
 
 export const configBotAPI = {
-  getAllTradingStreams: () =>
-    apiRequest('/stream/getAll', { method: 'GET' }),
-
+  
   getMyTradingStreams: () =>
     apiRequest('/stream/my-streams', { method: 'GET' }),
+
+  
+  getMyTradingStreamById: (id: number) =>
+    apiRequest(`/stream/my-stream?id=${id}`, { method: 'GET' }),
+
+  
+  createMyTradingStream: (data: any) =>
+    apiRequest('/stream/create-my-stream', {
+      method: 'POST',
+      body: data,
+    }),
+
+  
+  updateMyTradingStream: (id: number, data: any) =>
+    apiRequest(`/stream/update-my-stream?id=${id}`, {
+      method: 'PUT',
+      body: data,
+    }),
+
+ 
+  deleteMyTradingStream: (id: number) =>
+    apiRequest(`/stream/delete-my-stream?id=${id}`, {
+      method: 'DELETE',
+    }),
+
+
+  
+
+
+//----------------------- quyen configbot admin api -------------------
+
+getAllTradingStreams: () =>
+    apiRequest('/stream/getAll', { method: 'GET' }),
 
   getTradingStreamById: (id: number) =>
     apiRequest(`/stream/getById?id=${id}`, { method: 'GET' }),
 
   createTradingStream: (data: any) =>
     apiRequest('/stream/create', { method: 'POST', body: data }),
+
+  
 
   updateTradingStream: (id: number, data: any) =>
     apiRequest(`/stream/update?id=${id}`, { method: 'PUT', body: data }),

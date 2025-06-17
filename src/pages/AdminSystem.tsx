@@ -50,7 +50,10 @@ export default function AdminSystem() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'users' | 'pending' | 'system'>('users');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<'all' | 1 | 2 | 3>('all');
+  const [selectedType, setSelectedType] = useState<'all' | 0 | 1 | 2>('all');
+
+
+
   const [selectedStatus, setSelectedStatus] = useState<'all' | 0 | 1 | 2>('all');
   const [selectedUser, setSelectedUser] = useState<typeof mockUsers[0] | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -62,12 +65,13 @@ export default function AdminSystem() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+
   // Form states
   const [createForm, setCreateForm] = useState<CreateAccountForm>({
     username: '',
     email: '',
     password: '',
-    type: 3, // Default to User
+    type: 0, // Default to User
     status: 1, // Default to Active
     approved: 1 // Default to Approved
   });
@@ -97,21 +101,28 @@ export default function AdminSystem() {
   }, [message]);
 
   const loadAccounts = async () => {
+    
   setIsLoading(true);
   try {
+    
     const response = await accountApi.getListAccount();
     const rawAccounts = response.Data.accounts || []; // ✅ Lấy mảng đúng
 
-    const accountList = rawAccounts.map((acc: any) => ({
-      id: acc.id,
-      username: acc.Username,
-      email: acc.Email,
-      type: acc.Type,
-      status: acc.Status,
-      approved: 1, // Hoặc acc.Approved nếu có
-      createdAt: acc.create_time,
-      lastLogin: acc.update_time,
-    }));
+    const accountList = rawAccounts.map((acc: any) => {
+  console.log('🔥 acc.Type:', acc.Type, '| typeof:', typeof acc.Type);
+
+  return {
+    id: acc.id,
+    username: acc.Username,
+    email: acc.Email,
+    type: typeof acc.Type === 'number' ? acc.Type : 0, // fix luôn ở đây
+    status: Number(acc.Status),
+    approved: 1,
+    createdAt: acc.create_time,
+    lastLogin: acc.update_time,
+  };
+});
+
 
     setAccounts(accountList);
   } catch (error) {
@@ -174,7 +185,6 @@ export default function AdminSystem() {
   try {
     const { id, username, email, type, status, fullName } = editForm;
 
-    // 🔒 payload chỉ gửi type nếu là superadmin
     const payload: any = {
       Username: username,
       Email: email,
@@ -182,11 +192,15 @@ export default function AdminSystem() {
       FullName: fullName || '',
     };
 
-    // ✅ chỉ thêm Type nếu user hiện tại là superadmin (type === 0)
-    if (user?.type !== 0) {
-  setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
-  return;
-}
+    // ✅ chỉ cho superadmin được update Type
+    if (user?.role !== 'superadmin') {
+      setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
+      return;
+    }
+
+    payload.Type = typeof type === 'number' ? type : 0;
+
+
 
     console.log('📤 Payload gửi lên:', payload);
 
@@ -203,6 +217,7 @@ export default function AdminSystem() {
     setIsSaving(false);
   }
 };
+
 
 
 
@@ -235,12 +250,7 @@ export default function AdminSystem() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  const getUserTypeLabel = (type: number) => {
-  if ([2, 99].includes(type)) return 'SuperAdmin';
-  if (type === 1) return 'Admin';
-  if (type === 3) return 'User';
-  return 'Unknown';
-};
+  
 
 
   const getUserTypeBadgeColor = (type: number) => {
@@ -308,6 +318,18 @@ export default function AdminSystem() {
       return `${diffInDays} ngày trước`;
     }
   };
+  function getUserTypeLabel(type: number | null | undefined): string {
+  switch (type) {
+    case 0: return 'User';
+    case 1: return 'Admin';
+    case 2: return 'SuperAdmin';
+    default: return 'Unknown';
+  }
+}
+
+
+
+
 
   return (
     
@@ -405,15 +427,19 @@ export default function AdminSystem() {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:flex-shrink-0">
               <select
-                className="form-select min-w-[140px]"
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value === 'all' ? 'all' : Number(e.target.value) as 1 | 2 | 3)}
-              >
-                <option value="all">All Types</option>
-                <option value={1}>Admin </option>
-                <option value={2}>SuperAdmin </option>
-                <option value={3}>User </option>
-              </select>
+  className="form-select min-w-[140px]"
+  value={selectedType}
+  onChange={(e) =>
+    setSelectedType(e.target.value === 'all' ? 'all' : Number(e.target.value) as 0 | 1 | 2)
+  }
+>
+  <option value="all">All Types</option>
+  <option value={0}>User</option>
+  <option value={1}>Admin</option>
+  <option value={2}>SuperAdmin</option>
+  
+</select>
+
               <select
                 className="form-select min-w-[120px]"
                 value={selectedStatus}
@@ -765,7 +791,7 @@ export default function AdminSystem() {
                     <option value={1}>Admin</option>
                     <option value={2}>SuperAdmin</option>
                     
-                    <option value={3}>User</option>
+                    <option value={0}>User</option>
                   </select>
                 </div>
 
@@ -852,12 +878,12 @@ export default function AdminSystem() {
                   <select
                     id="edit-type"
                     className="form-select"
-                    value={editForm.type || 3}
+                    value={editForm.type ?? 0}
                     onChange={(e) => setEditForm({ ...editForm, type: Number(e.target.value) })}
                   >
                     <option value={1}>Admin</option>
                     <option value={2}>SuperAdmin</option>
-                    <option value={3}>User</option>
+                    <option value={0}>User</option>
                   </select>
                 </div>
 

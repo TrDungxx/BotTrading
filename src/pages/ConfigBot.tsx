@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { FormattedDate, FormattedTime } from 'react-intl';
 import { configBotAPI } from '../utils/api';
-
+import { useAuth } from '../context/AuthContext';
 interface TradingStream {
   id: number;
   InternalAccountId: number;
@@ -76,10 +76,13 @@ export default function ConfigBot() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [togglingStream, setTogglingStream] = useState<TradingStream | null>(null);
+  const { user } = useAuth();
+
 
 const SHOW_TYPE = false;
 const SHOW_STREAM_STATUS = false;
-const SHOW_ORDER_PRICE = false;
+const SHOW_ORDER_PRICE = false  ;
 const SHOW_TREND = false;
 
 
@@ -124,12 +127,12 @@ const SHOW_TREND = false;
   const loadStreams = async () => {
   setIsLoading(true);
   try {
-    const res = await configBotAPI.getAllTradingStreams();
-    console.log('📥 API raw result:', res);
+    const response =
+      user?.role === 'admin' || user?.role === 'superadmin'
+        ? await configBotAPI.getAllTradingStreams()
+        : await configBotAPI.getMyTradingStreams(); // ✅ phân quyền đúng
 
-    const raw = res?.Data?.streams ?? []; // ✅ TRUY CẬP ĐÚNG
-    setStreams(raw);
-    console.log('✅ Gán streams:', raw);
+    setStreams(response.Data.streams || []);
   } catch (error) {
     console.error('Lỗi khi load streams:', error);
     setMessage({ type: 'error', text: 'Không thể tải danh sách stream' });
@@ -141,13 +144,22 @@ const SHOW_TREND = false;
 
 
   const confirmDelete = async () => {
-  if (!deletingStream) return;
+  if (!deletingStream || !deletingStream.id) {
+    console.error('❌ Không có stream để xóa');
+    return;
+  }
+
   try {
-    await configBotAPI.deleteTradingStream(deletingStream.id);
+    console.log('🧪 Đang xoá stream với ID:', deletingStream.id);
+    if (user?.role === 'superadmin') {
+  await configBotAPI.deleteTradingStream(deletingStream.id);
+} else {
+  await configBotAPI.deleteMyTradingStream(deletingStream.id);
+}
     setMessage({ type: 'success', text: 'Deleted successfully' });
     await loadStreams();
   } catch (error) {
-    console.error('Delete failed:', error);
+    console.error('❌ Delete failed:', error);
     setMessage({ type: 'error', text: 'Failed to delete stream' });
   } finally {
     setDeletingStream(null);
@@ -156,17 +168,20 @@ const SHOW_TREND = false;
 
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault(); // ✅ Ngăn reload form
 
-  // ✅ Validate trước khi submit
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault(); // Ngăn reload form
+
   const errors = validateForm(formData);
   if (errors.length > 0) {
-    setValidationErrors(errors); // hiển thị lỗi trên UI
+    setValidationErrors(errors);
+    console.log("⛔ Validation errors:", errors);
     return;
   }
 
-  setValidationErrors([]); // xoá lỗi nếu form valid
+  setValidationErrors([]);
   setIsSaving(true);
 
   const payload = {
@@ -176,7 +191,9 @@ const SHOW_TREND = false;
     Type: formData.Type,
     StrategyId: formData.StrategyId ? parseInt(formData.StrategyId) : null,
     indicatorId: parseInt(formData.indicatorId),
-    StreamStatus: formData.StreamStatus,
+    ...(SHOW_STREAM_STATUS
+    ? { StreamStatus: formData.StreamStatus }
+    : { StreamStatus: 'waiting for setup' }),
     StreamType: 0,
     TrailingStop: formData.TrailingStop,
     TrailingStopPercent: formData.TrailingStopPercent ? parseFloat(formData.TrailingStopPercent) : null,
@@ -187,23 +204,42 @@ const SHOW_TREND = false;
     thresholdPercent: formData.thresholdPercent ? parseFloat(formData.thresholdPercent) : null,
     Symbol: formData.Symbol,
     OrderId: formData.OrderId,
-    OrderPrice: parseFloat(formData.OrderPrice),
+    
+    ...(SHOW_ORDER_PRICE
+  ? { OrderPrice: parseFloat(formData.OrderPrice) }
+  : { OrderPrice: 1 }), // ✅ fallback mặc định khi ẩn
     StopLost: parseFloat(formData.StopLost),
     TakeProfit: parseFloat(formData.TakeProfit),
     CapitalUsageRatio: parseInt(formData.CapitalUsageRatio),
     Description: formData.Description,
-    TrendStatus: formData.TrendStatus,
-    TrendType: formData.TrendType
+    ...(SHOW_TREND
+  ? {
+      TrendStatus: formData.TrendStatus,
+      TrendType: formData.TrendType
+    }
+  : {
+      TrendStatus: 0, // ✅ fallback mặc định khi ẩn
+      TrendType: 'SIDEWAYS'
+    }),
+    //TrendType: formData.TrendType
   };
 
   console.log('📤 Payload gửi đi:', JSON.stringify(payload, null, 2));
 
   try {
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
     if (editingStream) {
-      await configBotAPI.updateTradingStream(editingStream.id, payload);
+      isAdmin
+        ? await configBotAPI.updateTradingStream(editingStream.id, payload)
+        : await configBotAPI.updateMyTradingStream(editingStream.id, payload);
+
       setMessage({ type: 'success', text: 'Updated successfully' });
     } else {
-      await configBotAPI.createTradingStream(payload);
+      isAdmin
+        ? await configBotAPI.createTradingStream(payload)
+        : await configBotAPI.createMyTradingStream(payload);
+
       setMessage({ type: 'success', text: 'Created successfully' });
     }
 
@@ -213,9 +249,8 @@ const SHOW_TREND = false;
     await loadStreams();
   } catch (error: any) {
     console.error('❌ Submit failed:', error);
-    console.log('📥 Server response:', error.response?.data);
+console.log('📥 Server response:', error.response);
 
-    // ✅ Nếu backend trả về mảng lỗi
     if (error.response?.data?.Errors?.length) {
       setValidationErrors(error.response.data.Errors);
     } else {
@@ -226,12 +261,22 @@ const SHOW_TREND = false;
   }
 };
 
+
   const validateForm = (form: TradingStreamForm): string[] => {
   const errors: string[] = [];
+if (SHOW_ORDER_PRICE) {
+  if (!form.OrderPrice || isNaN(Number(form.OrderPrice))) {
+    errors.push("Order Price is required and must be a number");
+  } else if (Number(form.OrderPrice) <= 0) {
+    errors.push("Order Price must be a positive number");
+  }
+}
 
   if (!form.Symbol) errors.push("Symbol is required");
   if (!form.Description) errors.push("Description is required");
-  if (!form.OrderPrice || isNaN(Number(form.OrderPrice))) errors.push("Order Price must be a valid number");
+  if (form.OrderPrice !== '' && isNaN(Number(form.OrderPrice))) {
+  errors.push("Order Price must be a valid number");
+}
   if (!form.StopLost || isNaN(Number(form.StopLost))) errors.push("Stop Loss must be a number");
   if (!form.TakeProfit || isNaN(Number(form.TakeProfit))) errors.push("Take Profit must be a number");
 
@@ -247,13 +292,19 @@ const SHOW_TREND = false;
   }
 
   if (form.ATR === 1) {
-    if (!form.ATRPercent || isNaN(Number(form.ATRPercent))) {
-      errors.push("ATR % must be a number");
-    }
-    if (!form.ATRValue || isNaN(Number(form.ATRValue))) {
-      errors.push("ATR Value must be a number");
-    }
+  // ✅ Kiểm tra ATRPercent là số
+  if (!form.ATRPercent || isNaN(Number(form.ATRPercent))) {
+    errors.push("ATR % must be a valid number");
+  } else if (!Number.isInteger(Number(form.ATRPercent))) {
+    errors.push("ATR % must be an integer");
   }
+
+  // ✅ Kiểm tra ATRValue (vẫn là float được)
+  if (!form.ATRValue || isNaN(Number(form.ATRValue))) {
+    errors.push("ATR Value must be a valid number");
+  }
+}
+
 
   if (form.thresholdPercent && isNaN(Number(form.thresholdPercent))) {
     errors.push("Threshold % must be a number");
@@ -321,6 +372,10 @@ const SHOW_TREND = false;
     setMessage({ type: 'error', text: 'Failed to update stream' });
   }
 };
+const confirmResumeOrPause = (stream: TradingStream) => {
+  setTogglingStream(stream); // Mở popup confirm
+};
+
 
 
 
@@ -696,6 +751,7 @@ const filteredStreams = streams.filter(stream => {
                         </span>
                       </div>
                     </td>)}
+                    {SHOW_TYPE &&(
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
                       <div>
                         <FormattedDate
@@ -712,44 +768,45 @@ const filteredStreams = streams.filter(stream => {
                           minute="2-digit"
                         />
                       </div>
-                    </td>
+                    </td>)}
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex justify-end space-x-2">
-                        {stream.Status === 1 ? (
-                          <button
-                            onClick={() => handleStatusToggle(stream, 2)}
-                            className="text-dark-400 hover:text-warning-300"
-                            title="Pause Stream"
-                          >
-                            <Pause className="h-4 w-4" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleStatusToggle(stream, 1)}
-                            className="text-dark-400 hover:text-success-500"
-                            title="Activate Stream"
-                          >
-                            <Play className="h-4 w-4" />
-                          </button>
-                        )}
-                        
-                        <button
-                          onClick={() => handleEdit(stream)}
-                          className="text-dark-400 hover:text-primary-500"
-                          title="Edit Stream"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        
-                        <button
-                          onClick={() => handleDelete(stream)}
-                          className="text-dark-400 hover:text-danger-500"
-                          title="Delete Stream"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+  <div className="flex justify-end space-x-2">
+    {stream.Status === 1 ? (
+      <button
+        onClick={() => confirmResumeOrPause(stream)}
+        className="text-dark-400 hover:text-warning-300"
+        title="Pause Stream"
+      >
+        <Pause className="h-4 w-4" />
+      </button>
+    ) : (
+      <button
+        onClick={() => confirmResumeOrPause(stream)}
+        className="text-dark-400 hover:text-success-500"
+        title="Activate Stream"
+      >
+        <Play className="h-4 w-4" />
+      </button>
+    )}
+
+    <button
+      onClick={() => handleEdit(stream)}
+      className="text-dark-400 hover:text-primary-500"
+      title="Edit Stream"
+    >
+      <Edit className="h-4 w-4" />
+    </button>
+
+    <button
+      onClick={() => handleDelete(stream)}
+      className="text-dark-400 hover:text-danger-500"
+      title="Delete Stream"
+    >
+      <Trash2 className="h-4 w-4" />
+    </button>
+  </div>
+</td>
+
                   </tr>
                 ))}
               </tbody>
@@ -780,14 +837,13 @@ const filteredStreams = streams.filter(stream => {
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Basic Information */}
               {validationErrors.length > 0 && (
-    <div className="bg-danger-500/10 text-danger-500 p-4 rounded-md border border-danger-500/30 mb-4">
-      <ul className="list-disc pl-5 space-y-1 text-sm">
-        {validationErrors.map((err, idx) => (
-          <li key={idx}>{err}</li>
-        ))}
-      </ul>
-    </div>
-  )}
+  <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-3 rounded mt-4 space-y-1 text-sm">
+    {validationErrors.map((error, index) => (
+      <div key={index}>• {error}</div>
+    ))}
+  </div>
+)}
+
               <div>
                 <h3 className="text-base font-medium mb-4">Basic Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -952,7 +1008,7 @@ const filteredStreams = streams.filter(stream => {
               <div>
                 <h3 className="text-base font-medium mb-4">Trading Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {SHOW_TYPE && (
+                  {SHOW_ORDER_PRICE && (
                   <div>
                     <label htmlFor="orderPrice" className="form-label">Order Price</label>
                     <input
@@ -1170,6 +1226,57 @@ const filteredStreams = streams.filter(stream => {
           </div>
         </div>
       )}
+
+      {/* Pause & Resume Confirmation Modal */}
+
+      {/* Pause/Resume Confirmation Modal */}
+      
+{togglingStream !== null && (
+  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+    <div className="card w-full max-w-md bg-white dark:bg-dark-800 rounded-lg shadow-lg">
+      <div className="p-6">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+          <AlertTriangle className="h-6 w-6 text-warning-500" />
+        </div>
+
+        <h3 className="text-lg font-medium text-center mb-2">
+          {togglingStream.Status === 1 ? 'Pause Trading Stream' : 'Resume Trading Stream'}
+        </h3>
+
+        <p className="text-dark-400 text-center mb-6">
+          Are you sure you want to {togglingStream.Status === 1 ? 'pause' : 'resume'} the stream{' '}
+          <span className="text-white font-semibold">{togglingStream.Description}</span>?
+        </p>
+
+        <div className="flex justify-center space-x-3">
+          <button
+            className="btn btn-outline"
+            onClick={() => setTogglingStream(null)}
+          >
+            Cancel
+          </button>
+
+          <button
+            className="btn bg-primary-500 hover:bg-primary-600 text-white"
+            onClick={async () => {
+              if (!togglingStream) return;
+              const nextStatus = togglingStream.Status === 1 ? 0 : 1;
+              await handleStatusToggle(togglingStream, nextStatus);
+              setTogglingStream(null);
+            }}
+          >
+            {togglingStream.Status === 1 ? 'Pause Stream' : 'Resume Stream'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+
+
 
       {/* Delete Confirmation Modal */}
       {deletingStream && (

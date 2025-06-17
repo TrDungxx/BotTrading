@@ -69,6 +69,10 @@ export default function OrderHistory() {
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+
+const SHOW_ADD_ORDER=false;
+
+
   const [formData, setFormData] = useState<OrderForm>({
     orderId: '',
     symbol: '',
