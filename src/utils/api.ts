@@ -372,7 +372,7 @@ export const binanceAccountApi = {
 };
 
 
-//------------------------------ ConfigBot User API ---------------------------
+//------------------------------ ConfigBot API ---------------------------
 
 export const configBotAPI = {
   
@@ -423,9 +423,14 @@ getAllTradingStreams: () =>
   updateTradingStream: (id: number, data: any) =>
     apiRequest(`/stream/update?id=${id}`, { method: 'PUT', body: data }),
 
+  
+
+  getTradingStreamStats: () =>
+    apiRequest('/stream/stats', { method: 'GET' }),
+
+  //----------------------- quyen configbot supper api -------------------
+
   deleteTradingStream: (id: number) =>
     apiRequest(`/stream/delete?id=${id}`, { method: 'DELETE' }),
 
-  getTradingStreamStats: () =>
-    apiRequest('/stream/stats', { method: 'GET' })
 };

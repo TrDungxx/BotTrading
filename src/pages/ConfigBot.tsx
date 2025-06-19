@@ -151,20 +151,23 @@ const SHOW_TREND = false;
 
   try {
     console.log('🧪 Đang xoá stream với ID:', deletingStream.id);
+    
     if (user?.role === 'superadmin') {
-  await configBotAPI.deleteTradingStream(deletingStream.id);
-} else {
-  await configBotAPI.deleteMyTradingStream(deletingStream.id);
-}
+      await configBotAPI.deleteTradingStream(deletingStream.id);
+    } else {
+      await configBotAPI.deleteMyTradingStream(deletingStream.id);
+    }
+
     setMessage({ type: 'success', text: 'Deleted successfully' });
-    await loadStreams();
+
+    await loadStreams(); // ✅ Đảm bảo stream reload xong mới xoá modal
+    setDeletingStream(null); // ✅ Reset sau khi UI cập nhật
   } catch (error) {
     console.error('❌ Delete failed:', error);
     setMessage({ type: 'error', text: 'Failed to delete stream' });
-  } finally {
-    setDeletingStream(null);
   }
 };
+
 
 
 
@@ -348,33 +351,37 @@ if (SHOW_ORDER_PRICE) {
   const handleDelete = (stream: TradingStream) => {
     setDeletingStream(stream);
   };
-
+const confirmResumeOrPause = (stream: TradingStream) => {
+  setTogglingStream(stream); // Mở popup confirm Pause/Resume
+};
   
 
   const handleStatusToggle = async (stream: TradingStream, newStatus: number) => {
-  if (!stream.id) {
-    console.error('❌ Không có stream.id', stream);
-    return;
-  }
-
   const payload = {
     ...stream,
     Status: newStatus,
-    update_time: new Date().toISOString().replace('T', ' ').replace('Z', '+07')
+    update_time: new Date().toISOString().replace('T', ' ').replace('Z', '+07'),
   };
 
   try {
-    await configBotAPI.updateTradingStream(stream.id, payload);
-    setMessage({ type: 'success', text: 'Stream updated' });
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+    await (isAdmin
+      ? configBotAPI.updateTradingStream(stream.id, payload)
+      : configBotAPI.updateMyTradingStream(stream.id, payload));
+
+    setMessage({
+      type: 'success',
+      text: `Stream ${newStatus === 1 ? 'resumed' : 'paused'} successfully`,
+    });
+
     await loadStreams();
   } catch (error) {
     console.error('❌ Update failed:', error);
-    setMessage({ type: 'error', text: 'Failed to update stream' });
+    setMessage({ type: 'error', text: 'Failed to change stream status' });
   }
 };
-const confirmResumeOrPause = (stream: TradingStream) => {
-  setTogglingStream(stream); // Mở popup confirm
-};
+
 
 
 

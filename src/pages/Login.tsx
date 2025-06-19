@@ -137,7 +137,7 @@ export default function Login() {
                   <div className="opacity-75">super</div>
                 </button>
                 <button
-                  onClick={() => handleQuickLogin('user', 'user123')}
+                  onClick={() => handleQuickLogin('trdung0107', 'limlim0107')}
                   className="px-2 py-1 bg-success-500/20 text-success-400 rounded text-left hover:bg-success-500/30 transition-colors"
                 >
                   <div className="font-medium">User</div>

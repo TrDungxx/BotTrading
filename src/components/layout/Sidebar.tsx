@@ -81,9 +81,9 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           <Link to="/" className="flex items-center">
             <div className="flex items-center gap-x-2">
               <div className="h-8 w-8 rounded-md bg-gradient-to-tr from-primary-600 to-primary-500 flex items-center justify-center text-white font-bold">
-                3C
+                TW
               </div>
-              <span className="text-lg font-semibold">3Commas</span>
+              {/*<span className="text-lg font-semibold">TW</span>*/}
             </div>
           </Link>
           <button
@@ -128,9 +128,9 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           <Link to="/" className="flex items-center">
             <div className="flex items-center gap-x-2">
               <div className="h-8 w-8 rounded-md bg-gradient-to-tr from-primary-600 to-primary-500 flex items-center justify-center text-white font-bold">
-                3C
+                TW
               </div>
-              <span className="text-lg font-semibold">3Commas</span>
+               {/*<span className="text-lg font-semibold">3Commas</span>*/}
             </div>
           </Link>
         </div>

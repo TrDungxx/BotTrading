@@ -376,17 +376,20 @@ if (user?.role === 'user') {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setEditingOrder(null);
-              resetForm();
-              setIsFormOpen(true);
-            }}
-            className="btn btn-primary"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Order
-          </button>
+         {/* {(user?.role === 'admin' || user?.role === 'superadmin') && (
+  <button
+    onClick={() => {
+      setEditingOrder(null);
+      resetForm();
+      setIsFormOpen(true);
+    }}
+    className="btn btn-primary"
+  >
+    <Plus className="mr-2 h-4 w-4" />
+    Add Order
+  </button>
+)}*/}
+
           <button
             onClick={handleRefresh}
             disabled={refreshing}
