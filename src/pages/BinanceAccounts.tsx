@@ -111,13 +111,12 @@ const filteredAccounts = query
     Email: formData.Email?.trim(),
     ApiKey: formData.ApiKey?.trim(),
     SecretKey: formData.SecretKey?.trim(),
-    Status: 1,
-    internalAccountId: 1,
-    BinanceId: null,
-    Description: 'Test from frontend'
+    Status: Number(formData.Status),
+    internalAccountId: Number(formData.internalAccountId), // ✅ Lấy từ form
+    BinanceId: formData.BinanceId || null,
+    Description: formData.Description || null
   };
 
-  // ✅ Kiểm tra bắt buộc
   if (!payload.Name || !payload.Email || !payload.ApiKey || !payload.SecretKey) {
     setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ các trường bắt buộc' });
     return;
@@ -126,14 +125,12 @@ const filteredAccounts = query
   try {
     console.log('📤 Payload gửi đi:', payload);
 
-    // ✅ Gọi đúng API theo role
     if (user?.role === 'admin') {
       await binanceAccountApi.createAccount(payload);
     } else {
       await binanceAccountApi.createMyAccount(payload);
     }
 
-    // ✅ Load lại danh sách sau khi tạo thành công
     fetchAccounts();
     setMessage({ type: 'success', text: 'Tạo tài khoản Binance thành công' });
     setIsFormOpen(false);
@@ -143,6 +140,7 @@ const filteredAccounts = query
     setMessage({ type: 'error', text: 'Tạo tài khoản Binance thất bại' });
   }
 };
+
 
 
 
@@ -215,19 +213,10 @@ const handleUpdateAccount = async () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (account: BinanceAccount) => {
-    setDeletingAccount(account);
-    try {
-      await binanceAccountApi.deleteAccount(account.id);
-      fetchAccounts();
-      setMessage({ type: 'success', text: 'Binance account deleted successfully' });
-    } catch (error) {
-      console.error('Failed to delete account:', error);
-      setMessage({ type: 'error', text: 'Failed to delete Binance account' });
-    } finally {
-      setDeletingAccount(null);
-    }
-  };
+  const handleDelete = (account: BinanceAccount) => {
+  setDeletingAccount(account); // ✅ chỉ mở modal
+};
+
 
   const resetForm = () => {
     setFormData({
@@ -257,14 +246,15 @@ const handleUpdateAccount = async () => {
   try {
     await binanceAccountApi.deleteAccount(deletingAccount.id);
     setMessage({ type: 'success', text: 'Binance account deleted successfully' });
-    await loadAccounts(); // load lại danh sách từ server
+    await fetchAccounts(); // refresh lại danh sách
   } catch (error) {
-    console.error('Delete failed:', error);
-    setMessage({ type: 'error', text: 'Failed to delete account' });
+    console.error('Failed to delete account:', error);
+    setMessage({ type: 'error', text: 'Failed to delete Binance account' });
   } finally {
     setDeletingAccount(null); // đóng modal
   }
 };
+
 
 
 
@@ -308,6 +298,64 @@ const handleUpdateAccount = async () => {
           </p>
         </div>
       )}
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="card p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
+                <Building2 className="h-4 w-4 text-primary-500" />
+              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-dark-400">Total Accounts</p>
+              <p className="text-lg font-semibold">{accounts.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
+                <CheckCircle className="h-4 w-4 text-success-500" />
+              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-dark-400">Active</p>
+              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 1).length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-300/10">
+                <Building2 className="h-4 w-4 text-warning-300" />
+              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-dark-400">Connected</p>
+              <p className="text-lg font-semibold">{accounts.filter(a => a.BinanceId).length}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-4">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
+                <XCircle className="h-4 w-4 text-danger-500" />
+              </div>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-dark-400">Inactive</p>
+              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 0).length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -641,64 +689,7 @@ const handleUpdateAccount = async () => {
 
 
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
-                <Building2 className="h-4 w-4 text-primary-500" />
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Total Accounts</p>
-              <p className="text-lg font-semibold">{accounts.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
-                <CheckCircle className="h-4 w-4 text-success-500" />
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Active</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 1).length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-300/10">
-                <Building2 className="h-4 w-4 text-warning-300" />
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Connected</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.BinanceId).length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
-                <XCircle className="h-4 w-4 text-danger-500" />
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Inactive</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 0).length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      
     </div>
   );
 }

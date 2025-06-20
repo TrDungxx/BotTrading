@@ -496,9 +496,9 @@ if (user?.role === 'user') {
                   <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
                     Date
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                   {/*<th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
                     Actions
-                  </th>
+                  </th>*/}
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-700">
@@ -590,7 +590,7 @@ if (user?.role === 'user') {
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-right">
+                    {/*<td className="whitespace-nowrap px-4 py-4 text-sm text-right">
                       <div className="flex justify-end space-x-2">
                         <button
                           className="text-dark-400 hover:text-primary-500"
@@ -605,7 +605,7 @@ if (user?.role === 'user') {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
-                    </td>
+                    </td>*/}
                   </tr>
                 ))}
               </tbody>

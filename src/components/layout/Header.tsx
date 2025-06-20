@@ -192,7 +192,7 @@ export default function Header({ setSidebarOpen }: HeaderProps) {
                     className="h-8 w-8 rounded-full object-cover"
                   />
                   <span className="hidden md:flex items-center gap-x-1 text-sm">
-                    {user?.name || <FormattedMessage id="header.user" />}
+                    {user?.username || <FormattedMessage id="header.user" />}
                     <ChevronDown className="h-4 w-4 text-dark-400" />
                   </span>
                 </button>

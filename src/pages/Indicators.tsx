@@ -176,10 +176,12 @@ const openTvPopup = (indicator: any) => {
   setTvPopupOpen(true);
 };
 const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
-  let message = {
+  if (!selectedIndicator) return;
+
+  const message = {
     indicatorMessage: {
-      strategy: type.includes("exit") ? "Road sys" : "Ai sys",
-      indicator: type.includes("exit") ? "z-Trend-1" : selectedIndicator?.Name || "Unknown",
+      strategy: selectedIndicator.Name,
+      indicator: selectedIndicator.Name,
       type: type === 'long' ? 'long' : type === 'short' ? 'short' : 'exit',
       action: type === 'short' || type === 'exit_short' ? 'SELL entry' : 'BUY entry',
       position: type === 'short' || type === 'exit_short' ? 'SELL' : 'BUY',
@@ -209,6 +211,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
 
 
   return (
+    <div className="w-full max-w-full overflow-x-hidden">
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -243,8 +246,8 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
       </div>
 
       <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-dark-700">
+        <div className="card overflow-x-auto w-full">
+          <table className="min-w-[800px] w-full table-auto divide-y divide-dark-700">
             <thead>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
@@ -509,7 +512,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
 
       {tvPopupOpen && selectedIndicator && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-    <div className="bg-white dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative">
+    <div className="bg-dark-900 dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative">
       <button
         onClick={() => setTvPopupOpen(false)}
         className="absolute top-2 right-2 text-dark-400 hover:text-danger-500"
@@ -518,7 +521,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
       </button>
 
       <h2 className="text-xl font-semibold mb-4 text-center">
-        Signal Preview: {selectedIndicator.Name}
+        Signal Preview: {selectedIndicator?.Name}
       </h2>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -529,7 +532,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
       </div>
 
       {messageContent && (
-        <pre className="text-sm bg-dark-700 text-white p-4 rounded overflow-auto max-h-60">
+        <pre className="text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all">
           {messageContent}
         </pre>
       )}
@@ -537,6 +540,8 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
   </div>
 )}
 
+
+    </div>
     </div>
   );
 }

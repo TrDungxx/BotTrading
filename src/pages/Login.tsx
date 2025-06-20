@@ -24,7 +24,7 @@ export default function Login() {
     setError('');
 
     try {
-      await login(username, password);
+      await login(username, password,rememberMe);
       
       // Lưu remember me preference
       if (rememberMe) {
@@ -227,7 +227,7 @@ export default function Login() {
                   id="username"
                   type="text"
                   required
-                  className="form-input pl-10"
+                  className="form-input pl-12 h-12 text-white placeholder:text-dark-400"
                   placeholder="Nhập tên đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -247,7 +247,7 @@ export default function Login() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   required
-                  className="form-input pl-10 pr-10"
+                  className="form-input pl-10 pr-10 h-12"
                   placeholder={intl.formatMessage({ id: 'auth.passwordPlaceholder' })}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
