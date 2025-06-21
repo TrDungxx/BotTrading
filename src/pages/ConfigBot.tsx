@@ -8,7 +8,7 @@ import { FormattedDate, FormattedTime } from 'react-intl';
 import { configBotAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { binanceAccountApi } from '../utils/api';
-
+import { indicatorApi } from '../utils/api';
 interface TradingStream {
   id: number;
   InternalAccountId: number;
@@ -36,6 +36,8 @@ interface TradingStream {
   TrendType: string;
   create_time: string;
   update_time: string;
+  Leverage: number | null;
+  MarginType: 'CROSS' | 'ISOLATED' | null;
 }
 
 interface TradingStreamForm {
@@ -48,7 +50,7 @@ MarginType?: string;
 
   Type: number;
   StrategyId: string;
-  indicatorId: string;
+  indicatorId: number;
   StreamStatus: string;
   TrailingStop: number;
   TrailingStopPercent: string;
@@ -83,6 +85,13 @@ export default function ConfigBot() {
   const [togglingStream, setTogglingStream] = useState<TradingStream | null>(null);
   const { user } = useAuth();
   const [myBinanceAccountId, setMyBinanceAccountId] = useState<string>('1');
+  const [leverage, setLeverage] = useState<number>(1);
+  const [marginType, setMarginType] = useState<'ISOLATED' | 'CROSS'>('CROSS');
+  const [indicators, setIndicators] = useState<{ id: number; name: string; symbol: string }[]>([]);
+
+
+  const [showLeveragePopup, setShowLeveragePopup] = useState(false);
+
 
 
 const SHOW_TYPE = false;
@@ -97,7 +106,7 @@ const SHOW_TREND = false;
     Status: 0,
     Type: 0,
     StrategyId: '',
-    indicatorId: '1',
+    indicatorId: 1,
     StreamStatus: 'waiting for setup',
     TrailingStop: 0,
     TrailingStopPercent: '',
@@ -115,8 +124,11 @@ const SHOW_TREND = false;
     Description: '',
     TrendStatus: 0,
     TrendType: 'SIDEWAYS',
-    StreamType: 0
+    StreamType: 0,
+    MarginType: 'CROSS',
+    Leverage: '1'
   });
+  
 
   useEffect(() => {
     loadStreams();
@@ -179,8 +191,11 @@ const SHOW_TREND = false;
 
 
 
-
   const handleSubmit = async (e: React.FormEvent) => {
+    if (formData.Description?.length > 255) {
+  alert("🛑 Mô tả không được vượt quá 255 ký tự!");
+  return;
+}
   e.preventDefault(); // Ngăn reload form
 
   const errors = validateForm(formData);
@@ -192,6 +207,13 @@ const SHOW_TREND = false;
 
   setValidationErrors([]);
   setIsSaving(true);
+  const cleanDescription =
+  formData.Description?.includes('Config Warning')
+    ? ''
+    : formData.Description
+        ?.replace(/\[.*?Warning:.*?\]/g, '') // lọc Warning từ đoạn giữa []
+        .trim()
+        .slice(0, 250) || 'No description';
 
   const payload = {
     InternalAccountId: parseInt(formData.InternalAccountId),
@@ -220,8 +242,11 @@ const SHOW_TREND = false;
     StopLost: parseFloat(formData.StopLost),
     TakeProfit: parseFloat(formData.TakeProfit),
     CapitalUsageRatio: parseInt(formData.CapitalUsageRatio),
-    Description: formData.Description,
-    Leverage: formData.Leverage ?? '1',
+    Description: cleanDescription,
+
+
+
+    Leverage: parseInt(formData.Leverage?.replace('x', '') || '1'),
     MarginType: formData.MarginType ?? 'ISOLATED',
     ...(SHOW_TREND
   ? {
@@ -328,32 +353,35 @@ if (SHOW_ORDER_PRICE) {
   const handleEdit = (stream: TradingStream) => {
     setEditingStream(stream);
     setFormData({
-      InternalAccountId: stream.InternalAccountId.toString(),
-    BinanceAccountId: stream.BinanceAccountId.toString(),
-    Status: stream.Status,
-    Type: stream.Type,
-    StrategyId: stream.StrategyId?.toString() || '',
-    indicatorId: stream.indicatorId.toString(),
-    StreamStatus: stream.StreamStatus,
-    TrailingStop: stream.TrailingStop,
-    TrailingStopPercent: stream.TrailingStopPercent?.toString() || '',
-    TrailingStopValue: stream.TrailingStopValue?.toString() || '',
-    ATR: stream.ATR,
-    ATRPercent: stream.ATRPercent?.toString() || '',
-    ATRValue: stream.ATRValue?.toString() || '',
-    thresholdPercent: stream.thresholdPercent?.toString() || '',
-    Symbol: stream.Symbol,
-    OrderId: stream.OrderId.toString(),
-    OrderPrice: stream.OrderPrice.toString(),
-    StopLost: stream.StopLost.toString(),
-    TakeProfit: stream.TakeProfit.toString(),
-    CapitalUsageRatio: stream.CapitalUsageRatio.toString(),
-    Description: stream.Description,
-    TrendStatus: stream.TrendStatus,
-    TrendType: stream.TrendType,
-    StreamType: (stream as any).StreamType ?? 0
+  InternalAccountId: stream.InternalAccountId.toString(),
+  BinanceAccountId: stream.BinanceAccountId.toString(),
+  Status: stream.Status,
+  Type: stream.Type,
+  StrategyId: stream.StrategyId?.toString() || '',
+  indicatorId: stream.indicatorId.toString(),
+  StreamStatus: stream.StreamStatus,
+  TrailingStop: stream.TrailingStop,
+  TrailingStopPercent: stream.TrailingStopPercent?.toString() || '',
+  TrailingStopValue: stream.TrailingStopValue?.toString() || '',
+  ATR: stream.ATR,
+  ATRPercent: stream.ATRPercent?.toString() || '',
+  ATRValue: stream.ATRValue?.toString() || '',
+  thresholdPercent: stream.thresholdPercent?.toString() || '',
+  Symbol: stream.Symbol,
+  OrderId: stream.OrderId.toString(),
+  OrderPrice: stream.OrderPrice.toString(),
+  StopLost: stream.StopLost.toString(),
+  TakeProfit: stream.TakeProfit.toString(),
+  CapitalUsageRatio: stream.CapitalUsageRatio.toString(),
+  Description: stream.Description?.replace(/\[.*?Warning:.*?\]/g, '').trim(),
+  TrendStatus: stream.TrendStatus,
+  TrendType: stream.TrendType,
+  StreamType: (stream as any).StreamType ?? 0,
+  // ✅ Bổ sung:
+  Leverage: stream.Leverage ? stream.Leverage.toString() + 'x' : '1x',
+  MarginType: stream.MarginType || 'CROSS'
+});
 
-    });
     setIsFormOpen(true);
   };
 
@@ -366,24 +394,35 @@ const confirmResumeOrPause = (stream: TradingStream) => {
   
 
   const handleStatusToggle = async (stream: any) => {
-    const updatedStatus = stream.Status === 1 ? 0 : 1;
+  const updatedStatus = stream.Status === 1 ? 0 : 1;
 
-    const updatedStream = {
-      ...stream,
-      Status: updatedStatus,
-      Leverage: stream.Leverage ?? '1', // ✅ fallback nếu bị null
-      MarginType: stream.MarginType ?? 'ISOLATED', // ✅ fallback nếu bị null
-    };
+  const updatedStream = {
+  ...stream,
+  Status: stream.Status === 1 ? 0 : 1,
+  Leverage: String(stream.Leverage ?? '1'),
+  MarginType: stream.MarginType ?? 'ISOLATED',
+  OrderPrice: parseFloat(stream.OrderPrice ?? '1'),
+  TakeProfit: parseFloat(stream.TakeProfit ?? '1'),
+  StopLost: parseFloat(stream.StopLost ?? '0.1'),
+  CapitalUsageRatio: parseInt(stream.CapitalUsageRatio ?? '10'),
+  Description: stream.Description?.split("[")[0] ?? 'Unnamed Stream',
+};
 
-    console.log('📦 Payload gửi đi:', updatedStream);
+console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
 
-    try {
-      await configBotAPI.updateTradingStream(stream.id, updatedStream);
-      console.log('✅ Update status thành công');
-    } catch (err) {
-      console.error('❌ Update failed:', err);
-    }
-  };
+  console.log('📦 Payload gửi đi:', updatedStream);
+
+  try {
+    await configBotAPI.updateTradingStream(stream.id, updatedStream);
+    console.log('✅ Update status thành công');
+    
+
+    await loadStreams(); // 🔥 THÊM DÒNG NÀY → để cập nhật UI
+  } catch (err) {
+    console.error('❌ Update failed:', err);
+  }
+};
+
 
 
 
@@ -391,33 +430,45 @@ const confirmResumeOrPause = (stream: TradingStream) => {
 
 
   const resetForm = () => {
-    setFormData({
-      InternalAccountId: user?.internalAccountId?.toString() || '1',
-    BinanceAccountId: myBinanceAccountId || '1', // ✅ không còn lỗi
-      Status: 0,
-      Type: 0,
-      StrategyId: '',
-      indicatorId: '1',
-      StreamStatus: 'waiting for setup',
-      TrailingStop: 0,
-      TrailingStopPercent: '',
-      TrailingStopValue: '',
-      ATR: 0,
-      ATRPercent: '',
-      ATRValue: '',
-      thresholdPercent: '',
-      Symbol: '',
-      OrderId: '',
-      OrderPrice: '',
-      StopLost: '',
-      TakeProfit: '',
-      CapitalUsageRatio: '',
-      Description: '',
-      TrendStatus: 0,
-      StreamType: 0,
-      TrendType: 'SIDEWAYS'
-    });
+  setFormData({
+    InternalAccountId: user?.internalAccountId?.toString() || '1',
+    BinanceAccountId: myBinanceAccountId || '1',
+    Status: 0,
+    Type: 0,
+    StrategyId: '',
+    indicatorId: '1',
+    StreamStatus: 'waiting for setup',
+    TrailingStop: 0,
+    TrailingStopPercent: '',
+    TrailingStopValue: '',
+    ATR: 0,
+    ATRPercent: '',
+    ATRValue: '',
+    thresholdPercent: '',
+    Symbol: '',
+    OrderId: '',
+    OrderPrice: '',
+    StopLost: '',
+    TakeProfit: '',
+    CapitalUsageRatio: '',
+    Description: '',
+    TrendStatus: 0,
+    StreamType: 0,
+    TrendType: 'SIDEWAYS',
+    // ✅ FIX QUAN TRỌNG:
+    Leverage: '1',
+    MarginType: 'CROSS'
+  });
+};
+
+useEffect(() => {
+  const fetchIndicators = async () => {
+    const res = await indicatorApi.getAllIndicatorConfigs();
+    console.log('🎯 Indicators list:', res.Data?.indicators);
+    setIndicators(res.Data?.indicators || []);
   };
+  fetchIndicators();
+}, []);
 
   
 
@@ -705,6 +756,7 @@ const filteredStreams = streams.filter(stream => {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Stream</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Symbol</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Lavarage</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">StopLost</th>
 <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 min-w-[80px]">Take Profit</th>
 
@@ -735,7 +787,11 @@ const filteredStreams = streams.filter(stream => {
                           <Bot className="h-5 w-5 text-primary-500" />
                         </div>
                         <div className="ml-4 min-w-0">
-                          <div className="font-medium truncate">{stream.Description}</div>
+                          <div className="font-medium truncate max-w-[200px]" title={stream.Description?.split(' [')[0]}
+>
+  {stream.Description?.split(' [')[0]}
+
+</div>
                           <div className="text-sm text-dark-400">ID: {stream.id} | Indicator: {stream.indicatorId}</div>
                         </div>
                       </div>
@@ -743,6 +799,9 @@ const filteredStreams = streams.filter(stream => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-mono text-sm">{stream.Symbol}</span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+  x{stream.Leverage ?? '1'}
+</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
   {stream.StopLost && stream.StopLost > 0 ? stream.StopLost.toFixed(2) : '--'}
 </td>
@@ -899,19 +958,28 @@ const filteredStreams = streams.filter(stream => {
                       placeholder="e.g., BTC-Scalping-Pro"
                     />
                   </div>
+                  
+                 <div>
+  <label htmlFor="indicatorId" className="form-label">Indicator</label>
+<select
+  id="indicatorId"
+  className="form-select"
+  value={formData.indicatorId?.toString() ?? ''}
+  onChange={(e) =>
+    setFormData({ ...formData, indicatorId: parseInt(e.target.value) })
+  }
+>
+  <option value="">Select indicator...</option>
+  {indicators.map((ind) => (
+    <option key={ind.id} value={ind.id.toString()}>
+  {ind.Name} ({ind.Symbol})
+</option>
+  ))}
+</select>
 
-                  <div>
-                    <label htmlFor="symbol" className="form-label">Trading Symbol *</label>
-                    <input
-                      type="text"
-                      id="symbol"
-                      className="form-input"
-                      value={formData.Symbol}
-                      onChange={(e) => setFormData({ ...formData, Symbol: e.target.value.toUpperCase() })}
-                      required
-                      placeholder="e.g., BTCUSDT"
-                    />
-                  </div>
+</div>
+
+                  
                   
 
                   <div className="hidden">
@@ -929,19 +997,7 @@ const filteredStreams = streams.filter(stream => {
                       <option value="paused by user">Paused by User</option>
                     </select>
                   </div>
-                  <div >
-  <label htmlFor="streamType" className="form-label">Stream Type</label>
-  <select
-    id="streamType"
-    className="form-select"
-    value={formData.StreamType}
-    onChange={(e) => setFormData({ ...formData, StreamType: parseInt(e.target.value) })}
-  >
-    <option value={0}>Manual</option>
-    <option value={1}>Signal-Based</option>
-    <option value={2}>Auto-AI</option>
-  </select>
-</div>
+              
 
 
                   <div>
@@ -968,24 +1024,15 @@ const filteredStreams = streams.filter(stream => {
                     />
                   </div>
 
-                  <div>
-                    <label htmlFor="indicatorId" className="form-label">Indicator ID</label>
-                    <input
-                      type="number"
-                      id="indicatorId"
-                      className="form-input"
-                      value={formData.indicatorId}
-                      onChange={(e) => setFormData({ ...formData, indicatorId: e.target.value })}
-                      min="1"
-                    />
-                  </div>
+
+
                 </div>
               </div>
 
               {/* Status and Type */}
               <div>
                 <h3 className="text-base font-medium mb-4">Status & Type Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div>
                     <label htmlFor="status" className="form-label">Status</label>
                     <select
@@ -1040,6 +1087,97 @@ const filteredStreams = streams.filter(stream => {
                       placeholder="10"
                     />
                   </div>
+                  <div className="lg:col-span-2 space-y-2">
+                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+    
+  <div>
+    <label htmlFor="marginType" className="form-label">Margin Type</label>
+    <select
+      id="marginType"
+      className="form-select"
+      value={formData.MarginType}
+      onChange={(e) => {
+  const newMargin = e.target.value as 'ISOLATED' | 'CROSS';
+  setFormData({
+    ...formData,
+    MarginType: newMargin,
+    Leverage: newMargin === 'CROSS' ? '1x' : formData.Leverage,
+  });
+}}
+    >
+      <option value="CROSS">CROSS</option>
+      <option value="ISOLATED">ISOLATED</option>
+      
+    </select>
+  </div>
+
+  <div>
+  <label className="form-label">Leverage</label>
+  <button
+    type="button"
+    className="form-input text-left cursor-pointer"
+    onClick={() => setShowLeveragePopup(true)}
+  >
+     {formData.Leverage}
+  </button>
+</div>
+</div>
+{showLeveragePopup && (
+  <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+    <div className="bg-white dark:bg-dark-800 rounded-lg shadow-lg w-full max-w-md">
+      <div className="p-6 space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-bold">Điều chỉnh đòn bẩy</h2>
+          <button onClick={() => setShowLeveragePopup(false)}>
+            <XCircle className="h-5 w-5 text-dark-400 hover:text-red-500" />
+          </button>
+        </div>
+
+        <div className="text-center font-semibold text-2xl">
+          {formData.Leverage}
+        </div>
+
+        <input
+          type="range"
+          min={1}
+          max={125}
+          value={Number(formData.Leverage) || 1}
+          onChange={(e) =>
+            setFormData({ ...formData, Leverage: e.target.value })
+          }
+          className="w-full"
+        />
+        <div className="flex justify-between text-xs text-dark-400">
+          {[1, 25, 50, 75, 100, 125].map((v) => (
+            <span key={v}>{v}x</span>
+          ))}
+        </div>
+
+        <div className="text-sm text-dark-300 space-y-1 mt-2">
+          <p>* Vị thế tối đa 200,000,000 USDT</p>
+          <p>
+            Xin lưu ý rằng việc thay đổi đòn bẩy sẽ áp dụng cho các vị thế mở
+            và lệnh đang mở.
+          </p>
+          <p className="text-red-500">
+            * Khi chọn đòn bẩy cao hơn, chẳng hạn như [10x], rủi ro thanh lý sẽ
+            tăng lên. Hãy kiểm soát mức độ rủi ro của bạn.
+          </p>
+        </div>
+
+        <button
+          className="btn bg-primary-500 hover:bg-primary-600 text-white w-full"
+          onClick={() => setShowLeveragePopup(false)}
+        >
+          Xác nhận
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+</div>
+
                 </div>
               </div>
 
