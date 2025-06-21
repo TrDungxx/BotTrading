@@ -7,6 +7,8 @@ import {
 import { FormattedDate, FormattedTime } from 'react-intl';
 import { configBotAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { binanceAccountApi } from '../utils/api';
+
 interface TradingStream {
   id: number;
   InternalAccountId: number;
@@ -41,6 +43,8 @@ interface TradingStreamForm {
   BinanceAccountId: string;
   Status: number;
   StreamType: number;
+  Leverage?: string;
+MarginType?: string;
 
   Type: number;
   StrategyId: string;
@@ -78,6 +82,7 @@ export default function ConfigBot() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [togglingStream, setTogglingStream] = useState<TradingStream | null>(null);
   const { user } = useAuth();
+  const [myBinanceAccountId, setMyBinanceAccountId] = useState<string>('1');
 
 
 const SHOW_TYPE = false;
@@ -87,7 +92,7 @@ const SHOW_TREND = false;
 
 
   const [formData, setFormData] = useState<TradingStreamForm>({
-    InternalAccountId: '1',
+    InternalAccountId: user?.internalAccountId?.toString() || '1',
     BinanceAccountId: '1',
     Status: 0,
     Type: 0,
@@ -150,6 +155,7 @@ const SHOW_TREND = false;
   }
 
   try {
+    
     console.log('🧪 Đang xoá stream với ID:', deletingStream.id);
     
     if (user?.role === 'superadmin') {
@@ -215,6 +221,8 @@ const SHOW_TREND = false;
     TakeProfit: parseFloat(formData.TakeProfit),
     CapitalUsageRatio: parseInt(formData.CapitalUsageRatio),
     Description: formData.Description,
+    Leverage: formData.Leverage ?? '1',
+    MarginType: formData.MarginType ?? 'ISOLATED',
     ...(SHOW_TREND
   ? {
       TrendStatus: formData.TrendStatus,
@@ -223,6 +231,7 @@ const SHOW_TREND = false;
   : {
       TrendStatus: 0, // ✅ fallback mặc định khi ẩn
       TrendType: 'SIDEWAYS'
+      
     }),
     //TrendType: formData.TrendType
   };
@@ -356,31 +365,25 @@ const confirmResumeOrPause = (stream: TradingStream) => {
 };
   
 
-  const handleStatusToggle = async (stream: TradingStream, newStatus: number) => {
-  const payload = {
-    ...stream,
-    Status: newStatus,
-    update_time: new Date().toISOString().replace('T', ' ').replace('Z', '+07'),
+  const handleStatusToggle = async (stream: any) => {
+    const updatedStatus = stream.Status === 1 ? 0 : 1;
+
+    const updatedStream = {
+      ...stream,
+      Status: updatedStatus,
+      Leverage: stream.Leverage ?? '1', // ✅ fallback nếu bị null
+      MarginType: stream.MarginType ?? 'ISOLATED', // ✅ fallback nếu bị null
+    };
+
+    console.log('📦 Payload gửi đi:', updatedStream);
+
+    try {
+      await configBotAPI.updateTradingStream(stream.id, updatedStream);
+      console.log('✅ Update status thành công');
+    } catch (err) {
+      console.error('❌ Update failed:', err);
+    }
   };
-
-  try {
-    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-
-    await (isAdmin
-      ? configBotAPI.updateTradingStream(stream.id, payload)
-      : configBotAPI.updateMyTradingStream(stream.id, payload));
-
-    setMessage({
-      type: 'success',
-      text: `Stream ${newStatus === 1 ? 'resumed' : 'paused'} successfully`,
-    });
-
-    await loadStreams();
-  } catch (error) {
-    console.error('❌ Update failed:', error);
-    setMessage({ type: 'error', text: 'Failed to change stream status' });
-  }
-};
 
 
 
@@ -389,8 +392,8 @@ const confirmResumeOrPause = (stream: TradingStream) => {
 
   const resetForm = () => {
     setFormData({
-      InternalAccountId: '1',
-      BinanceAccountId: '1',
+      InternalAccountId: user?.internalAccountId?.toString() || '1',
+    BinanceAccountId: myBinanceAccountId || '1', // ✅ không còn lỗi
       Status: 0,
       Type: 0,
       StrategyId: '',
@@ -415,6 +418,36 @@ const confirmResumeOrPause = (stream: TradingStream) => {
       TrendType: 'SIDEWAYS'
     });
   };
+
+  
+
+// Load Binance account tương ứng với user đang login
+useEffect(() => {
+  const fetchMyBinanceAccount = async () => {
+    try {
+      const res = await binanceAccountApi.getMyAccounts();
+      const accounts = res.Data.accounts || [];
+      const matched = accounts.find(acc => acc.internalAccountId === user?.internalAccountId);
+
+      if (matched) {
+        setMyBinanceAccountId(matched.id.toString()); // ✅ lưu lại ID
+        setFormData(prev => ({
+          ...prev,
+          BinanceAccountId: matched.id.toString(),
+        }));
+      }
+    } catch (err) {
+      console.error('❌ Lỗi khi lấy BinanceAccount:', err);
+    }
+  };
+
+  if (user?.internalAccountId) {
+    fetchMyBinanceAccount();
+  }
+}, [user]);
+
+
+
 
   const getStatusBadgeColor = (status: number) => {
     switch (status) {
@@ -916,10 +949,10 @@ const filteredStreams = streams.filter(stream => {
                     <input
                       type="number"
                       id="internalAccountId"
-                      className="form-input"
+                      className="form-input bg-dark-700 cursor-not-allowed"
                       value={formData.InternalAccountId}
-                      onChange={(e) => setFormData({ ...formData, InternalAccountId: e.target.value })}
-                      min="1"
+                      readOnly // ✅ Không cho sửa
+  disabled // ✅ Không submit được từ tay người dùng
                     />
                   </div>
 
@@ -928,10 +961,10 @@ const filteredStreams = streams.filter(stream => {
                     <input
                       type="number"
                       id="binanceAccountId"
-                      className="form-input"
+                     className="form-input bg-dark-700 cursor-not-allowed"
                       value={formData.BinanceAccountId}
-                      onChange={(e) => setFormData({ ...formData, BinanceAccountId: e.target.value })}
-                      min="1"
+                      readOnly
+    disabled
                     />
                   </div>
 

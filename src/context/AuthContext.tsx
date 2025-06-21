@@ -12,6 +12,7 @@ interface User {
   
   avatar?: string;
   role: 'admin' | 'superadmin' | 'user';
+  internalAccountId?: number;
 }
 
 interface AuthContextType {
@@ -63,6 +64,7 @@ console.log("Final user role:", apiUser.role);
   type: apiUser.Type ?? apiUser.type ?? 3,
   approved: apiUser.Approved ?? apiUser.approved ?? 1,
   avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+  internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
   role: mapRole(
     apiUser.Role ??
     apiUser.role ??
@@ -124,6 +126,7 @@ console.log('Mapped role:', mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type
   type: apiUser.Type ?? apiUser.type ?? 3,
   approved: apiUser.Approved ?? apiUser.approved ?? 1,
   avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+  internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
   role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0), 
 };
 

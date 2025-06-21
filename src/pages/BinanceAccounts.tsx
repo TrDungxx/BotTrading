@@ -112,7 +112,8 @@ const filteredAccounts = query
     ApiKey: formData.ApiKey?.trim(),
     SecretKey: formData.SecretKey?.trim(),
     Status: Number(formData.Status),
-    internalAccountId: Number(formData.internalAccountId), // ✅ Lấy từ form
+    internalAccountId: user?.internalAccountId || 0, // lấy đúng account đang login
+
     BinanceId: formData.BinanceId || null,
     Description: formData.Description || null
   };
@@ -221,7 +222,7 @@ const handleUpdateAccount = async () => {
   const resetForm = () => {
     setFormData({
   Status: 1,
-  internalAccountId: 0,
+  internalAccountId: user?.internalAccountId || 0,
   Email: '',
   Name: '',
   BinanceId: '',
@@ -581,16 +582,15 @@ const handleUpdateAccount = async () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
-                  <input
-                    type="number"
-                    id="internalAccountId"
-                    className="form-input"
-                    value={formData.internalAccountId || ''}
-                    onChange={(e) => setFormData({ ...formData, internalAccountId: parseInt(e.target.value) || 0 })}
-                    placeholder="Auto-generated if 0"
-                  />
-                </div>
+  <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
+  <input
+    type="number"
+    id="internalAccountId"
+    className="form-input bg-dark-700 cursor-not-allowed"
+    value={formData.internalAccountId || ''}
+    disabled
+  />
+</div>
 
                 <div>
                   <label htmlFor="status" className="form-label">Status</label>
@@ -638,10 +638,14 @@ const handleUpdateAccount = async () => {
                   type="button"
                   className="btn btn-outline"
                   onClick={() => {
-                    setIsFormOpen(false);
-                    setEditingAccount(null);
-                    resetForm();
-                  }}
+  setEditingAccount(null);
+  setFormData((prev) => ({
+    ...prev,
+    internalAccountId: user?.internalAccountId || 0
+  }));
+  setIsFormOpen(true);
+}}
+
                 >
                   Cancel
                 </button>
