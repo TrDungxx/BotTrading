@@ -16,7 +16,7 @@ interface TradingStream {
   Status: number;
   Type: number;
   StrategyId: number | null;
-  indicatorId: number;
+  indicatorId: string;
   StreamStatus: string;
   TrailingStop: number;
   TrailingStopPercent: number;
@@ -49,7 +49,7 @@ interface TradingStreamForm {
   MarginType?: string;
   Type: number;
   StrategyId: string;
-  indicatorId: number;
+  indicatorId: string;
   StreamStatus: string;
   TrailingStop: number;
   TrailingStopPercent: string;
@@ -60,8 +60,8 @@ interface TradingStreamForm {
   thresholdPercent: string;
   OrderId: string;
   OrderPrice: string;
-  StopLost: number;
-  TakeProfit: number;
+  StopLost: string;
+  TakeProfit: string;
   CapitalUsageRatio: string;
   Description: string;
   TrendStatus: number;
@@ -107,7 +107,7 @@ const SHOW_TREND = false;
     Status: 0,
     Type: 0,
     StrategyId: '',
-    indicatorId: 1,
+    indicatorId: '1',
     StreamStatus: 'waiting for setup',
     TrailingStop: 0,
     TrailingStopPercent: '',
@@ -119,8 +119,8 @@ const SHOW_TREND = false;
     Symbol: '',
     OrderId: '',
     OrderPrice: '',
-    StopLost: 1,
-    TakeProfit: 4,
+    StopLost: '1',
+    TakeProfit: '4',
     CapitalUsageRatio: '10',
     Description: '',
     TrendStatus: 0,
@@ -362,36 +362,36 @@ if (SHOW_ORDER_PRICE) {
 
   const handleEdit = (stream: TradingStream) => {
     setEditingStream(stream);
+    
     setFormData({
-  InternalAccountId: stream.InternalAccountId.toString(),
-  BinanceAccountId: stream.BinanceAccountId.toString(),
+  InternalAccountId: stream.InternalAccountId?.toString() || '',
+  BinanceAccountId: stream.BinanceAccountId?.toString() || '',
   Status: stream.Status,
   Type: stream.Type,
   StrategyId: stream.StrategyId?.toString() || '',
-  indicatorId: stream.indicatorId.toString(),
-  StreamStatus: stream.StreamStatus,
+  indicatorId: stream.indicatorId?.toString() || '1',
+  StreamStatus: stream.StreamStatus || 'waiting for setup',
   TrailingStop: stream.TrailingStop,
   TrailingStopPercent: stream.TrailingStopPercent?.toString() || '',
   TrailingStopValue: stream.TrailingStopValue?.toString() || '',
   ATR: stream.ATR,
-  ATRPercent: stream.ATRPercent ?? 2,
-  ATRValue: stream.ATRValue ?? 0.2,
+  ATRPercent: stream.ATRPercent?.toString() || '',
+  ATRValue: stream.ATRValue?.toString() || '',
   thresholdPercent: stream.thresholdPercent?.toString() || '',
- Symbol: stream.Symbol,
-  OrderId: stream.OrderId.toString(),
-  OrderPrice: stream.OrderPrice.toString(),
-  StopLost: stream.StopLost ?? 1,
-
-  TakeProfit: stream.TakeProfit ?? 4,
-  CapitalUsageRatio: stream.CapitalUsageRatio.toString(),
-  Description: stream.Description?.replace(/\[.*?Warning:.*?\]/g, '').trim(),
-  TrendStatus: stream.TrendStatus,
-  TrendType: stream.TrendType,
+  Symbol: stream.Symbol || '',
+  OrderId: stream.OrderId?.toString() || '',
+  OrderPrice: stream.OrderPrice?.toString() || '',
+  StopLost: stream.StopLost?.toString() || '',
+  TakeProfit: stream.TakeProfit?.toString() || '',
+  CapitalUsageRatio: stream.CapitalUsageRatio?.toString() || '',
+  Description: stream.Description?.replace(/\[.*?Warning:.*?\]/g, '').trim() || '',
+  TrendStatus: stream.TrendStatus ?? 0,
+  TrendType: stream.TrendType || 'SIDEWAYS',
   StreamType: (stream as any).StreamType ?? 0,
-  // ✅ Bổ sung:
   Leverage: stream.Leverage ? stream.Leverage.toString() + 'x' : '1x',
   MarginType: stream.MarginType || 'CROSS'
 });
+
 
     setIsFormOpen(true);
   };
@@ -452,7 +452,7 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
     Status: 0,
     Type: 0,
     StrategyId: '',
-    indicatorId: '1',
+    indicatorId: '',
     StreamStatus: 'waiting for setup',
     TrailingStop: 0,
     TrailingStopPercent: '',
@@ -479,36 +479,56 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
 
 useEffect(() => {
   const fetchIndicators = async () => {
-    console.log("🟡 Indicator ID:", formData.indicatorId);
-console.log("🟡 Symbol final:", formData.Symbol);
-
     try {
       let res;
       if (user?.role === 'admin' || user?.role === 'superadmin') {
         res = await indicatorApi.getAllIndicatorConfigs();
       } else {
-        res = await indicatorApi.getMyActiveIndicators();
+        res = await indicatorApi.getMyActiveIndicators(); // 👈 API dành cho user
       }
 
-      const raw = res?.Data?.indicators || res?.Data || [];
+      console.log("📦 Raw indicator response:", res?.Data);
 
-      const mapped = raw.map((item: any) => ({
-        
-  id: Number(item.id), // ✅ ép kiểu về number
-  name: item.name || item.Name || 'Unknown',
-  symbol: item.symbol || item.Symbol || '',
-}));
-console.log("✅ Indicator mapping fixed:", mapped);
-      console.log('✅ Mapped indicators:', mapped);
+      // ✅ Kiểm tra Data có phải mảng không, nếu không thì lấy res.Data.indicators
+      const raw = Array.isArray(res?.Data)
+        ? res.Data
+        : Array.isArray(res?.Data?.indicators)
+        ? res.Data.indicators
+        : [];
+
+      if (!Array.isArray(raw)) {
+        console.error('❌ Indicator API không trả về mảng:', res?.Data);
+        return;
+      }
+
+      const mapped = raw.map((item: any) => {
+        let fixedName = item.name || item.Name || 'Unknown';
+        let fixedSymbol = item.symbol || item.Symbol || '';
+
+        // Fix typo nếu có
+        if (fixedName === 'EmaSingnal') {
+          fixedName = 'EmaSignal';
+          fixedSymbol = '1000PEPEUSDT';
+        }
+
+        return {
+          id: Number(item.id),
+          name: fixedName,
+          symbol: fixedSymbol,
+        };
+      });
+
       setIndicators(mapped);
+      console.log('✅ Mapped indicators:', mapped);
     } catch (err) {
-      console.error('❌ Lỗi khi fetch indicators:', err);
-      toast.error('Lỗi tải indicators. Vui lòng thử lại.');
+      console.error('❌ Lỗi tải indicators:', err);
     }
   };
 
   fetchIndicators();
 }, []);
+
+
 
 
 
@@ -546,19 +566,31 @@ useEffect(() => {
   }
 }, [user]);
 const handleChangeIndicator = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  const selectedId = parseInt(e.target.value);
-  const selectedIndicator = indicators.find(i => i.id === selectedId);
+  const rawValue = e.target.value;
 
-  console.log("🧠 ID chọn:", selectedId);
-  console.log("🧠 Danh sách indicators:", indicators);
-  console.log("🧠 Indicator tìm được:", selectedIndicator);
+  if (!rawValue) {
+    resetIndicator(); // ✅ Gọi hàm reset bạn đã tạo
+    console.warn('⚠️ User chưa chọn indicator hợp lệ');
+    return;
+  }
+
+  const selectedIndicator = indicators.find(i => i.id.toString() === rawValue);
+
+  if (!selectedIndicator) {
+    console.warn("⚠️ Không tìm thấy indicator tương ứng");
+    return;
+  }
 
   setFormData(prev => ({
     ...prev,
-    indicatorId: selectedId,
-    Symbol: selectedIndicator?.symbol || '',
+    indicatorId: rawValue, // ✅ giữ kiểu string
+    Symbol: selectedIndicator.symbol || "",
   }));
+
+  console.log("✅ Gán symbol khi chọn:", selectedIndicator.symbol);
 };
+
+
 
 
 
@@ -653,6 +685,15 @@ const filteredStreams = streams
   });
 
 const indicatorMap = Object.fromEntries(indicators.map(ind => [ind.id, ind.name]));
+const resetIndicator = () => {
+  setFormData(prev => ({
+    ...prev,
+    indicatorId: '',
+    Symbol: ''
+  }));
+};
+
+
 
 
   return (
@@ -1039,44 +1080,22 @@ const indicatorMap = Object.fromEntries(indicators.map(ind => [ind.id, ind.name]
                   
                  <div>
   <label htmlFor="indicatorId" className="form-label">Indicator</label>
-<select
-  id="indicatorId"
-  className="form-select"
-  value={formData.indicatorId?.toString() ?? ''}
-  onChange={(e) => {
-  const selectedId = parseInt(e.target.value);
-  const selectedIndicator = indicators.find((i) => i.id === selectedId);
-
-  if (!selectedIndicator) {
-    console.warn('⚠️ Không tìm thấy indicator tương ứng');
-    return;
-  }
-
-  const symbol = selectedIndicator.symbol || (selectedIndicator.name === 'EmaSingal' ? '1000PEPEUSDT' : '');
-
-  setFormData((prev) => ({
-    ...prev,
-    indicatorId: selectedId,
-    Symbol: symbol,
-  }));
-
-  console.log("🎯 Đã set Symbol:", symbol);
-}}
-
-
->
-  <option value="">Select indicator...</option>
-  {indicators.map((ind) => (
-    <option key={ind.id} value={ind.id.toString()}>
-      {ind.name} ({ind.symbol})
-    </option>
-  ))}
-</select>
-
-
-
-
+  <select
+    id="indicatorId"
+    className="form-select"
+    value={formData.indicatorId?.toString() ?? ''}
+    onChange={handleChangeIndicator}
+  >
+    <option value="">Select indicator...</option>
+    {indicators.map((ind) => (
+      <option key={ind.id} value={ind.id.toString()}>
+        {ind.name} ({ind.symbol})
+      </option>
+    ))}
+  </select>
 </div>
+
+
                   
 
                   

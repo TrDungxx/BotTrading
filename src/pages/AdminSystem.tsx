@@ -185,6 +185,13 @@ export default function AdminSystem() {
   try {
     const { id, username, email, type, status, fullName } = editForm;
 
+    // ❗ Kiểm tra quyền
+    if (![1, 2, 99].includes(user?.type)) {
+      setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
+      setIsSaving(false); // ✅ THÊM DÒNG NÀY
+      return;
+    }
+
     const payload: any = {
       Username: username,
       Email: email,
@@ -192,15 +199,10 @@ export default function AdminSystem() {
       FullName: fullName || '',
     };
 
-    // ✅ chỉ cho superadmin được update Type
-    if (user?.role !== 'superadmin') {
-      setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
-      return;
+    // ✅ Chỉ superadmin được đổi Type
+    if ([2, 99].includes(user?.type)) {
+      payload.Type = typeof type === 'number' ? type : 0;
     }
-
-    payload.Type = typeof type === 'number' ? type : 0;
-
-
 
     console.log('📤 Payload gửi lên:', payload);
 
@@ -217,6 +219,7 @@ export default function AdminSystem() {
     setIsSaving(false);
   }
 };
+
 
 
 

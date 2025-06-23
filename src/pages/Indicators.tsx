@@ -15,6 +15,9 @@ interface Indicator {
   Status: number;
   create_time: string;
   update_time: string;
+  IndicatorType: string;
+  IndicatorTimeframe: string;
+  IndicatorCandles: string;
 }
 
 export default function Indicators() {
@@ -33,14 +36,17 @@ const contentRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState<Omit<Indicator, 'id' | 'create_time' | 'update_time'>>({
     Name: '',
-    Symbol: '',
-    Leverage: '1',
-    MarginType: 'ISOLATED',
-    Description: '',
-    LongText: '',
-    ShortText: '',
-    ExitText: '',
-    Status: 1
+  Symbol: '',
+  Leverage: '1',
+  MarginType: 'ISOLATED',
+  Description: '',
+  LongText: '',
+  ShortText: '',
+  ExitText: '',
+  Status: 1,
+  IndicatorType: '',
+  IndicatorTimeframe: '',
+  IndicatorCandles: ''
   });
 
   useEffect(() => {
@@ -104,37 +110,35 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
     return matchesSearch;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const now = new Date().toISOString().replace('T', ' ').replace('Z', '+07');
+  try {
+    const payload = {
+      ...formData,
+      LongText: formData.LongText?.trim() || 'BUY,LONG',
+      ShortText: formData.ShortText?.trim() || 'SELL,SHORT',
+      ExitText: formData.ExitText?.trim() || 'EXIT,LONG EXIT,SHORT EXIT,SL,TP1',
+      IndicatorType: formData.IndicatorType || 'SIDEWAY',
+      IndicatorTimeframe: formData.IndicatorTimeframe || '1m',
+      IndicatorCandles: formData.IndicatorCandles || '100'
+    };
+
+    console.log('📤 Payload gửi lên:', payload);
 
     if (editingIndicator) {
-      setIndicators(prevIndicators => 
-        prevIndicators.map(ind => 
-          ind.id === editingIndicator.id 
-            ? {
-                ...ind,
-                ...formData,
-                update_time: now
-              }
-            : ind
-        )
-      );
-    } else {
-      const newId = indicators.length > 0 
-        ? Math.max(...indicators.map(i => i.id)) + 1 
-        : 1;
+  // ✅ Update: cần id
+  await indicatorApi.updateIndicatorConfig({
+    ...payload,
+    id: editingIndicator.id
+  });
+} else {
+  // ✅ Create: KHÔNG truyền id
+  const { id, ...createPayload } = payload; // ← gỡ id ra khỏi object
+  await indicatorApi.createIndicatorConfig(createPayload);
+}
 
-      const newIndicator: Indicator = {
-        id: newId,
-        ...formData,
-        create_time: now,
-        update_time: now
-      };
-
-      setIndicators(prevIndicators => [...prevIndicators, newIndicator]);
-    }
+    await loadIndicators();
 
     setIsFormOpen(false);
     setEditingIndicator(null);
@@ -147,22 +151,39 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
       LongText: '',
       ShortText: '',
       ExitText: '',
-      Status: 1
+      Status: 1,
+      IndicatorType: '',
+      IndicatorTimeframe: '',
+      IndicatorCandles: ''
     });
-  };
+  } catch (err: any) {
+      console.error('❌ Lỗi khi submit Indicator:', err);
+      console.log('📛 Chi tiết từ backend:', err.response?.data || err.message);
+      alert('❌ Lỗi khi lưu indicator. Kiểm tra console để biết thêm chi tiết.');
+    }
+};
+
+
+
+
+
+
 
   const handleEdit = (indicator: Indicator) => {
     setEditingIndicator(indicator);
     setFormData({
       Name: indicator.Name,
-      Symbol: indicator.Symbol,
-      Leverage: indicator.Leverage,
-      MarginType: indicator.MarginType,
-      Description: indicator.Description,
-      LongText: indicator.LongText,
-      ShortText: indicator.ShortText,
-      ExitText: indicator.ExitText,
-      Status: indicator.Status
+    Symbol: indicator.Symbol,
+    Leverage: indicator.Leverage,
+    MarginType: indicator.MarginType,
+    Description: indicator.Description,
+    LongText: indicator.LongText,
+    ShortText: indicator.ShortText,
+    ExitText: indicator.ExitText,
+    Status: indicator.Status,
+    IndicatorType: indicator.IndicatorType || 'SIDEWAY',
+    IndicatorTimeframe: indicator.IndicatorTimeframe || '1m',
+    IndicatorCandles: indicator.IndicatorCandles || '100'
     });
     setIsFormOpen(true);
   };
@@ -171,33 +192,50 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
     setDeletingIndicator(indicator);
   };
 
-  const confirmDelete = () => {
-    if (deletingIndicator) {
-      setIndicators(indicators.filter(ind => ind.id !== deletingIndicator.id));
-      setDeletingIndicator(null);
-    }
-  };
-const loadIndicators = async () => {
+  const confirmDelete = async () => {
+  if (!deletingIndicator) return;
+
   try {
-    const res = await indicatorApi.getAllIndicatorConfigs();
-    const raw = res?.Data?.indicators ?? [];
-    setIndicators(raw);
-    console.log('✅ Loaded indicators:', raw);
+    // Gọi API xóa ở backend
+    await indicatorApi.deleteIndicatorConfig(deletingIndicator.id);
+
+    // Cập nhật lại danh sách từ backend
+    await loadIndicators();
+
+    // Reset state
+    setDeletingIndicator(null);
   } catch (err) {
-    console.error('❌ Lỗi khi fetch indicators:', err);
+    console.error('❌ Lỗi khi xóa indicator:', err);
+    alert('❌ Không thể xóa indicator. Vui lòng kiểm tra console.');
   }
 };
-const openTvPopup = (indicator: any) => {
-  setSelectedIndicator(indicator);
-  setMessageContent(null); // reset nếu có message trước
-  setTvPopupOpen(true);
+
+const loadIndicators = async () => {
+  try {
+    const response = await indicatorApi.getAllIndicatorConfigs();
+    const raw = response?.Data?.indicators ?? [];
+
+    const mapped = raw.map((ind: any) => ({
+      id: ind.id,
+      Name: ind.Name,
+      Symbol: ind.Symbol,
+      Leverage: ind.Leverage,
+      MarginType: ind.MarginType,
+      Description: ind.Description,
+      LongText: ind.LongText,
+      ShortText: ind.ShortText,
+      ExitText: ind.ExitText,
+      Status: ind.Status,
+      create_time: ind.create_time,
+      update_time: ind.update_time
+    }));
+
+    setIndicators(mapped);
+  } catch (err) {
+    console.error('❌ Lỗi khi load indicators:', err);
+  }
 };
-const showStaticMessage = (type: typeof selectedType) => {
-  setSelectedType(type);
-  setTimeout(() => {
-    contentRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, 100);
-};
+
 const generateMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
   if (!selectedIndicator) return '';
   const message = {
@@ -229,6 +267,19 @@ const generateMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') =>
 
   return JSON.stringify(message, null, 2);
 };
+const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
+  setSelectedType(type);
+  setTimeout(() => {
+    contentRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+};
+const openTvPopup = (indicator: Indicator) => {
+  setSelectedIndicator(indicator);
+  setTvPopupOpen(true);
+  setSelectedType(null); // reset lại selectedType mỗi lần mở mới
+};
+
+
 
 
   return (
