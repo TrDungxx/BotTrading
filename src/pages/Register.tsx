@@ -65,7 +65,7 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await register(formData.username, formData.password);
+      await register(formData.username, formData.password, formData.email);
 
       setSuccess(true);
     } catch (err: any) {

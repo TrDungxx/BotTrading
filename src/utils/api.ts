@@ -113,18 +113,19 @@ export const authApi = {
     }),
 
   changePassword: (oldPassword: string, newPassword: string) =>
-    apiRequest('/auth/change-password', {
-      method: 'PUT',
-      body: { oldPassword, newPassword },
-    }),
+  apiRequest('/auth/change-password', {
+    method: 'PUT',
+    body: { oldPassword, newPassword },
+  }),
 
   // Nếu backend có thì giữ, không thì xoá hoặc comment
-  register: (username: string, password: string) =>
+  register: (username: string, password: string, email:string) =>
   apiRequest('/accounts/register', {
     method: 'POST',
     body: {
       Username: username,
       Password: password,
+      Email: email,
     },
   }),
 

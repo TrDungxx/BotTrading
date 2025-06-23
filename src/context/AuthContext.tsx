@@ -9,18 +9,31 @@ interface User {
   email: string;
   status: number;
   type: number;
-  
+
   avatar?: string;
+  fullName?: string;
+  timezone?: string;
+  language?: string;
+  approved?: number;
+  createdAt?: string;
+  lastLogin?: string;
+
   role: 'admin' | 'superadmin' | 'user';
   internalAccountId?: number;
+
+  DiscordWebhookUrl?: string | null;
+  DiscordUsername?: string | null;
+  DiscordNotificationsEnabled?: boolean;
+  DiscordSettings?: any; // hoặc bạn define thêm type nếu cần validate chặt hơn
 }
+
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isGuestMode: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, email:string) => Promise<void>;
 
   logout: () => void;
   resetPassword: (email: string) => Promise<void>;
@@ -49,6 +62,13 @@ const [isAuthenticating, setIsAuthenticating] = useState(true); // ✅ thêm
     try {
       const res = await authApi.getCurrentUser();
       const apiUser = res.Data?.user;
+      console.log("📥 Response data:", res.Data);
+console.log("📥 Raw user from API:", res.Data?.user);
+console.log("📥 DiscordWebhookUrl:", res.Data?.user?.DiscordWebhookUrl);
+console.log("📥 DiscordUsername:", res.Data?.user?.DiscordUsername);
+console.log("📥 DiscordNotificationsEnabled:", res.Data?.user?.DiscordNotificationsEnabled);
+console.log("📥 DiscordSettings:", res.Data?.user?.DiscordSettings);
+
       console.log("Mapped user:", apiUser); 
 console.log("Final user role:", apiUser.role);
 
@@ -68,11 +88,17 @@ console.log("Final user role:", apiUser.role);
   role: mapRole(
     apiUser.Role ??
     apiUser.role ??
-    apiUser.Type ?? // phải có dòng này
+    apiUser.Type ??
     apiUser.type ??
     0
-  )
-}
+  ),
+
+  // ✅ Các trường Discord cần thêm
+  DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
+  DiscordUsername: apiUser.DiscordUsername || '',
+  DiscordNotificationsEnabled: apiUser.DiscordNotificationsEnabled ?? false,
+  DiscordSettings: apiUser.DiscordSettings ?? null,
+};
 
       setUser(mappedUser);
     } catch (error) {
@@ -94,64 +120,63 @@ function mapRole(role: number | string): 'admin' | 'superadmin' | 'user' {
 
 
   const login = async (username: string, password: string) => {
-    
-    try {
-      const response = await authApi.login(username, password);
-const data = response.Data;
+  try {
+    const response = await authApi.login(username, password);
+    const data = response.Data;
 
-console.log('Token nhận được:', data.token);
-console.log('User:', data.user);
+    console.log('Token nhận được:', data.token);
+    console.log('User:', data.user);
 
-if (!data.user) {
-  throw new Error('API không trả về thông tin user');
-}
+    if (!data.user) throw new Error('API không trả về thông tin user');
 
-      if (!data.user) {
-        throw new Error('API không trả về thông tin user');
-      }
-      
-      // Handle both lowercase and uppercase field names from API
-      const apiUser = data.user;
-      console.log('User:', data.user);
-console.log('Role raw:', apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type);
+    const apiUser = data.user;
 
-console.log('Mapped role:', mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0));
+    const mappedUser: User = {
+      id: apiUser.id,
+      username: apiUser.Username || apiUser.username || '',
+      email: apiUser.Email || apiUser.email || '',
+      status: apiUser.Status ?? apiUser.status ?? 1,
+      type: apiUser.Type ?? apiUser.type ?? 3,
+      approved: apiUser.Approved ?? apiUser.approved ?? 1,
+      avatar:
+        apiUser.Avatar ||
+        'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+      internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
+      role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0),
 
+      // ✅ Thêm các trường Discord
+      DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
+      DiscordUsername: apiUser.DiscordUsername || '',
+      DiscordNotificationsEnabled: apiUser.DiscordNotificationsEnabled || false,
+      DiscordSettings:
+        typeof apiUser.DiscordSettings === 'string'
+          ? JSON.parse(apiUser.DiscordSettings)
+          : apiUser.DiscordSettings || {
+              notifyOnLogin: false,
+              notifyOnAccountUpdate: false,
+              notifyOnError: true,
+              messageFormat: 'embed',
+              timezone: 'Asia/Ho_Chi_Minh',
+            },
+    };
 
-      const mappedUser: User = {
-  id: apiUser.id,
-  username: apiUser.Username || apiUser.username || '',
-  email: apiUser.Email || apiUser.email || '',
-  status: apiUser.Status ?? apiUser.status ?? 1,
-  type: apiUser.Type ?? apiUser.type ?? 3,
-  approved: apiUser.Approved ?? apiUser.approved ?? 1,
-  avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
-  internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
-  role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0), 
+    console.log('✅ Mapped user:', mappedUser);
+    setUser(mappedUser);
+    setIsGuestMode(false);
+
+    if (data.token) {
+      localStorage.setItem('authToken', data.token);
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
 };
 
-      
-      console.log('Mapped user:', mappedUser); // Debug log
-      console.log('User type from API:', apiUser.Type || apiUser.Type); // Debug log
-      console.log('Final user role:', mappedUser.role); // Debug log
-      
-      setUser(mappedUser);
-      setIsGuestMode(false);
-      
-      // Lưu token nếu có trong response
-      if (data.token) {
-        localStorage.setItem('authToken', data.token);
-      }
-      
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
 
-  const register = async (username: string,  password: string) => {
+  const register = async (username: string,  password: string, email: string) => {
     try {
-      const data = await authApi.register(username, password);
+      const data = await authApi.register(username, password, email);
       
       console.log('Register API response:', data); // Debug log
       

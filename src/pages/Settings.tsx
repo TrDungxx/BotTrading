@@ -3,7 +3,8 @@ import { Bell, CreditCard, Key, Lock, Save, Shield, User, Camera, Globe, Clock, 
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
-import { apiRequest, ApiError } from '../utils/api';
+import { authApi, ApiError } from '../utils/api';
+import { accountApi } from '../utils/api';
 
 interface UserProfile {
   id: number;
@@ -18,6 +19,16 @@ interface UserProfile {
   approved: number;
   createdAt: string;
   lastLogin?: string;
+  DiscordWebhookUrl?: string | null;
+  DiscordUsername?: string | null;
+  DiscordNotificationsEnabled?: boolean;
+  DiscordSettings?: {
+    notifyOnLogin: boolean;
+    notifyOnAccountUpdate: boolean;
+    notifyOnError: boolean;
+    messageFormat: string;
+    timezone: string;
+  } | null;
 }
 
 interface NotificationSettings {
@@ -65,6 +76,16 @@ export default function Settings() {
     status: user?.status || 1,
     approved: user?.approved || 1,
     createdAt: '',
+    DiscordWebhookUrl: '',
+  DiscordUsername: '',
+  DiscordNotificationsEnabled: false,
+  DiscordSettings: JSON.stringify({
+    notifyOnLogin: false,
+    notifyOnAccountUpdate: false,
+    notifyOnError: true,
+    messageFormat: "embed",
+    timezone: "Asia/Ho_Chi_Minh"
+  }),
     lastLogin: ''
   });
   
@@ -101,35 +122,68 @@ export default function Settings() {
   }, []);
 
   const loadUserProfile = async () => {
-    if (!user) return;
-    
-    try {
-      setIsLoading(true);
-      // In real implementation, this would be an API call
-      // const response = await apiRequest('/user/profile');
-      
-      // For now, use mock data based on current user
-      setProfileData({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        fullName: user.username, // Mock full name
-        avatar: user.avatar,
-        timezone: 'UTC',
-        language: language,
-        type: user.type,
-        status: user.status,
-        approved: user.approved,
-        createdAt: '2024-01-15T08:00:00Z', // Mock creation date
-        lastLogin: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Failed to load profile:', error);
-      setMessage({ type: 'error', text: 'Failed to load profile data' });
-    } finally {
-      setIsLoading(false);
+  if (!user) return;
+
+  try {
+    setIsLoading(true);
+
+    // 🔍 Log để kiểm tra toàn bộ dữ liệu user từ context
+    console.log('🧠 Full user object:', user);
+
+    let parsedDiscordSettings = {
+      notifyOnLogin: false,
+      notifyOnAccountUpdate: false,
+      notifyOnError: true,
+      messageFormat: 'embed',
+      timezone: 'Asia/Ho_Chi_Minh',
+    };
+
+    if (typeof user.DiscordSettings === 'string') {
+      try {
+        parsedDiscordSettings = JSON.parse(user.DiscordSettings);
+        console.log('✅ Parsed DiscordSettings (from string):', parsedDiscordSettings);
+      } catch (err) {
+        console.warn('⚠️ Lỗi parse DiscordSettings:', err);
+      }
+    } else if (typeof user.DiscordSettings === 'object') {
+      parsedDiscordSettings = user.DiscordSettings;
+      console.log('✅ Parsed DiscordSettings (from object):', parsedDiscordSettings);
     }
-  };
+
+    // 🔍 Log thử các trường riêng biệt
+    console.log('📌 DiscordWebhookUrl:', user.DiscordWebhookUrl);
+    console.log('📌 DiscordUsername:', user.DiscordUsername);
+    console.log('📌 DiscordNotificationsEnabled:', user.DiscordNotificationsEnabled);
+
+    setProfileData({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName || user.username,
+      avatar: user.avatar,
+      timezone: user.timezone || 'UTC',
+      language: user.language || language,
+      type: user.type,
+      status: user.status,
+      approved: user.approved,
+      createdAt: user.createdAt || '2024-01-15T08:00:00Z',
+      lastLogin: user.lastLogin || new Date().toISOString(),
+
+      DiscordWebhookUrl: user.DiscordWebhookUrl || '',
+      DiscordUsername: user.DiscordUsername || '',
+      DiscordNotificationsEnabled: user.DiscordNotificationsEnabled || false,
+      DiscordSettings: parsedDiscordSettings,
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to load profile:', error);
+    setMessage({ type: 'error', text: '❌ Failed to load profile data' });
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
 
   const loadNotificationSettings = async () => {
     try {
@@ -171,99 +225,98 @@ export default function Settings() {
   };
 
   const handleProfileSave = async () => {
-    try {
-      setIsSaving(true);
-      setMessage(null);
-      
-      // Validate required fields
-      if (!profileData.username || !profileData.email) {
-        setMessage({ type: 'error', text: 'Username and email are required' });
-        return;
-      }
-      
-      // In real implementation:
-      // await apiRequest('/user/profile', {
-      //   method: 'PUT',
-      //   body: JSON.stringify({
-      //     username: profileData.username,
-      //     email: profileData.email,
-      //     fullName: profileData.fullName,
-      //     timezone: profileData.timezone,
-      //     language: profileData.language
-      //   })
-      // });
-      
-      // Update language context if changed
-      if (profileData.language !== language) {
-        setLanguage(profileData.language as 'en' | 'vi');
-      }
-      
-      setMessage({ type: 'success', text: 'Profile updated successfully' });
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => setMessage(null), 3000);
-      
-    } catch (error) {
-      console.error('Failed to save profile:', error);
-      setMessage({ type: 'error', text: 'Failed to update profile' });
-    } finally {
-      setIsSaving(false);
+  try {
+    setIsSaving(true);
+    setMessage(null);
+
+    // ✅ Kiểm tra user trước
+    if (!user) {
+      setMessage({ type: 'error', text: 'Không có thông tin người dùng' });
+      return;
     }
-  };
+
+    await accountApi.updateAccount(user.id, {
+      username: profileData.username,
+      email: profileData.email,
+      fullName: profileData.fullName,
+      language: profileData.language,
+      timezone: profileData.timezone,
+
+      // Các trường Discord
+      DiscordWebhookUrl: profileData.DiscordWebhookUrl,
+      DiscordUsername: profileData.DiscordUsername,
+      DiscordNotificationsEnabled: profileData.DiscordNotificationsEnabled,
+
+      // Trường mặc định (ẩn)
+      DiscordSettings: {
+        notifyOnLogin: false,
+        notifyOnAccountUpdate: false,
+        notifyOnError: true,
+        messageFormat: 'embed',
+        timezone: 'Asia/Ho_Chi_Minh',
+      },
+    });
+
+    setMessage({ type: 'success', text: '✅ Profile updated successfully' });
+    setTimeout(() => setMessage(null), 3000);
+
+  } catch (error) {
+    console.error('❌ Failed to save profile:', error);
+    setMessage({ type: 'error', text: '❌ Cập nhật thất bại' });
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+
 
   const handlePasswordChange = async () => {
-    try {
-      setIsSaving(true);
-      setMessage(null);
-      
-      // Validate passwords
-      if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-        setMessage({ type: 'error', text: 'All password fields are required' });
-        return;
-      }
-      
-      if (passwordData.newPassword !== passwordData.confirmPassword) {
-        setMessage({ type: 'error', text: 'New passwords do not match' });
-        return;
-      }
-      
-      if (passwordData.newPassword.length < 8) {
-        setMessage({ type: 'error', text: 'New password must be at least 8 characters long' });
-        return;
-      }
-      
-      // In real implementation:
-      // await apiRequest('/user/change-password', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     currentPassword: passwordData.currentPassword,
-      //     newPassword: passwordData.newPassword
-      //   })
-      // });
-      
-      // Clear password fields
-      setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      
-      setMessage({ type: 'success', text: 'Password updated successfully' });
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => setMessage(null), 3000);
-      
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      if (error instanceof ApiError && error.status === 401) {
-        setMessage({ type: 'error', text: 'Current password is incorrect' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update password' });
-      }
-    } finally {
-      setIsSaving(false);
+  try {
+    setIsSaving(true);
+    setMessage(null);
+
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      setMessage({ type: 'error', text: 'All password fields are required' });
+      return;
     }
-  };
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({ type: 'error', text: 'New passwords do not match' });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      setMessage({ type: 'error', text: 'New password must be at least 8 characters long' });
+      return;
+    }
+
+    // ✅ GỌI API CHÍNH XÁC Ở ĐÂY
+    await authApi.changePassword(
+      passwordData.currentPassword,
+      passwordData.newPassword
+    );
+
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+
+    setMessage({ type: 'success', text: 'Password updated successfully' });
+
+    setTimeout(() => setMessage(null), 3000);
+  } catch (error) {
+    console.error('Failed to change password:', error);
+    if (error instanceof ApiError && error.status === 401) {
+      setMessage({ type: 'error', text: 'Current password is incorrect' });
+    } else {
+      setMessage({ type: 'error', text: 'Failed to update password' });
+    }
+  } finally {
+    setIsSaving(false);
+  }
+};
+
 
   const handleNotificationSave = async () => {
     try {
@@ -307,13 +360,15 @@ export default function Settings() {
   };
 
   const getUserTypeLabel = (type: number) => {
-    switch (type) {
-      case 1: return 'Administrator';
-      case 2: return 'Moderator';
-      case 3: return 'User';
-      default: return 'Unknown';
-    }
-  };
+  switch (type) {
+    case 0: return 'User';
+    case 1: return 'Admin';
+    case 2:
+    case 99: return 'Superadmin';
+    default: return 'Unknown';
+  }
+};
+
 
   const getUserStatusLabel = (status: number) => {
     return status === 1 ? 'Active' : 'Suspended';
@@ -528,15 +583,74 @@ export default function Settings() {
                           onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                         />
                       </div>
+                      <div>
+  <label className="form-label">Discord Webhook URL</label>
+  <input
+    type="url"
+    className="form-input"
+    value={profileData.DiscordWebhookUrl || ''}
+    onChange={(e) =>
+      setProfileData(prev => ({ ...prev, DiscordWebhookUrl: e.target.value }))
+    }
+  />
+</div>
+
+<div>
+  <label className="form-label">Discord Username</label>
+  <input
+    type="text"
+    className="form-input"
+    value={profileData.DiscordUsername || ''}
+    onChange={(e) =>
+      setProfileData(prev => ({ ...prev, DiscordUsername: e.target.value }))
+    }
+  />
+</div>
+
+<div className="flex items-center">
+  <input
+    type="checkbox"
+    className="form-checkbox"
+    checked={profileData.DiscordNotificationsEnabled || false}
+    onChange={(e) =>
+      setProfileData(prev => ({ ...prev, DiscordNotificationsEnabled: e.target.checked }))
+    }
+  />
+  <label className="ml-2 text-sm">Bật thông báo Discord</label>
+</div>
+
+{profileData.type !== 0 && (
+  <div>
+    <label className="form-label">Discord Settings (JSON)</label>
+    <textarea
+      className="form-input"
+      rows={5}
+      value={JSON.stringify(profileData.DiscordSettings, null, 2)}
+      onChange={(e) => {
+        try {
+          const parsed = JSON.parse(e.target.value || '{}');
+          setProfileData((prev) => ({
+            ...prev,
+            DiscordSettings: parsed,
+          }));
+        } catch (err) {
+          console.warn('⚠️ Invalid JSON input');
+        }
+      }}
+    />
+  </div>
+)}
+
+
                       
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
+                     {/* <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                         <div>
                           <label htmlFor="timezone" className="form-label">
                             <FormattedMessage id="settings.timezone" />
                           </label>
-                          <div className="relative">
+                        <div className="relative">
                             <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-dark-400" />
-                            <select
+                             <select
                               id="timezone"
                               className="form-select pl-10"
                               value={profileData.timezone}
@@ -553,7 +667,7 @@ export default function Settings() {
                         </div>
                         
                         <div>
-                          <label htmlFor="language" className="form-label">
+                         <label htmlFor="language" className="form-label">
                             <FormattedMessage id="settings.language" />
                           </label>
                           <div className="relative">
@@ -569,7 +683,7 @@ export default function Settings() {
                             </select>
                           </div>
                         </div>
-                      </div>
+                      </div>*/}
                     </div>
                   </div>
                   

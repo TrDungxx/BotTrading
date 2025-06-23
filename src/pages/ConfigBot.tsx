@@ -46,8 +46,7 @@ interface TradingStreamForm {
   Status: number;
   StreamType: number;
   Leverage?: string;
-MarginType?: string;
-
+  MarginType?: string;
   Type: number;
   StrategyId: string;
   indicatorId: number;
@@ -56,19 +55,20 @@ MarginType?: string;
   TrailingStopPercent: string;
   TrailingStopValue: string;
   ATR: number;
-  ATRPercent: string;
-  ATRValue: string;
+  ATRPercent: number | null;
+  ATRValue: number | null;
   thresholdPercent: string;
-  Symbol: string;
   OrderId: string;
   OrderPrice: string;
-  StopLost: string;
-  TakeProfit: string;
+  StopLost: number;
+  TakeProfit: number;
   CapitalUsageRatio: string;
   Description: string;
   TrendStatus: number;
   TrendType: string;
+  Symbol: string; // ✅ thêm dòng này
 }
+
 
 export default function ConfigBot() {
   const [streams, setStreams] = useState<TradingStream[]>([]);
@@ -88,6 +88,7 @@ export default function ConfigBot() {
   const [leverage, setLeverage] = useState<number>(1);
   const [marginType, setMarginType] = useState<'ISOLATED' | 'CROSS'>('CROSS');
   const [indicators, setIndicators] = useState<{ id: number; name: string; symbol: string }[]>([]);
+ 
 
 
   const [showLeveragePopup, setShowLeveragePopup] = useState(false);
@@ -112,21 +113,22 @@ const SHOW_TREND = false;
     TrailingStopPercent: '',
     TrailingStopValue: '',
     ATR: 0,
-    ATRPercent: '',
-    ATRValue: '',
+    ATRPercent: 2,
+    ATRValue: 0.2,
     thresholdPercent: '',
     Symbol: '',
     OrderId: '',
     OrderPrice: '',
-    StopLost: '',
-    TakeProfit: '',
-    CapitalUsageRatio: '',
+    StopLost: 1,
+    TakeProfit: 4,
+    CapitalUsageRatio: '10',
     Description: '',
     TrendStatus: 0,
     TrendType: 'SIDEWAYS',
     StreamType: 0,
     MarginType: 'CROSS',
     Leverage: '1'
+    
   });
   
 
@@ -214,52 +216,60 @@ const SHOW_TREND = false;
         ?.replace(/\[.*?Warning:.*?\]/g, '') // lọc Warning từ đoạn giữa []
         .trim()
         .slice(0, 250) || 'No description';
+        console.log('🧪 Symbol hiện tại:', formData.Symbol);
 
   const payload = {
-    InternalAccountId: parseInt(formData.InternalAccountId),
-    BinanceAccountId: parseInt(formData.BinanceAccountId),
-    Status: formData.Status,
-    Type: formData.Type,
-    StrategyId: formData.StrategyId ? parseInt(formData.StrategyId) : null,
-    indicatorId: parseInt(formData.indicatorId),
-    ...(SHOW_STREAM_STATUS
-    ? { StreamStatus: formData.StreamStatus }
-    : { StreamStatus: 'waiting for setup' }),
-    StreamType: 0,
-    TrailingStop: formData.TrailingStop,
-    TrailingStopPercent: formData.TrailingStopPercent ? parseFloat(formData.TrailingStopPercent) : null,
-    TrailingStopValue: formData.TrailingStopValue ? parseFloat(formData.TrailingStopValue) : null,
-    ATR: formData.ATR,
-    ATRPercent: formData.ATRPercent ? parseFloat(formData.ATRPercent) : null,
-    ATRValue: formData.ATRValue ? parseFloat(formData.ATRValue) : null,
-    thresholdPercent: formData.thresholdPercent ? parseFloat(formData.thresholdPercent) : null,
-    Symbol: formData.Symbol,
-    OrderId: formData.OrderId,
-    
-    ...(SHOW_ORDER_PRICE
-  ? { OrderPrice: parseFloat(formData.OrderPrice) }
-  : { OrderPrice: 1 }), // ✅ fallback mặc định khi ẩn
-    StopLost: parseFloat(formData.StopLost),
-    TakeProfit: parseFloat(formData.TakeProfit),
-    CapitalUsageRatio: parseInt(formData.CapitalUsageRatio),
-    Description: cleanDescription,
+  // 🧩 Tài khoản và trạng thái cơ bản
+  InternalAccountId: Number(formData.InternalAccountId),
+  BinanceAccountId: Number(formData.BinanceAccountId),
+  Status: formData.Status,
+  Type: formData.Type,
+  StrategyId: formData.StrategyId ? Number(formData.StrategyId) : null,
+  indicatorId: Number(formData.indicatorId),
+  StreamType: 0,
+  Description: cleanDescription,
+Symbol: formData.Symbol || '',
+  
 
+  // ⏳ Trạng thái stream
+  StreamStatus: SHOW_STREAM_STATUS ? formData.StreamStatus : 'waiting for setup',
 
+  // 🛑 Risk Config
+  StopLost: Number(formData.StopLost),
+  TakeProfit: Number(formData.TakeProfit),
+  CapitalUsageRatio: Number(formData.CapitalUsageRatio),
+  Leverage: Number(formData.Leverage?.replace('x', '') || '1'),
+  MarginType: (formData.MarginType === 'CROSSED' ? 'CROSSED' : 'ISOLATED'),
 
-    Leverage: parseInt(formData.Leverage?.replace('x', '') || '1'),
-    MarginType: formData.MarginType ?? 'ISOLATED',
-    ...(SHOW_TREND
-  ? {
-      TrendStatus: formData.TrendStatus,
-      TrendType: formData.TrendType
-    }
-  : {
-      TrendStatus: 0, // ✅ fallback mặc định khi ẩn
-      TrendType: 'SIDEWAYS'
-      
-    }),
-    //TrendType: formData.TrendType
-  };
+  // 💸 Trailing Stop
+  TrailingStop: formData.TrailingStop,
+  TrailingStopPercent: formData.TrailingStopPercent ? Number(formData.TrailingStopPercent) : null,
+  TrailingStopValue: formData.TrailingStopValue ? Number(formData.TrailingStopValue) : null,
+
+  // 📊 ATR
+  ATR: formData.ATR,
+  ATRPercent: formData.ATRPercent ? Number(formData.ATRPercent) : null,
+  ATRValue: formData.ATRValue ? Number(formData.ATRValue) : null,
+
+  // ⚠️ Threshold
+  thresholdPercent: formData.thresholdPercent ? Number(formData.thresholdPercent) : null,
+
+  // 📈 Trend Config
+  ...(SHOW_TREND
+    ? {
+        TrendStatus: formData.TrendStatus,
+        TrendType: formData.TrendType
+      }
+    : {
+        TrendStatus: 0,
+        TrendType: 'SIDEWAYS'
+      }),
+
+  // 🧾 Order Price (ẩn hoặc hiện)
+  OrderId: formData.OrderId,
+  OrderPrice: SHOW_ORDER_PRICE ? Number(formData.OrderPrice) : 1,
+};
+
 
   console.log('📤 Payload gửi đi:', JSON.stringify(payload, null, 2));
 
@@ -309,7 +319,7 @@ if (SHOW_ORDER_PRICE) {
   }
 }
 
-  if (!form.Symbol) errors.push("Symbol is required");
+  
   if (!form.Description) errors.push("Description is required");
   if (form.OrderPrice !== '' && isNaN(Number(form.OrderPrice))) {
   errors.push("Order Price must be a valid number");
@@ -364,14 +374,15 @@ if (SHOW_ORDER_PRICE) {
   TrailingStopPercent: stream.TrailingStopPercent?.toString() || '',
   TrailingStopValue: stream.TrailingStopValue?.toString() || '',
   ATR: stream.ATR,
-  ATRPercent: stream.ATRPercent?.toString() || '',
-  ATRValue: stream.ATRValue?.toString() || '',
+  ATRPercent: stream.ATRPercent ?? 2,
+  ATRValue: stream.ATRValue ?? 0.2,
   thresholdPercent: stream.thresholdPercent?.toString() || '',
-  Symbol: stream.Symbol,
+ Symbol: stream.Symbol,
   OrderId: stream.OrderId.toString(),
   OrderPrice: stream.OrderPrice.toString(),
-  StopLost: stream.StopLost.toString(),
-  TakeProfit: stream.TakeProfit.toString(),
+  StopLost: stream.StopLost ?? 1,
+
+  TakeProfit: stream.TakeProfit ?? 4,
   CapitalUsageRatio: stream.CapitalUsageRatio.toString(),
   Description: stream.Description?.replace(/\[.*?Warning:.*?\]/g, '').trim(),
   TrendStatus: stream.TrendStatus,
@@ -413,7 +424,12 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
   console.log('📦 Payload gửi đi:', updatedStream);
 
   try {
-    await configBotAPI.updateTradingStream(stream.id, updatedStream);
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
+  await configBotAPI.updateTradingStream(stream.id, updatedStream);
+} else {
+  await configBotAPI.updateMyTradingStream(stream.id, updatedStream); // ✅ dùng endpoint cho user
+}
+
     console.log('✅ Update status thành công');
     
 
@@ -442,33 +458,59 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
     TrailingStopPercent: '',
     TrailingStopValue: '',
     ATR: 0,
-    ATRPercent: '',
-    ATRValue: '',
+    ATRPercent: 2,
+    ATRValue: 0.2,
     thresholdPercent: '',
-    Symbol: '',
     OrderId: '',
     OrderPrice: '',
-    StopLost: '',
-    TakeProfit: '',
-    CapitalUsageRatio: '',
+    StopLost: 1,
+    TakeProfit: 4,
+    CapitalUsageRatio: '10',
     Description: '',
     TrendStatus: 0,
     StreamType: 0,
     TrendType: 'SIDEWAYS',
-    // ✅ FIX QUAN TRỌNG:
     Leverage: '1',
-    MarginType: 'CROSS'
+    MarginType: 'CROSS',
+    Symbol: '' // ✅ Thêm đúng chỗ này
   });
 };
 
+
 useEffect(() => {
   const fetchIndicators = async () => {
-    const res = await indicatorApi.getAllIndicatorConfigs();
-    console.log('🎯 Indicators list:', res.Data?.indicators);
-    setIndicators(res.Data?.indicators || []);
+    console.log("🟡 Indicator ID:", formData.indicatorId);
+console.log("🟡 Symbol final:", formData.Symbol);
+
+    try {
+      let res;
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
+        res = await indicatorApi.getAllIndicatorConfigs();
+      } else {
+        res = await indicatorApi.getMyActiveIndicators();
+      }
+
+      const raw = res?.Data?.indicators || res?.Data || [];
+
+      const mapped = raw.map((item: any) => ({
+        
+  id: Number(item.id), // ✅ ép kiểu về number
+  name: item.name || item.Name || 'Unknown',
+  symbol: item.symbol || item.Symbol || '',
+}));
+console.log("✅ Indicator mapping fixed:", mapped);
+      console.log('✅ Mapped indicators:', mapped);
+      setIndicators(mapped);
+    } catch (err) {
+      console.error('❌ Lỗi khi fetch indicators:', err);
+      toast.error('Lỗi tải indicators. Vui lòng thử lại.');
+    }
   };
+
   fetchIndicators();
 }, []);
+
+
 
   
 
@@ -478,15 +520,22 @@ useEffect(() => {
     try {
       const res = await binanceAccountApi.getMyAccounts();
       const accounts = res.Data.accounts || [];
+
       const matched = accounts.find(acc => acc.internalAccountId === user?.internalAccountId);
 
-      if (matched) {
-        setMyBinanceAccountId(matched.id.toString()); // ✅ lưu lại ID
-        setFormData(prev => ({
-          ...prev,
-          BinanceAccountId: matched.id.toString(),
-        }));
+      if (!matched) {
+        console.warn('⚠️ Admin chưa có BinanceAccount tương ứng');
+        // Optional: hiện cảnh báo UI
+        toast.error("⚠️ Bạn chưa có Binance Account. Vui lòng tạo trước!");
+        return; // ⛔ Dừng lại không setFormData
       }
+
+      // ✅ Nếu tìm thấy thì set ID vào form
+      setMyBinanceAccountId(matched.id.toString());
+      setFormData(prev => ({
+        ...prev,
+        BinanceAccountId: matched.id.toString(),
+      }));
     } catch (err) {
       console.error('❌ Lỗi khi lấy BinanceAccount:', err);
     }
@@ -496,6 +545,22 @@ useEffect(() => {
     fetchMyBinanceAccount();
   }
 }, [user]);
+const handleChangeIndicator = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const selectedId = parseInt(e.target.value);
+  const selectedIndicator = indicators.find(i => i.id === selectedId);
+
+  console.log("🧠 ID chọn:", selectedId);
+  console.log("🧠 Danh sách indicators:", indicators);
+  console.log("🧠 Indicator tìm được:", selectedIndicator);
+
+  setFormData(prev => ({
+    ...prev,
+    indicatorId: selectedId,
+    Symbol: selectedIndicator?.symbol || '',
+  }));
+};
+
+
 
 
 
@@ -569,22 +634,25 @@ useEffect(() => {
         return 'text-dark-400';
     }
   };
-const filteredStreams = streams.filter(stream => {
-  const matchesSearch =
-    searchQuery === '' ||
-    stream.Description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    stream.Symbol?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    stream.StreamStatus?.toLowerCase().includes(searchQuery.toLowerCase());
+const filteredStreams = streams
+  .filter(stream => stream.Status !== -1) // 👈 Loại bỏ stream đã bị soft delete
+  .filter(stream => {
+    const matchesSearch =
+      searchQuery === '' ||
+      stream.Description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      stream.Symbol?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      stream.StreamStatus?.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const matchesStatus =
-    selectedStatus === 'all' || stream.Status === Number(selectedStatus);
+    const matchesStatus =
+      selectedStatus === 'all' || stream.Status === Number(selectedStatus);
 
-  const matchesType =
-    selectedType === 'all' || stream.Type === Number(selectedType);
+    const matchesType =
+      selectedType === 'all' || stream.Type === Number(selectedType);
 
-  return matchesSearch && matchesStatus && matchesType;
-});
+    return matchesSearch && matchesStatus && matchesType;
+  });
 
+const indicatorMap = Object.fromEntries(indicators.map(ind => [ind.id, ind.name]));
 
 
   return (
@@ -757,8 +825,8 @@ const filteredStreams = streams.filter(stream => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Stream</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Symbol</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Lavarage</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">StopLost</th>
-<th className="px-6 py-3 text-right text-xs font-medium text-dark-400 min-w-[80px]">Take Profit</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">StopLost %</th>
+<th className="px-6 py-3 text-right text-xs font-medium text-dark-400 min-w-[80px]">Take Profit %</th>
 
                   {SHOW_TYPE && (
   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 min-w-[100px]">Type</th>
@@ -782,20 +850,30 @@ const filteredStreams = streams.filter(stream => {
                 {filteredStreams.map((stream) => (
                   <tr key={stream.id} className="hover:bg-dark-700/40">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
-                          <Bot className="h-5 w-5 text-primary-500" />
-                        </div>
-                        <div className="ml-4 min-w-0">
-                          <div className="font-medium truncate max-w-[200px]" title={stream.Description?.split(' [')[0]}
->
-  {stream.Description?.split(' [')[0]}
+  <div className="flex items-center">
+    <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
+      <Bot className="h-5 w-5 text-primary-500" />
+    </div>
+    <div className="ml-4 min-w-0">
+      {(() => {
+        const description = stream.Description?.split(' [')[0] || 'Unnamed';
+        const indicatorName = indicatorMap[stream.indicatorId] || 'Unknown';
+        return (
+          <div
+            className="font-medium truncate max-w-[250px]"
+            title={`${description} - ${indicatorName}`}
+          >
+            {description} - {indicatorName}
+          </div>
+        );
+      })()}
+      <div className="text-sm text-dark-400">
+        ID: {stream.id} | Indicator: {stream.indicatorId}
+      </div>
+    </div>
+  </div>
+</td>
 
-</div>
-                          <div className="text-sm text-dark-400">ID: {stream.id} | Indicator: {stream.indicatorId}</div>
-                        </div>
-                      </div>
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="font-mono text-sm">{stream.Symbol}</span>
                     </td>
@@ -965,23 +1043,43 @@ const filteredStreams = streams.filter(stream => {
   id="indicatorId"
   className="form-select"
   value={formData.indicatorId?.toString() ?? ''}
-  onChange={(e) =>
-    setFormData({ ...formData, indicatorId: parseInt(e.target.value) })
+  onChange={(e) => {
+  const selectedId = parseInt(e.target.value);
+  const selectedIndicator = indicators.find((i) => i.id === selectedId);
+
+  if (!selectedIndicator) {
+    console.warn('⚠️ Không tìm thấy indicator tương ứng');
+    return;
   }
+
+  const symbol = selectedIndicator.symbol || (selectedIndicator.name === 'EmaSingal' ? '1000PEPEUSDT' : '');
+
+  setFormData((prev) => ({
+    ...prev,
+    indicatorId: selectedId,
+    Symbol: symbol,
+  }));
+
+  console.log("🎯 Đã set Symbol:", symbol);
+}}
+
+
 >
   <option value="">Select indicator...</option>
   {indicators.map((ind) => (
     <option key={ind.id} value={ind.id.toString()}>
-  {ind.Name} ({ind.Symbol})
-</option>
+      {ind.name} ({ind.symbol})
+    </option>
   ))}
 </select>
 
+
+
+
 </div>
-
-                  
                   
 
+                  
                   <div className="hidden">
                     <label htmlFor="streamStatus" className="form-label">Stream Status</label>
                     <select
@@ -1000,7 +1098,7 @@ const filteredStreams = streams.filter(stream => {
               
 
 
-                  <div>
+                  {/* <div>
                     <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
                     <input
                       type="number"
@@ -1022,7 +1120,7 @@ const filteredStreams = streams.filter(stream => {
                       readOnly
     disabled
                     />
-                  </div>
+                  </div>*/}
 
 
 
@@ -1062,7 +1160,7 @@ const filteredStreams = streams.filter(stream => {
                     </select>
                   </div>
 )}
-                  <div>
+                 {/* <div>
                     <label htmlFor="strategyId" className="form-label">Strategy ID</label>
                     <input
                       type="number"
@@ -1072,7 +1170,7 @@ const filteredStreams = streams.filter(stream => {
                       onChange={(e) => setFormData({ ...formData, StrategyId: e.target.value })}
                       placeholder="Optional"
                     />
-                  </div>
+                  </div>*/}
 
                   <div>
                     <label htmlFor="capitalUsageRatio" className="form-label">Capital Usage %</label>
@@ -1105,7 +1203,7 @@ const filteredStreams = streams.filter(stream => {
   });
 }}
     >
-      <option value="CROSS">CROSS</option>
+      <option value="CROSS">CROSSED</option>
       <option value="ISOLATED">ISOLATED</option>
       
     </select>
@@ -1200,7 +1298,7 @@ const filteredStreams = streams.filter(stream => {
                   </div>
                   )}
                   <div>
-                    <label htmlFor="stopLost" className="form-label">Stop Loss</label>
+                    <label htmlFor="stopLost" className="form-label">Stop Lost</label>
                     <input
                       type="number"
                       id="stopLost"
@@ -1225,7 +1323,7 @@ const filteredStreams = streams.filter(stream => {
                     />
                   </div>
 
-                  <div>
+                  {/* <div>
                     <label htmlFor="orderId" className="form-label">Order ID</label>
                     <input
                       type="text"
@@ -1235,12 +1333,12 @@ const filteredStreams = streams.filter(stream => {
                       onChange={(e) => setFormData({ ...formData, OrderId: e.target.value })}
                       placeholder="74753557217"
                     />
-                  </div>
+                  </div>*/}
                 </div>
               </div>
 
               {/* Trailing Stop Configuration */}
-              <div>
+               {/*<div>
                 <h3 className="text-base font-medium mb-4">Trailing Stop Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
@@ -1295,10 +1393,10 @@ const filteredStreams = streams.filter(stream => {
                     />
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* ATR Configuration */}
-              <div>
+             {/* <div>
                 <h3 className="text-base font-medium mb-4">ATR Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
@@ -1340,7 +1438,7 @@ const filteredStreams = streams.filter(stream => {
                     />
                   </div>
                 </div>
-              </div>
+              </div>*/}
 
               {/* Trend Configuration */}
               <div>

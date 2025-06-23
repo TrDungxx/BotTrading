@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { indicatorApi } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,9 @@ export default function Indicators() {
   const [tvPopupOpen, setTvPopupOpen] = useState(false);
 const [selectedIndicator, setSelectedIndicator] = useState<any | null>(null);
 const [messageContent, setMessageContent] = useState<string | null>(null);
+const [selectedType, setSelectedType] = useState<'long' | 'short' | 'exit_long' | 'exit_short' | null>(null);
+const contentRef = useRef<HTMLDivElement>(null);
+
 
   const [formData, setFormData] = useState<Omit<Indicator, 'id' | 'create_time' | 'update_time'>>({
     Name: '',
@@ -50,10 +53,22 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
 } else {
   response = await indicatorApi.getMyActiveIndicators(); // User chỉ xem indicator được gán cho họ
 }
-      const rawIndicators = response?.Data?.indicators ?? [];
+     let rawIndicators: any[] = [];
+
+if (user?.role === 'admin' || user?.role === 'superadmin') {
+  if (Array.isArray(response?.Data)) {
+    rawIndicators = response.Data;
+  } else {
+    rawIndicators = response?.Data?.indicators ?? [];
+  }
+} else {
+  rawIndicators = Array.isArray(response?.Data) ? response.Data : [];
+}
+
 
 
       const mappedIndicators = rawIndicators.map((ind: any) => ({
+        
         id: ind.id,
         Name: ind.Name,
         Symbol: ind.Symbol,
@@ -65,7 +80,7 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
         ExitText: ind.ExitText,
         Status: ind.Status,
         create_time: ind.create_time,
-        update_time: ind.update_time,
+        update_time: ind.update_time ?? 'N/A'
       }));
 
       setIndicators(mappedIndicators);
@@ -78,7 +93,9 @@ if (user?.role === 'admin' || user?.role === 'superadmin') {
 }, []);
 
 
-  const filteredIndicators = indicators.filter(indicator => {
+  const filteredIndicators = indicators
+  .filter(indicator => indicator.Status === 1) // 🟢 chỉ lấy indicator đang active
+  .filter(indicator => {
     const matchesSearch = 
       indicator.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       indicator.Symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -175,9 +192,14 @@ const openTvPopup = (indicator: any) => {
   setMessageContent(null); // reset nếu có message trước
   setTvPopupOpen(true);
 };
-const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
-  if (!selectedIndicator) return;
-
+const showStaticMessage = (type: typeof selectedType) => {
+  setSelectedType(type);
+  setTimeout(() => {
+    contentRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, 100);
+};
+const generateMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') => {
+  if (!selectedIndicator) return '';
   const message = {
     indicatorMessage: {
       strategy: selectedIndicator.Name,
@@ -189,7 +211,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
         ticker: "{{ticker}}",
         exchange: "{{exchange}}",
         interval: "{{interval}}",
-        time: "{{time}} ",
+        time: "{{time}}",
         timenow: "{{timenow}}"
       },
       symbolData: {
@@ -205,9 +227,8 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
     }
   };
 
-  setMessageContent(JSON.stringify(message, null, 2));
+  return JSON.stringify(message, null, 2);
 };
-
 
 
   return (
@@ -218,16 +239,18 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
           <h1 className="text-2xl font-bold">Indicators</h1>
           <p className="text-dark-400">Manage trading indicators and signals</p>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingIndicator(null);
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Indicator
-        </button>
+        {(user?.role === 'admin' || user?.role === 'superadmin') && (
+  <button 
+    className="btn btn-primary"
+    onClick={() => {
+      setEditingIndicator(null);
+      setIsFormOpen(true);
+    }}
+  >
+    <Plus className="mr-2 h-4 w-4" />
+    Add Indicator
+  </button>
+)}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -252,12 +275,13 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Symbol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Leverage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Margin Type</th>
+                 {/*<th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Leverage</th>*/}
+               {/* <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Margin Type</th>*/}
                 <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Description</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-dark-400">Status</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>
+                {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-dark-700">
@@ -269,12 +293,12 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
                   <td className="px-6 py-4 whitespace-nowrap">
                     {indicator.Symbol}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  {/* <td className="px-6 py-4 whitespace-nowrap">
                     {indicator.Leverage}x
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  </td>*/}
+                  {/* <td className="px-6 py-4 whitespace-nowrap">
                     {indicator.MarginType}
-                  </td>
+                  </td>*/}
                   <td className="px-6 py-4">
                     <div className="text-sm text-dark-300">{indicator.Description}</div>
                   </td>
@@ -296,27 +320,36 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
                     {indicator.update_time}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                    <div className="flex justify-end space-x-2">
-                      <button
-    className="text-dark-400 hover:text-yellow-500"
-    onClick={() => openTvPopup(indicator)}
-  >
-    📈
-  </button>
-                      <button
-                        className="text-dark-400 hover:text-primary-500"
-                        onClick={() => handleEdit(indicator)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-dark-400 hover:text-danger-500"
-                        onClick={() => handleDelete(indicator)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+  <div className="flex justify-end space-x-2">
+    {/* Nút mở TV preview luôn hiển thị */}
+    {(user?.role === 'admin' || user?.role === 'superadmin') && (
+    <button
+      className="text-dark-400 hover:text-yellow-500"
+      onClick={() => openTvPopup(indicator)}
+    >
+      📈
+    </button>
+   )}
+    {/* Chỉ hiện nếu là admin/superadmin */}
+    {(user?.role === 'admin' || user?.role === 'superadmin') && (
+      <>
+        <button
+          className="text-dark-400 hover:text-primary-500"
+          onClick={() => handleEdit(indicator)}
+        >
+          <Edit className="h-4 w-4" />
+        </button>
+        <button
+          className="text-dark-400 hover:text-danger-500"
+          onClick={() => handleDelete(indicator)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </>
+    )}
+  </div>
+</td>
+
                 </tr>
               ))}
             </tbody>
@@ -405,7 +438,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
                   required
                 />
               </div>
-
+ {/*<div>
               <div>
                 <label htmlFor="longText" className="form-label">Long Text</label>
                 <input
@@ -441,7 +474,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
                   required
                 />
               </div>
-
+</div>*/}
               <div>
                 <label htmlFor="status" className="form-label">Status</label>
                 <select
@@ -512,7 +545,7 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
 
       {tvPopupOpen && selectedIndicator && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-    <div className="bg-dark-900 dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative">
+    <div className="bg-dark-900 dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative overflow-y-auto max-h-[90vh]">
       <button
         onClick={() => setTvPopupOpen(false)}
         className="absolute top-2 right-2 text-dark-400 hover:text-danger-500"
@@ -523,22 +556,34 @@ const showStaticMessage = (type: 'long' | 'short' | 'exit_long' | 'exit_short') 
       <h2 className="text-xl font-semibold mb-4 text-center">
         Signal Preview: {selectedIndicator?.Name}
       </h2>
+      <p className="text-sm text-dark-400 text-center mb-4">
+        API Webhook: <code className="text-primary-500">http://45.77.33.141/listen/indicator</code>
+      </p>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <button className="btn btn-primary" onClick={() => showStaticMessage('long')}>Long Message</button>
-        <button className="btn btn-primary" onClick={() => showStaticMessage('short')}>Short Message</button>
-        <button className="btn btn-primary" onClick={() => showStaticMessage('exit_long')}>Exit Long</button>
-        <button className="btn btn-primary" onClick={() => showStaticMessage('exit_short')}>Exit Short</button>
-      </div>
-
-      {messageContent && (
-        <pre className="text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all">
-          {messageContent}
-        </pre>
+      {/* === Bố cục xử lý nút và nội dung === */}
+      {!selectedType ? (
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('long')}>Long Message</button>
+          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('short')}>Short Message</button>
+          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('exit_long')}>Exit Long</button>
+          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('exit_short')}>Exit Short</button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div ref={contentRef}>
+            <pre className="w-full text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all max-h-[400px] overflow-auto">
+              {generateMessage(selectedType)}
+            </pre>
+          </div>
+          <div className="flex justify-center">
+            <button className="btn btn-outline" onClick={() => setSelectedType(null)}>← Back</button>
+          </div>
+        </div>
       )}
     </div>
   </div>
 )}
+
 
 
     </div>
