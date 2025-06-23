@@ -604,33 +604,30 @@ const openTvPopup = (indicator: Indicator) => {
         ✖
       </button>
 
-      <h2 className="text-xl font-semibold mb-4 text-center">
-        Signal Preview: {selectedIndicator?.Name}
-      </h2>
-      <p className="text-sm text-dark-400 text-center mb-4">
-        API Webhook: <code className="text-primary-500">http://45.77.33.141/listen/indicator</code>
-      </p>
+      
 
-      {/* === Bố cục xử lý nút và nội dung === */}
-      {!selectedType ? (
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('long')}>Long Message</button>
-          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('short')}>Short Message</button>
-          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('exit_long')}>Exit Long</button>
-          <button className="btn btn-primary w-full" onClick={() => showStaticMessage('exit_short')}>Exit Short</button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div ref={contentRef}>
-            <pre className="w-full text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all max-h-[400px] overflow-auto">
-              {generateMessage(selectedType)}
-            </pre>
-          </div>
-          <div className="flex justify-center">
-            <button className="btn btn-outline" onClick={() => setSelectedType(null)}>← Back</button>
-          </div>
-        </div>
-      )}
+      <div className="space-y-4">
+  <h2 className="text-xl font-semibold text-center">Signal Preview: {selectedIndicator?.Name}</h2>
+  <p className="text-sm text-dark-400 text-center">
+    API Webhook: <code className="text-primary-500">http://45.77.33.141/listen/indicator</code>
+  </p>
+
+  {/* 4 nút chia 2 hàng, 2 cột */}
+  <div className="grid grid-cols-2 gap-4">
+    <button className="btn btn-primary w-full" onClick={() => setSelectedType('long')}>Long Message</button>
+    <button className="btn btn-primary w-full" onClick={() => setSelectedType('short')}>Short Message</button>
+    <button className="btn btn-primary w-full" onClick={() => setSelectedType('exit_long')}>Exit Long</button>
+    <button className="btn btn-primary w-full" onClick={() => setSelectedType('exit_short')}>Exit Short</button>
+  </div>
+
+  {/* Nếu có selectedType thì hiện message JSON */}
+  {selectedType && (
+    <pre className="mt-4 text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all max-h-[400px] overflow-auto">
+      {generateMessage(selectedType)}
+    </pre>
+  )}
+</div>
+
     </div>
   </div>
 )}

@@ -73,7 +73,8 @@ interface TradingStreamForm {
 export default function ConfigBot() {
   const [streams, setStreams] = useState<TradingStream[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<'all' | 0 | 1 | 2>('all');
+  const [selectedStatus, setSelectedStatus] = useState<number | 'all'>('all');
+
   const [selectedType, setSelectedType] = useState<'all' | 0 | 1 | 2>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStream, setEditingStream] = useState<TradingStream | null>(null);
@@ -88,7 +89,12 @@ export default function ConfigBot() {
   const [leverage, setLeverage] = useState<number>(1);
   const [marginType, setMarginType] = useState<'ISOLATED' | 'CROSS'>('CROSS');
   const [indicators, setIndicators] = useState<{ id: number; name: string; symbol: string }[]>([]);
- 
+
+
+  
+ const indicatorMap: Record<number, string> = Object.fromEntries(
+  indicators.map(ind => [ind.id, ind.name])
+);
 
 
   const [showLeveragePopup, setShowLeveragePopup] = useState(false);
@@ -187,6 +193,27 @@ const SHOW_TREND = false;
     setMessage({ type: 'error', text: 'Failed to delete stream' });
   }
 };
+function getPaginationRange(current: number, total: number): (number | string)[] {
+  const delta = 2;
+  const range: (number | string)[] = [];
+
+  for (let i = 1; i <= total; i++) {
+    if (
+      i === 1 ||
+      i === total ||
+      (i >= current - delta && i <= current + delta)
+    ) {
+      range.push(i);
+    } else if (
+      range[range.length - 1] !== '...'
+    ) {
+      range.push('...');
+    }
+  }
+
+  return range;
+}
+
 
 
 
@@ -463,8 +490,8 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
     thresholdPercent: '',
     OrderId: '',
     OrderPrice: '',
-    StopLost: 1,
-    TakeProfit: 4,
+    StopLost: '1',
+    TakeProfit: '1',
     CapitalUsageRatio: '10',
     Description: '',
     TrendStatus: 0,
@@ -599,37 +626,33 @@ const handleChangeIndicator = (e: React.ChangeEvent<HTMLSelectElement>) => {
 
   const getStatusBadgeColor = (status: number) => {
     switch (status) {
-      case 1:
-        return 'bg-success-500/10 text-success-500';
-      case 2:
-        return 'bg-warning-300/10 text-warning-300';
-      case 0:
-        return 'bg-dark-600 text-dark-300';
-      default:
-        return 'bg-dark-600 text-dark-300';
-    }
+    case 1: return 'bg-success-500/10 text-success-500';
+    case 0: return 'bg-dark-600 text-dark-300';
+    case -1: return 'bg-danger-500/10 text-danger-500'; // ✅ mới thêm
+    default: return 'bg-dark-600 text-dark-300';
+  }
   };
 
   const getStatusIcon = (status: number) => {
-    switch (status) {
-      case 1:
-        return <Play className="h-3 w-3" />;
-      case 2:
-        return <Pause className="h-3 w-3" />;
-      case 0:
-        return <XCircle className="h-3 w-3" />;
-      default:
-        return <XCircle className="h-3 w-3" />;
-    }
-  };
+  switch (status) {
+    case 1:
+      return <Play className="h-3 w-3" />;
+    case 0:
+      return <XCircle className="h-3 w-3" />;
+    case -1:
+      return <Trash2 className="h-3 w-3" />; // (tuỳ bạn muốn dùng icon gì cho Deleted)
+    default:
+      return <XCircle className="h-3 w-3" />;
+  }
+};
 
   const getStatusLabel = (status: number) => {
     switch (status) {
-      case 1: return 'Active';
-      case 2: return 'Paused';
-      case 0: return 'Inactive';
-      default: return 'Unknown';
-    }
+    case 1: return 'Active';
+    case 0: return 'Inactive';
+    case -1: return 'Deleted by user'; 
+    default: return 'Unknown';
+  }
   };
 
   const getTypeLabel = (type: number) => {
@@ -667,7 +690,13 @@ const handleChangeIndicator = (e: React.ChangeEvent<HTMLSelectElement>) => {
     }
   };
 const filteredStreams = streams
-  .filter(stream => stream.Status !== -1) // 👈 Loại bỏ stream đã bị soft delete
+  .filter(stream => {
+    // ✅ Ẩn stream nếu là soft-delete và user không phải admin/superadmin
+    if (stream.Status === -1 && user?.role !== 'admin' && user?.role !== 'superadmin') {
+      return false;
+    }
+    return true;
+  })
   .filter(stream => {
     const matchesSearch =
       searchQuery === '' ||
@@ -684,16 +713,23 @@ const filteredStreams = streams
     return matchesSearch && matchesStatus && matchesType;
   });
 
-const indicatorMap = Object.fromEntries(indicators.map(ind => [ind.id, ind.name]));
-const resetIndicator = () => {
-  setFormData(prev => ({
-    ...prev,
-    indicatorId: '',
-    Symbol: ''
-  }));
+  const handleApplyFilter = () => {
+  setSelectedStatus(
+    filterInputs.status === 'all'
+      ? 'all'
+      : parseInt(filterInputs.status, 10)
+  );
+
+  setSelectedType(filterInputs.type); // nếu cần
+  setSearchQuery(filterInputs.query);
 };
 
 
+const [filterInputs, setFilterInputs] = useState({
+  status: 'all',
+  type: 'all',
+  query: ''
+});
 
 
   return (
@@ -739,63 +775,70 @@ const resetIndicator = () => {
       )}
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
-                <Bot className="h-4 w-4 text-primary-500" />
-              </div>
-            </div>
-            <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Total Streams</p>
-              <p className="text-lg font-semibold">{streams.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
-                <Play className="h-4 w-4 text-success-500" />
-              </div>
-            </div>
-            <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Active</p>
-              <p className="text-lg font-semibold">{streams.filter(s => s.Status === 1).length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-300/10">
-                <Pause className="h-4 w-4 text-warning-300" />
-              </div>
-            </div>
-            <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Paused</p>
-              <p className="text-lg font-semibold">{streams.filter(s => s.Status === 2).length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-dark-600">
-                <XCircle className="h-4 w-4 text-dark-300" />
-              </div>
-            </div>
-            <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Inactive</p>
-              <p className="text-lg font-semibold">{streams.filter(s => s.Status === 0).length}</p>
-            </div>
-          </div>
+<div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
+  {/* Total */}
+  <div className="card p-4">
+    <div className="flex items-center">
+      <div className="flex-shrink-0">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
+          <Bot className="h-4 w-4 text-primary-500" />
         </div>
       </div>
+      <div className="ml-3 min-w-0">
+        <p className="text-sm font-medium text-dark-400">Total Streams</p>
+        <p className="text-lg font-semibold">{streams.length}</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Active */}
+  <div className="card p-4">
+    <div className="flex items-center">
+      <div className="flex-shrink-0">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
+          <Play className="h-4 w-4 text-success-500" />
+        </div>
+      </div>
+      <div className="ml-3 min-w-0">
+        <p className="text-sm font-medium text-dark-400">Active</p>
+        <p className="text-lg font-semibold">{streams.filter(s => s.Status === 1).length}</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Inactive */}
+  <div className="card p-4">
+    <div className="flex items-center">
+      <div className="flex-shrink-0">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-dark-600">
+          <XCircle className="h-4 w-4 text-dark-300" />
+        </div>
+      </div>
+      <div className="ml-3 min-w-0">
+        <p className="text-sm font-medium text-dark-400">Inactive</p>
+        <p className="text-lg font-semibold">{streams.filter(s => s.Status === 0).length}</p>
+      </div>
+    </div>
+  </div>
+
+  {/* Deleted - chỉ hiển thị với admin/superadmin */}
+  {['admin', 'superadmin'].includes(user?.role) && (
+    <div className="card p-4">
+      <div className="flex items-center">
+        <div className="flex-shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
+            <Trash2 className="h-4 w-4 text-danger-500" />
+          </div>
+        </div>
+        <div className="ml-3 min-w-0">
+          <p className="text-sm font-medium text-dark-400">Deleted By User</p>
+          <p className="text-lg font-semibold">{streams.filter(s => s.Status === -1).length}</p>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+
 
       {/* Search and filters - Completely redesigned responsive layout */}
       <div className="space-y-4">
@@ -819,15 +862,17 @@ const resetIndicator = () => {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:gap-4">
           <div className="lg:min-w-[140px]">
             <select
-              className="form-select w-full"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value === 'all' ? 'all' : parseInt(e.target.value) as 0 | 1 | 2)}
-            >
-              <option value="all">All Status</option>
-              <option value={1}>Active</option>
-              <option value={2}>Paused</option>
-              <option value={0}>Inactive</option>
-            </select>
+  className="form-select w-full"
+  value={selectedStatus}
+  onChange={(e) => setSelectedStatus(e.target.value === 'all' ? 'all' : parseInt(e.target.value) as 0 | 1 | -1)}
+>
+  <option value="all">All Status</option>
+  <option value={1}>Active</option>
+  <option value={0}>Inactive</option>
+  {user?.role === 'admin' || user?.role === 'superadmin' ? (
+    <option value={-1}>Deleted</option>
+  ) : null}
+</select>
           </div>
           {SHOW_TYPE && (
           <div className="lg:min-w-[140px]">
@@ -844,10 +889,14 @@ const resetIndicator = () => {
           </div>
           )}
           <div className="lg:min-w-[120px]">
-            <button className="btn btn-outline w-full inline-flex items-center justify-center">
-              <Filter className="mr-2 h-4 w-4" />
-              Filter
-            </button>
+            <button
+  className="btn btn-outline w-full inline-flex items-center justify-center"
+  onClick={handleApplyFilter}
+>
+  <Filter className="mr-2 h-4 w-4" />
+  Filter
+</button>
+
           </div>
         </div>
       </div>
@@ -898,7 +947,8 @@ const resetIndicator = () => {
     <div className="ml-4 min-w-0">
       {(() => {
         const description = stream.Description?.split(' [')[0] || 'Unnamed';
-        const indicatorName = indicatorMap[stream.indicatorId] || 'Unknown';
+        const indicatorName = indicatorMap[Number(stream.indicatorId)] || 'Unknown';
+        
         return (
           <div
             className="font-medium truncate max-w-[250px]"
@@ -1150,7 +1200,7 @@ const resetIndicator = () => {
               <div>
                 <h3 className="text-base font-medium mb-4">Status & Type Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                  <div>
+                    {/*<div>
                     <label htmlFor="status" className="form-label">Status</label>
                     <select
                       id="status"
@@ -1162,7 +1212,7 @@ const resetIndicator = () => {
                       <option value={1}>Active</option>
                       <option value={2}>Paused</option>
                     </select>
-                  </div>
+                  </div>*/}
 
 {SHOW_TYPE && (
                   <div>
@@ -1461,9 +1511,9 @@ const resetIndicator = () => {
 
               {/* Trend Configuration */}
               <div>
-                <h3 className="text-base font-medium mb-4">Trend Configuration</h3>
+                {/* <h3 className="text-base font-medium mb-4">Trend Configuration</h3>*/}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
+                {/*  <div>
                     <label htmlFor="trendStatus" className="form-label">Trend Status</label>
                     <select
                       id="trendStatus"
@@ -1474,7 +1524,7 @@ const resetIndicator = () => {
                       <option value={0}>Inactive</option>
                       <option value={1}>Active</option>
                     </select>
-                  </div>
+                  </div>*/}
 {SHOW_TYPE && (
                   <div>
                     <label htmlFor="trendType" className="form-label">Trend Type</label>
