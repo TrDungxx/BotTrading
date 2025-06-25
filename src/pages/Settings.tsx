@@ -275,26 +275,26 @@ export default function Settings() {
     setIsSaving(true);
     setMessage(null);
 
-    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+    const { currentPassword, newPassword, confirmPassword } = passwordData;
+
+    // Kiểm tra input cơ bản
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setMessage({ type: 'error', text: 'All password fields are required' });
       return;
     }
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
+    if (newPassword !== confirmPassword) {
       setMessage({ type: 'error', text: 'New passwords do not match' });
       return;
     }
 
-    if (passwordData.newPassword.length < 8) {
+    if (newPassword.length < 8) {
       setMessage({ type: 'error', text: 'New password must be at least 8 characters long' });
       return;
     }
 
-    // ✅ GỌI API CHÍNH XÁC Ở ĐÂY
-    await authApi.changePassword(
-      passwordData.currentPassword,
-      passwordData.newPassword
-    );
+    // ✅ Gửi đúng API mới
+    await authApi.changePassword(currentPassword, newPassword, confirmPassword);
 
     setPasswordData({
       currentPassword: '',
@@ -303,7 +303,6 @@ export default function Settings() {
     });
 
     setMessage({ type: 'success', text: 'Password updated successfully' });
-
     setTimeout(() => setMessage(null), 3000);
   } catch (error) {
     console.error('Failed to change password:', error);
@@ -316,6 +315,7 @@ export default function Settings() {
     setIsSaving(false);
   }
 };
+
 
 
   const handleNotificationSave = async () => {

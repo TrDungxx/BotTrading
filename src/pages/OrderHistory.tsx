@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, Search, Filter, Calendar, RefreshCw, Plus, Edit, Tr
 import { FormattedMessage, FormattedNumber, FormattedDate } from 'react-intl';
 import { orderHistoryApi, ApiError, API_BASE_URL } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { binanceAccountApi } from '../utils/api';
+import { User, Link2 } from 'lucide-react';
 interface Order {
   orderId: string;
   symbol: string;
@@ -65,12 +67,14 @@ export default function OrderHistory() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deletingOrder, setDeletingOrder] = useState<Order | null>(null);
   const { user } = useAuth();
+  const [accountInfoMap, setAccountInfoMap] = useState<Record<string, { name: string; email: string }> | null>(null);
+
   // Use ref to prevent double calls
   const isInitialMount = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
 
-const SHOW_ADD_ORDER=false;
+  const SHOW_ADD_ORDER = false;
 
 
   const [formData, setFormData] = useState<OrderForm>({
@@ -87,84 +91,84 @@ const SHOW_ADD_ORDER=false;
   });
 
   const fetchOrders = async (pageNum: number = 1, showLoading: boolean = true) => {
-  try {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+    try {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
 
-    abortControllerRef.current = new AbortController();
+      abortControllerRef.current = new AbortController();
 
-    if (showLoading) setLoading(true);
-    setError(null);
+      if (showLoading) setLoading(true);
+      setError(null);
 
-    console.log(`📡 Fetching orders for page ${pageNum}...`);
+      console.log(`📡 Fetching orders for page ${pageNum}...`);
 
-    let response;
-if (user?.role === 'user') {
-  response = await orderHistoryApi.getMyOrderHistory(); // ✅ API dành cho user
-} else {
-  response = await orderHistoryApi.getAllOrderHistory(pageNum, 20); // ✅ chỉ cho admin
-}
-
-    if (response.Data && Array.isArray(response.Data.orders)) {
-      const orders = response.Data.orders;
-      const pagination = response.Data.pagination;
-
-      setOrders(orders);
-
-      // ✅ Nếu backend trả totalPages → dùng nó
-      if (pagination?.totalPages) {
-        setTotalPages(pagination.totalPages);
+      let response;
+      if (user?.role === 'user') {
+        response = await orderHistoryApi.getMyOrderHistory(); // ✅ API dành cho user
       } else {
-        // Nếu không có thì ước lượng đơn giản
-        setTotalPages(orders.length >= 20 ? pageNum + 1 : pageNum);
+        response = await orderHistoryApi.getAllOrderHistory(pageNum, 20); // ✅ chỉ cho admin
       }
-    } else {
+
+      if (response.Data && Array.isArray(response.Data.orders)) {
+        const orders = response.Data.orders;
+        const pagination = response.Data.pagination;
+
+        setOrders(orders);
+
+        // ✅ Nếu backend trả totalPages → dùng nó
+        if (pagination?.totalPages) {
+          setTotalPages(pagination.totalPages);
+        } else {
+          // Nếu không có thì ước lượng đơn giản
+          setTotalPages(orders.length >= 20 ? pageNum + 1 : pageNum);
+        }
+      } else {
+        setOrders([]);
+        setTotalPages(1);
+      }
+
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('⚠️ Request was aborted');
+        return;
+      }
+
+      console.error('❌ Error fetching orders:', err);
+
+      if (err instanceof ApiError) {
+        switch (err.status) {
+          case 0:
+            setError(!err.response
+              ? 'Network connection failed. Please check the API URL and your internet.'
+              : 'Unexpected response format from API.');
+            break;
+          case 401:
+            setError('Unauthorized. Please login again.');
+            break;
+          case 403:
+            setError('Access denied. You do not have permission to view order history.');
+            break;
+          case 404:
+            setError('Order history service not found.');
+            break;
+          case 500:
+            setError('Server error. Please try again later.');
+            break;
+          default:
+            setError(err.message || 'Failed to fetch order history');
+        }
+      } else {
+        setError('Network error. Please check your connection and try again.');
+      }
+
       setOrders([]);
-      setTotalPages(1);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      abortControllerRef.current = null;
     }
-
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      console.log('⚠️ Request was aborted');
-      return;
-    }
-
-    console.error('❌ Error fetching orders:', err);
-
-    if (err instanceof ApiError) {
-      switch (err.status) {
-        case 0:
-          setError(!err.response
-            ? 'Network connection failed. Please check the API URL and your internet.'
-            : 'Unexpected response format from API.');
-          break;
-        case 401:
-          setError('Unauthorized. Please login again.');
-          break;
-        case 403:
-          setError('Access denied. You do not have permission to view order history.');
-          break;
-        case 404:
-          setError('Order history service not found.');
-          break;
-        case 500:
-          setError('Server error. Please try again later.');
-          break;
-        default:
-          setError(err.message || 'Failed to fetch order history');
-      }
-    } else {
-      setError('Network error. Please check your connection and try again.');
-    }
-
-    setOrders([]);
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-    abortControllerRef.current = null;
-  }
-};
+  };
 
 
 
@@ -180,27 +184,27 @@ if (user?.role === 'user') {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const now = new Date().toISOString();
-    
+
     if (editingOrder) {
       // Update existing order
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
-          order.orderId === editingOrder.orderId 
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.orderId === editingOrder.orderId
             ? {
-                ...order,
-                symbol: formData.symbol,
-                status: formData.status,
-                price: formData.price,
-                origQty: formData.origQty,
-                executedQty: formData.executedQty,
-                type: formData.type,
-                side: formData.side,
-                indicatorCall: formData.indicatorCall,
-                description: formData.description,
-                update_time: now
-              }
+              ...order,
+              symbol: formData.symbol,
+              status: formData.status,
+              price: formData.price,
+              origQty: formData.origQty,
+              executedQty: formData.executedQty,
+              type: formData.type,
+              side: formData.side,
+              indicatorCall: formData.indicatorCall,
+              description: formData.description,
+              update_time: now
+            }
             : order
         )
       );
@@ -239,7 +243,7 @@ if (user?.role === 'user') {
 
       setOrders(prevOrders => [newOrder, ...prevOrders]);
     }
-    
+
     setIsFormOpen(false);
     setEditingOrder(null);
     resetForm();
@@ -287,6 +291,33 @@ if (user?.role === 'user') {
       description: ''
     });
   };
+  useEffect(() => {
+    const fetchAccountInfo = async () => {
+      try {
+        const res = await binanceAccountApi.getListAccounts(); // cần quyền admin/superadmin
+        const map: Record<string, { name: string; email: string }> = {};
+
+        res?.Data?.accounts?.forEach((acc: any) => {
+          if (acc.id) {
+            map[acc.id.toString()] = {
+              name: acc.Name,
+              email: acc.Email,
+            };
+          }
+        });
+
+        setAccountInfoMap(map);
+      } catch (err) {
+        console.error('❌ Lỗi khi load BinanceAccounts:', err);
+      }
+    };
+
+    if (user?.role !== 'user') {
+      fetchAccountInfo();
+    }
+  }, []);
+
+
 
   useEffect(() => {
     // Prevent double call on initial mount in development mode
@@ -294,7 +325,7 @@ if (user?.role === 'user') {
       isInitialMount.current = false;
       fetchOrders(page);
     }
-    
+
     // Cleanup function to abort pending requests
     return () => {
       if (abortControllerRef.current) {
@@ -313,7 +344,7 @@ if (user?.role === 'user') {
   // Filter orders based on search query
   const filteredOrders = orders.filter(order => {
     if (!searchQuery) return true;
-    
+
     const searchLower = searchQuery.toLowerCase();
     return (
       order.orderId.toLowerCase().includes(searchLower) ||
@@ -376,7 +407,7 @@ if (user?.role === 'user') {
           </p>
         </div>
         <div className="flex gap-2">
-         {/* {(user?.role === 'admin' || user?.role === 'superadmin') && (
+          {/* {(user?.role === 'admin' || user?.role === 'superadmin') && (
   <button
     onClick={() => {
       setEditingOrder(null);
@@ -496,7 +527,7 @@ if (user?.role === 'user') {
                   <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
                     Date
                   </th>
-                   {/*<th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  {/*<th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
                     Actions
                   </th>*/}
                 </tr>
@@ -504,17 +535,34 @@ if (user?.role === 'user') {
               <tbody className="divide-y divide-dark-700">
                 {filteredOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-dark-700/40">
-                    <td className="whitespace-nowrap px-4 py-4 text-sm font-mono">
-                      {order.orderId}
+                    <td className="whitespace-nowrap px-4 py-4 text-sm font-mono align-top">
+                      <div className="flex flex-col gap-1 text-white font-semibold">
+                        <div className="text-sm font-mono">{order.orderId}</div>
+
+                        {order.binanceAccount && accountInfoMap?.[order.binanceAccount.toString()] && (
+                          <>
+                            <div className="flex items-center gap-1 text-xs">
+                              <User className="h-4 w-4 text-primary-500" />
+                              {accountInfoMap[order.binanceAccount.toString()].name}
+                            </div>
+                            <div className="flex items-center gap-1 text-xs">
+                              <Link2 className="h-4 w-4 text-warning-300" />
+                              {accountInfoMap[order.binanceAccount.toString()].email}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </td>
+
+
+
                     <td className="whitespace-nowrap px-4 py-4 text-sm font-medium">
                       {order.symbol}
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-sm">
                       <div className="flex flex-col">
-                        <span className={`inline-flex items-center ${
-                          order.side === 'BUY' ? 'text-success-500' : 'text-danger-500'
-                        }`}>
+                        <span className={`inline-flex items-center ${order.side === 'BUY' ? 'text-success-500' : 'text-danger-500'
+                          }`}>
                           {order.side === 'BUY' ? (
                             <ArrowDown className="mr-1 h-4 w-4" />
                           ) : (
@@ -577,8 +625,8 @@ if (user?.role === 'user') {
                         <FormattedDate
                           value={order.update_time}
                           day="2-digit"
-  month="2-digit"
-  year="numeric"
+                          month="2-digit"
+                          year="numeric"
                         />
                         <div className="text-xs">
                           <FormattedDate
@@ -631,29 +679,28 @@ if (user?.role === 'user') {
             >
               <FormattedMessage id="common.previous" />
             </button>
-            
+
             {/* Page numbers */}
             <div className="flex space-x-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + i;
                 if (pageNum > totalPages) return null;
-                
+
                 return (
                   <button
                     key={pageNum}
                     onClick={() => handlePageChange(pageNum)}
-                    className={`px-3 py-2 text-sm rounded-md ${
-                      pageNum === page
-                        ? 'bg-primary-500 text-white'
-                        : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
-                    }`}
+                    className={`px-3 py-2 text-sm rounded-md ${pageNum === page
+                      ? 'bg-primary-500 text-white'
+                      : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
+                      }`}
                   >
                     {pageNum}
                   </button>
                 );
               })}
             </div>
-            
+
             <button
               onClick={() => handlePageChange(page + 1)}
               disabled={page === totalPages}
@@ -853,9 +900,9 @@ if (user?.role === 'user') {
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
                 <AlertTriangle className="h-6 w-6 text-danger-500" />
               </div>
-              
+
               <h3 className="text-lg font-medium text-center mb-2">Delete Order</h3>
-              
+
               <p className="text-dark-400 text-center mb-6">
                 Are you sure you want to delete order "{deletingOrder.orderId}"? This action cannot be undone.
               </p>

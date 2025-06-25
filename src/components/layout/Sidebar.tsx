@@ -40,25 +40,25 @@ const adminNavigation = [
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
   const { user, isGuestMode, isAuthenticated } = useAuth();
-  
+
   // Xác định navigation items dựa trên authentication status và user type
   let finalNavigation = [...navigation];
-  
+
   if (isAuthenticated && user) {
     // Add authenticated user navigation
     finalNavigation = [...finalNavigation, ...authenticatedNavigation];
-    
+
     // Type 1 (Admin) - có quyền cao nhất, thấy tất cả
     if ([1, 2, 99].includes(user.type)) {
-  finalNavigation = [...finalNavigation, ...adminNavigation];
-}
-   
+      finalNavigation = [...finalNavigation, ...adminNavigation];
+    }
+
     // Type 3 (User) - chỉ thấy navigation cơ bản + authenticated navigation
   } else if (isGuestMode) {
     // Guest mode - chỉ có basic navigation
     finalNavigation = navigation;
   }
-  
+
   return (
     <>
       {/* Mobile sidebar overlay */}
@@ -69,7 +69,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         )}
         onClick={() => setOpen(false)}
       />
-      
+
       {/* Mobile sidebar */}
       <div
         className={cn(
@@ -93,7 +93,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
             <X className="h-6 w-6" />
           </button>
         </div>
-        
+
         <nav className="mt-4 px-2 space-y-1">
           {finalNavigation.map((item) => {
             const isActive = location.pathname === item.href;
@@ -121,7 +121,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           })}
         </nav>
       </div>
-      
+
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-dark-700 lg:bg-dark-800">
         <div className="flex h-16 items-center justify-center border-b border-dark-700">
@@ -130,11 +130,11 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               <div className="h-8 w-8 rounded-md bg-gradient-to-tr from-primary-600 to-primary-500 flex items-center justify-center text-white font-bold">
                 TW
               </div>
-               {/*<span className="text-lg font-semibold">3Commas</span>*/}
+              {/*<span className="text-lg font-semibold">3Commas</span>*/}
             </div>
           </Link>
         </div>
-        
+
         <div className="flex flex-1 flex-col overflow-y-auto">
           <nav className="mt-4 px-3 space-y-1">
             {finalNavigation.map((item) => {
@@ -161,7 +161,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               );
             })}
           </nav>
-          
+
           {/* User info section */}
           <div className="mt-auto p-4">
             {isAuthenticated && user && (
@@ -173,17 +173,17 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-dark-200 truncate">{user.username}</p>
                     <p className="text-xs text-dark-400">
-  {user.type === 1
-    ? 'Admin'
-    : [2, 99].includes(user.type)
-    ? 'SuperAdmin'
-    : 'User'}
-</p>
+                      {user.type === 1
+                        ? 'Admin'
+                        : [2, 99].includes(user.type)
+                          ? 'SuperAdmin'
+                          : 'User'}
+                    </p>
                   </div>
                 </div>
               </div>
             )}
-            
+
             {isGuestMode && (
               <div className="mb-4 p-3 bg-warning-300/10 rounded-lg border border-warning-300/20">
                 <div className="flex items-center gap-x-3">
@@ -197,8 +197,8 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                 </div>
               </div>
             )}
-            
-            <div className="rounded-md bg-dark-700/50 p-3">
+
+           {/* <div className="rounded-md bg-dark-700/50 p-3">
               <div className="flex items-center gap-x-3">
                 <div className="h-10 w-10 rounded-md bg-dark-600 flex items-center justify-center">
                   <Bot className="h-5 w-5 text-primary-500" />
@@ -215,7 +215,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               <button className="mt-3 w-full rounded-md bg-primary-500 py-1.5 text-xs font-medium text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-800">
                 {isAuthenticated ? 'Upgrade Now' : 'Sign Up'}
               </button>
-            </div>
+            </div>*/}
           </div>
         </div>
       </div>

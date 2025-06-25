@@ -17,6 +17,11 @@ export interface ApiResponse<T = any> {
   };
   token?: string;
 }
+export interface ApiRequestOptions {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: any;
+  params?: Record<string, any>; // 👈 rất quan trọng!
+}
 
 export class ApiError extends Error {
   constructor(
@@ -40,20 +45,19 @@ export const checkApiHealth = async (): Promise<boolean> => {
 
 export const apiRequest = async <T = any>(
   endpoint: string,
-  options: {
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-    body?: any
-  } = { method: 'GET' }
+  options: ApiRequestOptions
 ): Promise<ApiResponse<T>> => {
   try {
     const config = {
       method: options.method,
       url: endpoint,
       data: options.body || undefined,
+      params: options.params, // 👈 thêm dòng này để axios encode ?page= & limit=
     };
 
     console.log('📡 Making API request to:', API_BASE_URL + endpoint);
-    
+    console.log('📥 Params gửi đi:', options.params);
+
     const response = await axiosInstance.request(config);
     const data = response.data;
 
@@ -66,16 +70,6 @@ export const apiRequest = async <T = any>(
     return data;
   } catch (error: any) {
     console.error('❌ API request error:', error);
-
-    if (error instanceof ApiError) throw error;
-
-   // const isReachable = await checkApiHealth().catch(() => false);
-    //if (!isReachable) {
-      //throw new ApiError(
-        //`Không thể kết nối đến server tại ${API_BASE_URL}.\n\nVui lòng kiểm tra:\n• Server backend có đang chạy không?\n• Ngrok URL có hết hạn không?\n• Đã restart frontend sau khi sửa .env chưa?`,
-        //0
-      //);
-    //}
 
     throw new ApiError(
       error?.message || 'Lỗi không xác định',
@@ -112,11 +106,24 @@ export const authApi = {
       method: 'POST',
     }),
 
-  changePassword: (oldPassword: string, newPassword: string) =>
-  apiRequest('/auth/change-password', {
+  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) =>
+  apiRequest('/accounts/change-password', {
     method: 'PUT',
-    body: { oldPassword, newPassword },
+    body: { currentPassword, newPassword, confirmPassword },
   }),
+
+  // --------------Reset Password-------------------
+resetPasswordAsAdmin: (accountId: number, newPassword: string, notifyUser = true) =>
+  apiRequest('/accounts/admin/reset-password', {
+    method: 'PUT',
+    body: {
+      accountId,
+      newPassword,
+      notifyUser
+    },
+  }),
+
+
 
   // Nếu backend có thì giữ, không thì xoá hoặc comment
   register: (username: string, password: string, email:string) =>
@@ -241,8 +248,11 @@ export const adminApi = {
 // -------------------- Account Management API --------------------
 
 export const accountApi = {
-  getListAccount: () =>
-    apiRequest('/accounts', { method: 'GET' }),
+  getListAccount: (params?: { page?: number; limit?: number }) =>
+  apiRequest('/accounts', {
+    method: 'GET',
+    params,
+  }),
 
   getAccountById: (id: number) =>
     apiRequest(`/accounts/getById?id=${id}`, { method: 'GET' }),
@@ -293,7 +303,13 @@ createIndicatorConfig: (payload: any) =>
   apiRequest('/m-sys/indicators/create', { method: 'POST', body: payload }),
 
 updateIndicatorConfig: (payload: any) =>
-  apiRequest('/m-sys/indicators/update', { method: 'PUT', body: payload }),
+  apiRequest(`/m-sys/indicators/update?id=${payload.id}`, {
+    method: 'PUT',
+    body: {
+      ...payload,
+      id: undefined // hoặc không truyền id trong body nếu backend không cần
+    }
+  }),
 
 getActiveIndicators: () =>
   apiRequest('/m-sys/indicators/active/all', { method: 'GET' }),
@@ -318,8 +334,11 @@ bulkUpdateIndicators: (payload: any) =>
 export const binanceAccountApi = {
   // -------------------- USER APIs --------------------
   // Người dùng có thể thao tác trên tài khoản Binance của chính họ
-  getMyAccounts: () =>
-    apiRequest('/binance/my-accounts', { method: 'GET' }),
+  getMyAccounts: (params?: { page?: number; limit?: number }) =>
+  apiRequest('/binance/my-accounts', {
+    method: 'GET',
+    params,
+  }),
 
   getMyAccountById: (id: number) =>
     apiRequest(`/binance/my-account?id=${id}`, { method: 'GET' }),
@@ -343,8 +362,12 @@ export const binanceAccountApi = {
 
   // -------------------- ADMIN APIs --------------------
   // Admin có quyền quản lý tất cả tài khoản Binance
-  getListAccounts: () =>
-    apiRequest('/binance/accounts', { method: 'GET' }),
+  getListAccounts: (params?: { page?: number; limit?: number }) =>
+  apiRequest('/binance/accounts', {
+    method: 'GET',
+     params,
+  }),
+
 
   getAccountById: (id: number) =>
     apiRequest(`/binance/accounts/getById?id=${id}`, { method: 'GET' }),
@@ -410,8 +433,10 @@ export const configBotAPI = {
 
 //----------------------- quyen configbot admin api -------------------
 
-getAllTradingStreams: () =>
-    apiRequest('/stream/getAll', { method: 'GET' }),
+getAllTradingStreams: ({ page, limit }: { page: number; limit: number }) =>
+  apiRequest(`/stream/getAll?page=${page}&limit=${limit}`, {
+    method: 'GET',
+  }),
 
   getTradingStreamById: (id: number) =>
     apiRequest(`/stream/getById?id=${id}`, { method: 'GET' }),

@@ -8,23 +8,7 @@ import { adminApi, accountApi } from '../utils/api';
 // Mock data for users với type system
 
 
-// Mock data for system stats
-const systemStats = {
-  //totalUsers: 1247,
-  //activeUsers: 892,
-  pendingUsers: 15, // New stat for pending approvals
-  //adminUsers: 5,
-  //moderatorUsers: 12,
-  regularUsers: 1230,
-  totalBots: 3456,
-  activeBots: 2789,
-  totalTrades: 156789,
-  dailyTrades: 4567,
-  systemLoad: 42,
-  memoryUsage: 68,
-  uptime: '99.99%',
-  lastBackup: '2024-03-15T00:00:00Z',
-};
+
 
 interface Account {
   id: number;
@@ -64,7 +48,9 @@ export default function AdminSystem() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10); // hoặc số bạn muốn
+  const [totalPages, setTotalPages] = useState(1);
 
   // Form states
   const [createForm, setCreateForm] = useState<CreateAccountForm>({
@@ -80,8 +66,8 @@ export default function AdminSystem() {
 
   // Kiểm tra quyền admin (type 1)
   if (!user || ![1, 2, 99].includes(user.type)) {
-  return <Navigate to="/" replace />;
-}
+    return <Navigate to="/" replace />;
+  }
 
   // Load data on component mount and tab change
   useEffect(() => {
@@ -101,124 +87,132 @@ export default function AdminSystem() {
   }, [message]);
 
   const loadAccounts = async () => {
-    
-  setIsLoading(true);
-  try {
-    
-    const response = await accountApi.getListAccount();
-    const rawAccounts = response.Data.accounts || []; // ✅ Lấy mảng đúng
+    setIsLoading(true);
+    try {
+      const response = await accountApi.getListAccount({ page, limit });
 
-    const accountList = rawAccounts.map((acc: any) => {
-  console.log('🔥 acc.Type:', acc.Type, '| typeof:', typeof acc.Type);
+      const rawAccounts = response.Data?.accounts || [];
+      const pagination = response.Data?.pagination;
 
-  return {
-    id: acc.id,
-    username: acc.Username,
-    email: acc.Email,
-    type: typeof acc.Type === 'number' ? acc.Type : 0, // fix luôn ở đây
-    status: Number(acc.Status),
-    approved: 1,
-    createdAt: acc.create_time,
-    lastLogin: acc.update_time,
+      const accountList = rawAccounts.map((acc: any) => ({
+        id: acc.id,
+        username: acc.Username,
+        email: acc.Email,
+        type: typeof acc.Type === 'number' ? acc.Type : 0,
+        status: Number(acc.Status),
+        approved: 1,
+        createdAt: acc.create_time,
+        lastLogin: acc.update_time,
+      }));
+
+      setAccounts(accountList);
+
+      if (pagination?.totalPages) {
+        setTotalPages(pagination.totalPages);
+      } else {
+        setTotalPages(Math.ceil(rawAccounts.length / limit));
+      }
+    } catch (error) {
+      console.error('Failed to load accounts:', error);
+      setMessage({ type: 'error', text: 'Failed to load accounts' });
+    } finally {
+      setIsLoading(false);
+    }
   };
-});
 
+  //pagination
 
-    setAccounts(accountList);
-  } catch (error) {
-    console.error('Failed to load accounts:', error);
-    setMessage({ type: 'error', text: 'Failed to load accounts' });
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  useEffect(() => {
+    if (activeTab === 'users') {
+      loadAccounts();
+    }
+  }, [activeTab, page]);
 
 
 
 
   //const loadPendingUsers = async () => {
-    //setIsLoading(true);
-   // try {
-     // const response = await adminApi.getPendingUsers();
-      //setPendingUsers(response.data || []);
-   // } catch (error) {
-     // console.error('Failed to load pending users:', error);
-      //setMessage({ type: 'error', text: 'Failed to load pending users' });
-   // } finally {
-    //  setIsLoading(false);
-   // }
- // };
+  //setIsLoading(true);
+  // try {
+  // const response = await adminApi.getPendingUsers();
+  //setPendingUsers(response.data || []);
+  // } catch (error) {
+  // console.error('Failed to load pending users:', error);
+  //setMessage({ type: 'error', text: 'Failed to load pending users' });
+  // } finally {
+  //  setIsLoading(false);
+  // }
+  // };
 
   const handleCreateAccount = async () => {
-  try {
-    const payload = {
-      Username: createForm.username, // chuyển sang viết hoa key đúng
-      Password: createForm.password,
-    };
+    try {
+      const payload = {
+        Username: createForm.username, // chuyển sang viết hoa key đúng
+        Password: createForm.password,
+      };
 
-    console.log('📤 Payload gửi đi:', payload);
-    await accountApi.createAccount(payload);
+      console.log('📤 Payload gửi đi:', payload);
+      await accountApi.createAccount(payload);
 
-    setMessage({ type: 'success', text: 'Tạo tài khoản thành công' });
-    setShowCreateModal(false);
-    setCreateForm({
-      username: '',
-      email: '',
-      password: '',
-      type: 3,
-      status: 1,
-      approved: 1
-    });
-    loadAccounts(); // refresh lại danh sách
-  } catch (error) {
-    console.error('❌ Lỗi khi tạo tài khoản:', error);
-    setMessage({ type: 'error', text: 'Tạo tài khoản thất bại' });
-  }
-};
+      setMessage({ type: 'success', text: 'Tạo tài khoản thành công' });
+      setShowCreateModal(false);
+      setCreateForm({
+        username: '',
+        email: '',
+        password: '',
+        type: 3,
+        status: 1,
+        approved: 1
+      });
+      loadAccounts(); // refresh lại danh sách
+    } catch (error) {
+      console.error('❌ Lỗi khi tạo tài khoản:', error);
+      setMessage({ type: 'error', text: 'Tạo tài khoản thất bại' });
+    }
+  };
 
 
   const handleUpdateAccount = async () => {
-  if (!editForm.id) return;
+    if (!editForm.id) return;
 
-  setIsSaving(true);
-  try {
-    const { id, username, email, type, status, fullName } = editForm;
+    setIsSaving(true);
+    try {
+      const { id, username, email, type, status, fullName } = editForm;
 
-    // ❗ Kiểm tra quyền
-    if (![1, 2, 99].includes(user?.type)) {
-      setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
-      setIsSaving(false); // ✅ THÊM DÒNG NÀY
-      return;
+      // ❗ Kiểm tra quyền
+      if (![1, 2, 99].includes(user?.type)) {
+        setMessage({ type: 'error', text: '❌ Bạn không có quyền cập nhật thông tin người dùng' });
+        setIsSaving(false); // ✅ THÊM DÒNG NÀY
+        return;
+      }
+
+      const payload: any = {
+        Username: username,
+        Email: email,
+        Status: Number(status),
+        FullName: fullName || '',
+      };
+
+      // ✅ Chỉ superadmin được đổi Type
+      if ([2, 99].includes(user?.type)) {
+        payload.Type = typeof type === 'number' ? type : 0;
+      }
+
+      console.log('📤 Payload gửi lên:', payload);
+
+      await accountApi.updateAccount(id, payload);
+
+      setMessage({ type: 'success', text: 'Account updated successfully' });
+      setShowEditModal(false);
+      setEditForm({});
+      await loadAccounts();
+    } catch (error) {
+      console.error('❌ Failed to update account:', error);
+      setMessage({ type: 'error', text: 'Failed to update account' });
+    } finally {
+      setIsSaving(false);
     }
-
-    const payload: any = {
-      Username: username,
-      Email: email,
-      Status: Number(status),
-      FullName: fullName || '',
-    };
-
-    // ✅ Chỉ superadmin được đổi Type
-    if ([2, 99].includes(user?.type)) {
-      payload.Type = typeof type === 'number' ? type : 0;
-    }
-
-    console.log('📤 Payload gửi lên:', payload);
-
-    await accountApi.updateAccount(id, payload);
-
-    setMessage({ type: 'success', text: 'Account updated successfully' });
-    setShowEditModal(false);
-    setEditForm({});
-    await loadAccounts();
-  } catch (error) {
-    console.error('❌ Failed to update account:', error);
-    setMessage({ type: 'error', text: 'Failed to update account' });
-  } finally {
-    setIsSaving(false);
-  }
-};
+  };
 
 
 
@@ -243,17 +237,17 @@ export default function AdminSystem() {
 
   // Filter users based on search and filters
   const filteredUsers = accounts.filter(account => {
-    const matchesSearch = 
+    const matchesSearch =
       account.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       account.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesType = selectedType === 'all' || account.type === selectedType;
     const matchesStatus = selectedStatus === 'all' || account.status === selectedStatus;
 
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  
+
 
 
   const getUserTypeBadgeColor = (type: number) => {
@@ -269,7 +263,7 @@ export default function AdminSystem() {
     switch (status) {
       case 0: return 'bg-warning-300/10 text-warning-300';
       case 1: return 'bg-success-500/10 text-success-500';
-      case 2: return 'bg-danger-500/10 text-danger-500';
+      case -1: return 'bg-danger-500/10 text-danger-500';
       default: return 'bg-dark-600 text-dark-300';
     }
   };
@@ -278,7 +272,7 @@ export default function AdminSystem() {
     switch (status) {
       case 0: return 'Pending';
       case 1: return 'Active';
-      case 2: return 'Suspended';
+      case -1: return 'Delete by user';
       default: return 'Unknown';
     }
   };
@@ -308,11 +302,11 @@ export default function AdminSystem() {
     const now = new Date();
     const created = new Date(createdAt);
     const diffInMs = now.getTime() - created.getTime();
-    
+
     const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffInMinutes < 60) {
       return `${diffInMinutes} phút trước`;
     } else if (diffInHours < 24) {
@@ -325,7 +319,8 @@ export default function AdminSystem() {
   switch (type) {
     case 0: return 'User';
     case 1: return 'Admin';
-    case 2: return 'SuperAdmin';
+    case 2:
+    case 99: return 'SuperAdmin';
     default: return 'Unknown';
   }
 }
@@ -334,8 +329,9 @@ export default function AdminSystem() {
 
 
 
+
   return (
-    
+
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Admin System</h1>
@@ -344,11 +340,10 @@ export default function AdminSystem() {
 
       {/* Global message */}
       {message && (
-        <div className={`flex items-center gap-3 p-4 rounded-lg ${
-          message.type === 'success' 
-            ? 'bg-success-500/10 border border-success-500/20' 
+        <div className={`flex items-center gap-3 p-4 rounded-lg ${message.type === 'success'
+            ? 'bg-success-500/10 border border-success-500/20'
             : 'bg-danger-500/10 border border-danger-500/20'
-        }`}>
+          }`}>
           {message.type === 'success' ? (
             <CheckCircle className="h-5 w-5 text-success-500 flex-shrink-0" />
           ) : (
@@ -372,25 +367,25 @@ export default function AdminSystem() {
             <div className="ml-4">
               <h2 className="text-sm font-medium text-dark-400">Total Users</h2>
               <div className="mt-1 flex items-baseline">
-                <p className="text-2xl font-semibold">{accounts.length || systemStats.totalUsers}</p>
-                <p className="ml-2 text-sm text-dark-400">
-                  ({accounts.filter(a => a.status === 1).length || systemStats.activeUsers} active)
-                </p>
+                <p className="text-2xl font-semibold">{accounts.length}</p>
+<p className="ml-2 text-sm text-dark-400">
+  ({accounts.filter(a => a.status === 1).length} active)
+</p>
               </div>
               <div className="mt-1 text-xs text-dark-500">
-                Admin: {accounts.filter(a => a.type === 1).length || systemStats.adminUsers} | 
-                Super: {accounts.filter(a => a.type === 2).length || systemStats.superadminUsers} | 
-                User: {accounts.filter(a => a.type === 3).length || systemStats.regularUsers}
+                Admin: {accounts.filter(a => a.type === 1).length} |
+Super: {accounts.filter(a => a.type === 2 || a.type === 99).length} |
+User: {accounts.filter(a => a.type === 0).length}
               </div>
             </div>
           </div>
         </div>
 
-        
 
-        
 
-        
+
+
+
       </div>
 
       {/* Tabs */}
@@ -398,16 +393,15 @@ export default function AdminSystem() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('users')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
-              activeTab === 'users'
+            className={`border-b-2 px-1 py-4 text-sm font-medium ${activeTab === 'users'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
-            }`}
+              }`}
           >
             All Users
           </button>
-          
-          
+
+
         </nav>
       </div>
 
@@ -430,18 +424,18 @@ export default function AdminSystem() {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 lg:flex-shrink-0">
               <select
-  className="form-select min-w-[140px]"
-  value={selectedType}
-  onChange={(e) =>
-    setSelectedType(e.target.value === 'all' ? 'all' : Number(e.target.value) as 0 | 1 | 2)
-  }
->
-  <option value="all">All Types</option>
-  <option value={0}>User</option>
-  <option value={1}>Admin</option>
-  <option value={2}>SuperAdmin</option>
-  
-</select>
+                className="form-select min-w-[140px]"
+                value={selectedType}
+                onChange={(e) =>
+                  setSelectedType(e.target.value === 'all' ? 'all' : Number(e.target.value) as 0 | 1 | 2)
+                }
+              >
+                <option value="all">All Types</option>
+                <option value={0}>User</option>
+                <option value={1}>Admin</option>
+                <option value={2}>SuperAdmin</option>
+
+              </select>
 
               <select
                 className="form-select min-w-[120px]"
@@ -451,7 +445,7 @@ export default function AdminSystem() {
                 <option value="all">All Status</option>
                 <option value={0}>Pending</option>
                 <option value={1}>Active</option>
-                <option value={2}>Suspended</option>
+                <option value={-1}>Deleted</option>
               </select>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -513,8 +507,8 @@ export default function AdminSystem() {
                           <FormattedDate
                             value={account.createdAt}
                             day="2-digit"
-  month="2-digit"
-  year="numeric"
+                            month="2-digit"
+                            year="numeric"
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
@@ -522,8 +516,8 @@ export default function AdminSystem() {
                             <FormattedDate
                               value={account.lastLogin}
                               day="2-digit"
-  month="2-digit"
-  year="numeric"
+                              month="2-digit"
+                              year="numeric"
                               hour="2-digit"
                               minute="2-digit"
                             />
@@ -540,7 +534,7 @@ export default function AdminSystem() {
                             >
                               <Edit className="h-4 w-4" />
                             </button>
-                            
+
                             <button
                               onClick={() => handleUserAction(account, 'delete')}
                               className="text-dark-400 hover:text-danger-500"
@@ -551,14 +545,60 @@ export default function AdminSystem() {
                           </div>
                         </td>
                       </tr>
+
                     ))}
                   </tbody>
+
+
                 </table>
+
               </div>
+
             )}
+
           </div>
+          {!isLoading && accounts.length > 0 && (
+            <div className="flex justify-between items-center mt-4 px-6">
+              <div className="text-sm text-dark-400">
+                Showing page {page} of {totalPages}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i + 1}
+                    onClick={() => setPage(i + 1)}
+                    className={`px-3 py-2 text-sm rounded-md ${i + 1 === page
+                        ? 'bg-primary-500 text-white'
+                        : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
+                      }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === totalPages}
+                  className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
         </>
+
       )}
+
 
       {activeTab === 'pending' && (
         <div className="space-y-6">
@@ -793,7 +833,7 @@ export default function AdminSystem() {
                   >
                     <option value={1}>Admin</option>
                     <option value={2}>SuperAdmin</option>
-                    
+
                     <option value={0}>User</option>
                   </select>
                 </div>

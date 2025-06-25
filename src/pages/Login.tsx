@@ -193,7 +193,7 @@ export default function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-primary-600 to-primary-500 rounded-2xl mb-4">
-            <span className="text-2xl font-bold text-white">TW</span>
+            <span className="text-2xl font-bold text-white">TW1</span>
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-dark-300 bg-clip-text text-transparent">
             <FormattedMessage id="auth.welcome" />

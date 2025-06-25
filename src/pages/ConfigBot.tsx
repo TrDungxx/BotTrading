@@ -1,3 +1,5 @@
+import { User, Link2 } from 'lucide-react';
+
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Search, Filter, Edit, Trash2, Save, XCircle,
@@ -9,6 +11,8 @@ import { configBotAPI } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { binanceAccountApi } from '../utils/api';
 import { indicatorApi } from '../utils/api';
+import { adminApi } from '../utils/api';
+import { accountApi } from '../utils/api';
 interface TradingStream {
   id: number;
   InternalAccountId: number;
@@ -74,7 +78,7 @@ export default function ConfigBot() {
   const [streams, setStreams] = useState<TradingStream[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<number | 'all'>('all');
-
+  const isDev = import.meta.env.MODE === 'development';
   const [selectedType, setSelectedType] = useState<'all' | 0 | 1 | 2>('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStream, setEditingStream] = useState<TradingStream | null>(null);
@@ -86,9 +90,22 @@ export default function ConfigBot() {
   const [togglingStream, setTogglingStream] = useState<TradingStream | null>(null);
   const { user } = useAuth();
   const [myBinanceAccountId, setMyBinanceAccountId] = useState<string>('1');
+  const [accountUsernameMap, setAccountUsernameMap] = useState<Record<number, string>>({});
+  const [page, setPage] = useState(1);
+const [limit] = useState(10); // số dòng mỗi trang, bạn có thể chỉnh
+const [totalPages, setTotalPages] = useState(1);
+
+
+
+
   const [leverage, setLeverage] = useState<number>(1);
   const [marginType, setMarginType] = useState<'ISOLATED' | 'CROSS'>('CROSS');
   const [indicators, setIndicators] = useState<{ id: number; name: string; symbol: string }[]>([]);
+  const [binanceAccounts, setBinanceAccounts] = useState<{ id: number; name: string }[]>([]);
+  const getBinanceAccountName = (id: number) => {
+  const acc = binanceAccounts.find(acc => acc.id === id);
+  return acc?.name || 'Unknown';
+};
 
 
   
@@ -152,19 +169,77 @@ const SHOW_TREND = false;
   const loadStreams = async () => {
   setIsLoading(true);
   try {
-    const response =
-      user?.role === 'admin' || user?.role === 'superadmin'
-        ? await configBotAPI.getAllTradingStreams()
-        : await configBotAPI.getMyTradingStreams(); // ✅ phân quyền đúng
+    
+    let response;
+    console.log("📦 Gọi API với page:", page, "limit:", limit);
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
+  response = await configBotAPI.getAllTradingStreams({ page, limit });
+} else {
+  response = await configBotAPI.getMyTradingStreams({ page, limit });
+}
 
-    setStreams(response.Data.streams || []);
+    const data = response?.Data?.streams || [];
+    const total = response?.Data?.pagination?.total || data.length;
+setTotalPages(Math.ceil(total / limit));
+    setStreams(data);
+    setTotalPages(Math.ceil(total / limit));
+
+    // 👉 Gọi mapping username
+    const internalIds = [...new Set(data.map((s) => s.InternalAccountId))];
+    await fetchUsernamesByInternalIds(internalIds);
+
   } catch (error) {
-    console.error('Lỗi khi load streams:', error);
-    setMessage({ type: 'error', text: 'Không thể tải danh sách stream' });
+    console.error('❌ Lỗi khi load streams:', error);
   } finally {
     setIsLoading(false);
   }
 };
+useEffect(() => {
+  loadStreams();
+}, [page]);
+
+
+
+const fetchUsernamesByInternalIds = async (ids: number[]) => {
+  try {
+    let map: Record<number, string> = {};
+
+    // 👉 Nếu là admin/superadmin → lấy danh sách tất cả accounts
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
+      const res = await accountApi.getListAccount();
+      const accounts = res?.Data?.accounts || [];
+
+      ids.forEach((id) => {
+        const match = accounts.find((acc: any) => acc.id === id);
+        map[id] = match?.Username || 'Unknown';
+      });
+    } 
+    
+    // 👉 Nếu là user → chỉ gọi 1 ID chính mình
+    else {
+      const res = await accountApi.getAccountById(user.id);
+      const username = res?.Data?.Username || 'Unknown';
+      map[user.id] = username;
+    }
+
+    console.log('✅ Mapped username:', map);
+    setAccountUsernameMap(map);
+
+  } catch (err) {
+    console.error('❌ Lỗi khi lấy thông tin account:', err);
+  }
+};
+const handlePageChange = (newPage: number) => {
+  if (newPage < 1 || newPage > totalPages || newPage === page) return;
+  setPage(newPage);
+};
+
+
+
+
+
+
+
 
 
 
@@ -193,26 +268,7 @@ const SHOW_TREND = false;
     setMessage({ type: 'error', text: 'Failed to delete stream' });
   }
 };
-function getPaginationRange(current: number, total: number): (number | string)[] {
-  const delta = 2;
-  const range: (number | string)[] = [];
 
-  for (let i = 1; i <= total; i++) {
-    if (
-      i === 1 ||
-      i === total ||
-      (i >= current - delta && i <= current + delta)
-    ) {
-      range.push(i);
-    } else if (
-      range[range.length - 1] !== '...'
-    ) {
-      range.push('...');
-    }
-  }
-
-  return range;
-}
 
 
 
@@ -266,7 +322,7 @@ Symbol: formData.Symbol || '',
   TakeProfit: Number(formData.TakeProfit),
   CapitalUsageRatio: Number(formData.CapitalUsageRatio),
   Leverage: Number(formData.Leverage?.replace('x', '') || '1'),
-  MarginType: (formData.MarginType === 'CROSSED' ? 'CROSSED' : 'ISOLATED'),
+  MarginType: formData.MarginType === 'CROSS' ? 'CROSSED' : 'ISOLATED',
 
   // 💸 Trailing Stop
   TrailingStop: formData.TrailingStop,
@@ -503,6 +559,40 @@ console.log('📦 Payload gửi khi update trạng thái:', updatedStream);
   });
 };
 
+useEffect(() => {
+  console.log('🔐 User role:', user?.role);
+
+  const fetchBinanceAccounts = async () => {
+  try {
+    const res =
+      user?.role === 'admin' || user?.role === 'superadmin'
+        ? await binanceAccountApi.getListAccounts()
+        : await binanceAccountApi.getMyAccounts();
+
+    const raw = res?.Data?.accounts || [];
+
+    
+
+    const mapped = raw.map((acc: any) => {
+  const name = typeof acc.Name === 'string' ? acc.Name : acc.name;
+  return {
+    id: Number(acc.id),
+    name: name || 'Unnamed',
+  };
+});
+
+    console.log('📦 BinanceAccounts mapped:', mapped);
+
+    setBinanceAccounts(mapped);
+  } catch (err) {
+    console.error('❌ Lỗi khi load Binance Accounts:', err);
+  }
+};
+
+
+  fetchBinanceAccounts();
+}, []);
+
 
 useEffect(() => {
   const fetchIndicators = async () => {
@@ -563,9 +653,13 @@ useEffect(() => {
 
 // Load Binance account tương ứng với user đang login
 useEffect(() => {
+  
   const fetchMyBinanceAccount = async () => {
     try {
-      const res = await binanceAccountApi.getMyAccounts();
+      const res =
+  user?.role === 'admin' || user?.role === 'superadmin'
+    ? await binanceAccountApi.getListAccounts()
+    : await binanceAccountApi.getMyAccounts();
       const accounts = res.Data.accounts || [];
 
       const matched = accounts.find(acc => acc.internalAccountId === user?.internalAccountId);
@@ -775,7 +869,7 @@ const [filterInputs, setFilterInputs] = useState({
       )}
 
       {/* Summary Stats */}
-<div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-5">
+<div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
   {/* Total */}
   <div className="card p-4">
     <div className="flex items-center">
@@ -866,6 +960,7 @@ const [filterInputs, setFilterInputs] = useState({
   value={selectedStatus}
   onChange={(e) => setSelectedStatus(e.target.value === 'all' ? 'all' : parseInt(e.target.value) as 0 | 1 | -1)}
 >
+  
   <option value="all">All Status</option>
   <option value={1}>Active</option>
   <option value={0}>Inactive</option>
@@ -909,9 +1004,10 @@ const [filterInputs, setFilterInputs] = useState({
           </div>
         ) : (
           <div className=" overflow-x-auto">
-            <table className=" configbot-table min-w-[800px] w-full divide-y divide-dark-700">
+            <table className=" min-w-[1200px] table-auto text-sm text-left text-gray-200">
               <thead>
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Stream</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Symbol</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Lavarage</th>
@@ -936,9 +1032,26 @@ const [filterInputs, setFilterInputs] = useState({
                   <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-dark-700">
+              <tbody className="divide-y divide-dark-700 text-xs font-small">
+                
                 {filteredStreams.map((stream) => (
+    
+                  
+                  
                   <tr key={stream.id} className="hover:bg-dark-700/40">
+                    <td className="px-6 py-4 whitespace-nowrap">
+  <div className="space-y-1">
+    <div className="flex items-center gap-2 text-white font-semibold">
+      <User className="h-4 w-4 text-primary-500" />
+      {accountUsernameMap[Number(stream.InternalAccountId)] || 'Unknown'}
+    </div>
+    <div className="flex items-center gap-2 text-sm text-dark-400">
+      <Link2 className="h-4 w-4 text-warning-300" />
+      {getBinanceAccountName(stream.BinanceAccountId)}
+    </div>
+  </div>
+</td>
+
                     <td className="px-6 py-4 whitespace-nowrap">
   <div className="flex items-center">
     <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
@@ -958,9 +1071,10 @@ const [filterInputs, setFilterInputs] = useState({
           </div>
         );
       })()}
+      {user?.role === 'admin' || user?.role === 'superadmin' ? (
       <div className="text-sm text-dark-400">
         ID: {stream.id} | Indicator: {stream.indicatorId}
-      </div>
+      </div>  ) : null}
     </div>
   </div>
 </td>
@@ -1076,12 +1190,60 @@ const [filterInputs, setFilterInputs] = useState({
 </td>
 
                   </tr>
-                ))}
+                
+  ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
+      {/* Pagination */}
+{!isLoading && filteredStreams.length > 0 && (
+  <div className="flex justify-between items-center mt-4">
+    <div className="text-sm text-dark-400">
+      Showing page {page} of {totalPages}
+    </div>
+    <div className="flex space-x-2">
+      <button
+        onClick={() => handlePageChange(page - 1)}
+        disabled={page === 1}
+        className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Previous
+      </button>
+
+      <div className="flex space-x-1">
+        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+          const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + i;
+          if (pageNum > totalPages) return null;
+
+          return (
+            <button
+              key={pageNum}
+              onClick={() => handlePageChange(pageNum)}
+              className={`px-3 py-2 text-sm rounded-md ${
+                pageNum === page
+                  ? 'bg-primary-500 text-white'
+                  : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
+              }`}
+            >
+              {pageNum}
+            </button>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={() => handlePageChange(page + 1)}
+        disabled={page === totalPages}
+        className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
+
 
       {/* Form Modal */}
       {isFormOpen && (
@@ -1167,29 +1329,47 @@ const [filterInputs, setFilterInputs] = useState({
               
 
 
-                  {/* <div>
-                    <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
-                    <input
-                      type="number"
-                      id="internalAccountId"
-                      className="form-input bg-dark-700 cursor-not-allowed"
-                      value={formData.InternalAccountId}
-                      readOnly // ✅ Không cho sửa
-  disabled // ✅ Không submit được từ tay người dùng
-                    />
-                  </div>
+                   {isDev && (
+  <div>
+    <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
+    <input
+      type="number"
+      id="internalAccountId"
+      className="form-input bg-dark-700 cursor-not-allowed"
+      value={formData.InternalAccountId}
+      readOnly
+      disabled
+    />
+  </div>
+)}
 
-                  <div>
-                    <label htmlFor="binanceAccountId" className="form-label">Binance Account ID</label>
-                    <input
-                      type="number"
-                      id="binanceAccountId"
-                     className="form-input bg-dark-700 cursor-not-allowed"
-                      value={formData.BinanceAccountId}
-                      readOnly
-    disabled
-                    />
-                  </div>*/}
+
+  <div>
+  <label htmlFor="binanceAccountId" className="form-label">Binance Account</label>
+  <select
+    id="binanceAccountId"
+    className="form-select"
+    value={formData.BinanceAccountId}
+    onChange={(e) =>
+      setFormData({ ...formData, BinanceAccountId: e.target.value })
+    }
+  >
+    <option value="">Select account...</option>
+    {binanceAccounts.map((acc) => {
+      const showId = user?.role === 'admin' || user?.role === 'superadmin' || isDev;
+      const label = showId ? `${acc.name} (ID: ${acc.id})` : acc.name;
+
+      return (
+        <option key={acc.id} value={acc.id.toString()}>
+          {label}
+        </option>
+      );
+    })}
+  </select>
+</div>
+
+
+
 
 
 
@@ -1285,13 +1465,13 @@ const [filterInputs, setFilterInputs] = useState({
     className="form-input text-left cursor-pointer"
     onClick={() => setShowLeveragePopup(true)}
   >
-     {formData.Leverage}
+     {formData.Leverage}x
   </button>
 </div>
 </div>
 {showLeveragePopup && (
   <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-    <div className="bg-white dark:bg-dark-800 rounded-lg shadow-lg w-full max-w-md">
+    <div className="bg-dark-900 rounded-lg shadow-lg w-full max-w-md">
       <div className="p-6 space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-bold">Điều chỉnh đòn bẩy</h2>
@@ -1301,7 +1481,7 @@ const [filterInputs, setFilterInputs] = useState({
         </div>
 
         <div className="text-center font-semibold text-2xl">
-          {formData.Leverage}
+          x{formData.Leverage}
         </div>
 
         <input
