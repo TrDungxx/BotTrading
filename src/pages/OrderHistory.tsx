@@ -173,9 +173,10 @@ export default function OrderHistory() {
 
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchOrders(page, false);
-  };
+  setRefreshing(true);
+  setSearchQuery('');
+  await fetchOrders(page, false);
+};
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);

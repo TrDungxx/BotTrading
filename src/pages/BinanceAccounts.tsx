@@ -667,7 +667,7 @@ export default function BinanceAccounts() {
                 </div>
               </div>
 
-              <div>
+            {/*  <div>
                 <label htmlFor="binanceId" className="form-label">Binance ID</label>
                 <input
                   type="text"
@@ -680,7 +680,7 @@ export default function BinanceAccounts() {
                 <p className="mt-1 text-xs text-dark-400">
                   Leave empty if not connected to Binance yet
                 </p>
-              </div>
+              </div>*/}
 
               <div>
                 <label htmlFor="description" className="form-label">Description</label>
