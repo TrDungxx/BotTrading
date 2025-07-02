@@ -31,6 +31,8 @@ const authenticatedNavigation = [
 // Admin navigation - chỉ hiển thị cho type 1
 const adminNavigation = [
   { name: "Admin Dashboard", href: '/admin', icon: Shield },
+  { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
+  { name:"System Dashboard", href:'/admin/dashboard',icon:LayoutDashboard},
   //{ name: "User Management", href: '/admin/users', icon: Users },
   //{ name: "System Settings", href: '/admin/settings', icon: SettingsIcon },
 ];

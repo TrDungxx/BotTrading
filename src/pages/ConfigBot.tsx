@@ -321,7 +321,7 @@ Symbol: formData.Symbol || '',
   StopLost: Number(formData.StopLost),
   TakeProfit: Number(formData.TakeProfit),
   CapitalUsageRatio: Number(formData.CapitalUsageRatio),
-  Leverage: Number(formData.Leverage?.replace('x', '') || '1'),
+  Leverage: Number(formData.Leverage?.replace('x1', '') || '1'),
   MarginType: formData.MarginType === 'CROSS' ? 'CROSSED' : 'ISOLATED',
 
   // 💸 Trailing Stop
@@ -471,7 +471,8 @@ if (SHOW_ORDER_PRICE) {
   TrendStatus: stream.TrendStatus ?? 0,
   TrendType: stream.TrendType || 'SIDEWAYS',
   StreamType: (stream as any).StreamType ?? 0,
-  Leverage: stream.Leverage ? stream.Leverage.toString() + 'x' : '1x',
+  Leverage: stream.Leverage?.toString() || '1'
+,
   MarginType: stream.MarginType || 'CROSS'
 });
 
@@ -824,6 +825,11 @@ const [filterInputs, setFilterInputs] = useState({
   type: 'all',
   query: ''
 });
+const handleStatusCardClick = (status: 'all' | 1 | 0 | -1) => {
+  setSelectedStatus(status);
+  setFilterInputs((prev) => ({ ...prev, status: status.toString() }));
+};
+
 
 
   return (
@@ -871,7 +877,12 @@ const [filterInputs, setFilterInputs] = useState({
       {/* Summary Stats */}
 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
   {/* Total */}
-  <div className="card p-4">
+  <div
+    className={`card p-4 cursor-pointer transition ${
+      selectedStatus === 'all' ? 'ring-2 ring-primary-500' : ''
+    }`}
+    onClick={() => handleStatusCardClick('all')}
+  >
     <div className="flex items-center">
       <div className="flex-shrink-0">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
@@ -886,7 +897,12 @@ const [filterInputs, setFilterInputs] = useState({
   </div>
 
   {/* Active */}
-  <div className="card p-4">
+  <div
+    className={`card p-4 cursor-pointer transition ${
+      selectedStatus === 1 ? 'ring-2 ring-success-500' : ''
+    }`}
+    onClick={() => handleStatusCardClick(1)}
+  >
     <div className="flex items-center">
       <div className="flex-shrink-0">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
@@ -901,7 +917,12 @@ const [filterInputs, setFilterInputs] = useState({
   </div>
 
   {/* Inactive */}
-  <div className="card p-4">
+  <div
+    className={`card p-4 cursor-pointer transition ${
+      selectedStatus === 0 ? 'ring-2 ring-dark-500' : ''
+    }`}
+    onClick={() => handleStatusCardClick(0)}
+  >
     <div className="flex items-center">
       <div className="flex-shrink-0">
         <div className="flex h-8 w-8 items-center justify-center rounded-md bg-dark-600">
@@ -915,9 +936,14 @@ const [filterInputs, setFilterInputs] = useState({
     </div>
   </div>
 
-  {/* Deleted - chỉ hiển thị với admin/superadmin */}
+  {/* Deleted */}
   {['admin', 'superadmin'].includes(user?.role) && (
-    <div className="card p-4">
+    <div
+      className={`card p-4 cursor-pointer transition ${
+        selectedStatus === -1 ? 'ring-2 ring-danger-500' : ''
+      }`}
+      onClick={() => handleStatusCardClick(-1)}
+    >
       <div className="flex items-center">
         <div className="flex-shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
@@ -932,6 +958,7 @@ const [filterInputs, setFilterInputs] = useState({
     </div>
   )}
 </div>
+
 
 
       {/* Search and filters - Completely redesigned responsive layout */}
@@ -1481,7 +1508,7 @@ const [filterInputs, setFilterInputs] = useState({
         </div>
 
         <div className="text-center font-semibold text-2xl">
-          x{formData.Leverage}
+          {formData.Leverage}x
         </div>
 
         <input

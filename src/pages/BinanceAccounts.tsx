@@ -41,6 +41,7 @@ export default function BinanceAccounts() {
   const [limit] = useState(10); // số dòng mỗi trang
   const [totalPages, setTotalPages] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedAccountStatus, setSelectedAccountStatus] = useState<'all' | 1 | 0>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { user } = useAuth(); // lấy thông tin user hiện tại
   const getAccounts = (params: { page: number; limit: number }) => {
@@ -50,6 +51,9 @@ export default function BinanceAccounts() {
       return binanceAccountApi.getMyAccounts(params);
     }
   };
+  const handleAccountStatusCardClick = (status: 'all' | 1 | 0) => {
+  setSelectedAccountStatus(status);
+};
 
   const [formData, setFormData] = useState<BinanceAccountForm>({
     Name: '',
@@ -110,14 +114,18 @@ export default function BinanceAccounts() {
 
   const query = searchQuery.trim().toLowerCase();
 
-  const filteredAccounts = query
-    ? accounts.filter((account) =>
-      (account.Name ?? '').toLowerCase().includes(query) ||
-      (account.Email ?? '').toLowerCase().includes(query) ||
-      (account.BinanceId ?? '').toLowerCase().includes(query) ||
-      (account.Description ?? '').toLowerCase().includes(query)
-    )
-    : accounts;
+  const filteredAccounts = accounts
+  .filter(account => {
+    if (selectedAccountStatus === 'all') return true;
+    return account.Status === selectedAccountStatus;
+  })
+  .filter(account =>
+    (account.Name ?? '').toLowerCase().includes(query) ||
+    (account.Email ?? '').toLowerCase().includes(query) ||
+    (account.BinanceId ?? '').toLowerCase().includes(query) ||
+    (account.Description ?? '').toLowerCase().includes(query)
+  );
+
 
 
 
@@ -325,7 +333,12 @@ export default function BinanceAccounts() {
       )}
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="card p-4">
+        <div
+  className={`card p-4 cursor-pointer transition ${
+    selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
+  }`}
+  onClick={() => handleAccountStatusCardClick('all')}
+>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
@@ -339,7 +352,12 @@ export default function BinanceAccounts() {
           </div>
         </div>
 
-        <div className="card p-4">
+        <div
+  className={`card p-4 cursor-pointer transition ${
+    selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
+  }`}
+  onClick={() => handleAccountStatusCardClick(1)}
+>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
@@ -367,7 +385,12 @@ export default function BinanceAccounts() {
           </div>
         </div>
 
-        <div className="card p-4">
+        <div
+  className={`card p-4 cursor-pointer transition ${
+    selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
+  }`}
+  onClick={() => handleAccountStatusCardClick(0)}
+>
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">

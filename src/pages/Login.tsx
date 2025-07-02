@@ -19,53 +19,54 @@ export default function Login() {
   const intl = useIntl();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+  e.preventDefault();
+  setShowPassword(false); // Đảm bảo type="password"
+  setIsLoading(true);
+  setError('');
 
-    try {
-      await login(username, password,rememberMe);
-      
-      // Lưu remember me preference
-      if (rememberMe) {
-        localStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('savedUsername', username);
-      } else {
-        localStorage.removeItem('rememberMe');
-        localStorage.removeItem('savedUsername');
-      }
-      
-      navigate('/');
-    } catch (err) {
-      console.error('Login error:', err);
-      
-      if (err instanceof ApiError) {
-        // Xử lý các loại lỗi khác nhau từ API
-        switch (err.status) {
-          case 0:
-            // Network/connection error - show detailed error message
-            setError(err.message);
-            setShowApiInfo(true);
-            break;
-          case 401:
-            setError('Tên đăng nhập hoặc mật khẩu không đúng');
-            break;
-          case 403:
-            setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin.');
-            break;
-          case 429:
-            setError('Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau.');
-            break;
-          default:
-            setError(err.message || 'Đăng nhập thất bại');
-        }
-      } else {
-        setError('Đăng nhập thất bại. Vui lòng thử lại.');
-      }
-    } finally {
-      setIsLoading(false);
+  try {
+    await login(username, password); // ✅ chỉ truyền 2 đối số
+
+    // ✅ Lưu remember me
+    if (rememberMe) {
+      localStorage.setItem('rememberMe', 'true');
+      localStorage.setItem('savedUsername', username);
+    } else {
+      localStorage.removeItem('rememberMe');
+      localStorage.removeItem('savedUsername');
     }
-  };
+
+    // ✅ Bắt Chrome hiển thị popup lưu mật khẩu
+    window.location.href = '/';
+  } catch (err) {
+    console.error('Login error:', err);
+
+    if (err instanceof ApiError) {
+      switch (err.status) {
+        case 0:
+          setError(err.message);
+          setShowApiInfo(true);
+          break;
+        case 401:
+          setError('Tên đăng nhập hoặc mật khẩu không đúng');
+          break;
+        case 403:
+          setError('Tài khoản của bạn đã bị khóa. Vui lòng liên hệ admin.');
+          break;
+        case 429:
+          setError('Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau.');
+          break;
+        default:
+          setError(err.message || 'Đăng nhập thất bại');
+      }
+    } else {
+      setError('Đăng nhập thất bại. Vui lòng thử lại.');
+    }
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleGuestMode = () => {
     enterGuestMode();
@@ -205,7 +206,8 @@ export default function Login() {
 
         {/* Login Form */}
         <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} autoComplete="on" className="space-y-6">
+
             {error && (
               <div className="flex items-start gap-3 p-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0 mt-0.5" />
@@ -225,6 +227,7 @@ export default function Login() {
                 </div>
                 <input
                   id="username"
+                  name="username"
                   type="text"
                   required
                   className="form-input pl-12 h-12 text-white placeholder:text-dark-400"
@@ -245,6 +248,7 @@ export default function Login() {
                 </div>
                 <input
                   id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
                   className="form-input pl-10 pr-10 h-12"

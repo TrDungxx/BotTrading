@@ -186,5 +186,8 @@
     line-height: 1.25rem !important;
   }
 }
+.bg-dark-700 {
+  background-color: #2a2f3a; /* hoặc dùng bg-gray-800 nếu xài Tailwind */
+}
 
 

@@ -21,6 +21,8 @@ import GuestLayout from './components/layout/GuestLayout';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ConfigBot from './pages/ConfigBot';
+import MonitoringSystem from './pages/MonitoringSystem';
+import AdminDashBoard from './pages/AdminDashboard';
 function App() {
   return (
     <LanguageProvider>
@@ -59,11 +61,14 @@ function App() {
             <Route path="history" element={<OrderHistory />} />
             <Route path="indicators" element={<Indicators />} />
             <Route path="binance-accounts" element={<BinanceAccounts />} />
+            
              
             {/* Admin routes - chỉ type 1 mới truy cập được */}
             <Route path="admin" element={<AdminSystem />} />
             <Route path="admin/users" element={<AdminSystem />} />
             <Route path="admin/settings" element={<AdminSystem />} />
+            <Route path="admin/monitoring" element={<MonitoringSystem />} />
+            <Route path="admin/dashboard" element={<AdminDashBoard/>}/>
             <Route path="config-bot" element={<ConfigBot />} />
             <Route path="*" element={<NotFound />} />
           </Route>

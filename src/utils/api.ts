@@ -460,3 +460,78 @@ getAllTradingStreams: ({ page, limit }: { page: number; limit: number }) =>
     apiRequest(`/stream/delete?id=${id}`, { method: 'DELETE' }),
 
 };
+
+// -------------------- Metrics API --------------------
+export const metricsApi = {
+  // 👤 User chỉ được xem của mình
+  getMyMetrics: () =>
+    apiRequest('/metrics/my-metrics', { method: 'GET' }),
+
+  getLatestMetrics: () =>
+    apiRequest('/metrics/latest', { method: 'GET' }),
+
+  getMetricsStats: () =>
+    apiRequest('/metrics/stats', { method: 'GET' }),
+
+  // 🛡️ Admin được xem toàn bộ
+  getAllMetrics: () =>
+    apiRequest('/metrics/getAll', { method: 'GET' }),
+
+  getMetricsById: (id: number) =>
+    apiRequest(`/metrics/getById?id=${id}`, { method: 'GET' }),
+};
+
+// -------------------- Stream Performance API --------------------
+export const streamPerformanceApi = {
+  // 👤 User
+  getMyStreamPerformance: () =>
+    apiRequest('/stream-performance/my-performance', { method: 'GET' }),
+
+  getLatestPerformance: () =>
+    apiRequest('/stream-performance/latest', { method: 'GET' }),
+
+  getPerformanceStats: () =>
+    apiRequest('/stream-performance/stats', { method: 'GET' }),
+
+  // 🛡️ Admin
+  getAllStreamPerformance: () =>
+    apiRequest('/stream-performance/getAll', { method: 'GET' }),
+
+  getStreamPerformanceById: (id: number) =>
+    apiRequest(`/stream-performance/getById?id=${id}`, { method: 'GET' }),
+};
+
+//--------------- Monitoring API --------------------------------
+
+export const monitoringApi = {
+  getAllSystemMonitors: () =>
+    apiRequest('/m-sys/system-monitor', { method: 'GET' }),
+
+  getSystemMonitorById: (id: string) =>
+    apiRequest(`/m-sys/system-monitor/getById?id=${id}`, { method: 'GET' }),
+
+  getCurrentSystemStatus: () =>
+    apiRequest('/m-sys/system-monitor/current', { method: 'GET' }),
+
+  getSystemStats: () =>
+    apiRequest('/m-sys/system-monitor/stats', { method: 'GET' }),
+
+  getSystemAlerts: () =>
+    apiRequest('/m-sys/system-monitor/alerts', { method: 'GET' }),
+
+  getPerformanceMetrics: () =>
+    apiRequest('/m-sys/system-monitor/metrics', { method: 'GET' }),
+
+  getLatestSystemStatus: () =>
+    apiRequest('/m-sys/system-monitor/latest', { method: 'GET' }),
+
+  manualCollect: () =>
+    apiRequest('/m-sys/system-monitor/collect', { method: 'POST' }),
+
+  cleanupOldRecords: () =>
+    apiRequest('/m-sys/system-monitor/cleanup', { method: 'DELETE' }),
+
+  getSystemDashboard: () =>
+    apiRequest('/m-sys/system-monitor/dashboard', { method: 'GET' }),
+};
+
