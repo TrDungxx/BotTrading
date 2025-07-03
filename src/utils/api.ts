@@ -161,9 +161,9 @@ export const orderHistoryApi = {
     return apiRequest(endpoint, { method: 'GET' });
   },
 
-  getMyOrderHistory: () => {
-    return apiRequest('/history/getMyOrderHistory', { method: 'GET' });
-  },
+  getMyOrderHistory: (page = 1, limit = 20) =>
+  apiRequest(`/history/getMyOrderHistory?page=${page}&limit=${limit}`, { method: 'GET' }),
+
 
   getMyOrderById: (id: number) => {
     return apiRequest(`/order/getMyOrder?id=${id}`, { method: 'GET' });

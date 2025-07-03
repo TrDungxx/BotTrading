@@ -91,84 +91,67 @@ export default function OrderHistory() {
   });
 
   const fetchOrders = async (pageNum: number = 1, showLoading: boolean = true) => {
-    try {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      abortControllerRef.current = new AbortController();
-
-      if (showLoading) setLoading(true);
-      setError(null);
-
-      console.log(`📡 Fetching orders for page ${pageNum}...`);
-
-      let response;
-      if (user?.role === 'user') {
-        response = await orderHistoryApi.getMyOrderHistory(); // ✅ API dành cho user
-      } else {
-        response = await orderHistoryApi.getAllOrderHistory(pageNum, 20); // ✅ chỉ cho admin
-      }
-
-      if (response.Data && Array.isArray(response.Data.orders)) {
-        const orders = response.Data.orders;
-        const pagination = response.Data.pagination;
-
-        setOrders(orders);
-
-        // ✅ Nếu backend trả totalPages → dùng nó
-        if (pagination?.totalPages) {
-          setTotalPages(pagination.totalPages);
-        } else {
-          // Nếu không có thì ước lượng đơn giản
-          setTotalPages(orders.length >= 20 ? pageNum + 1 : pageNum);
-        }
-      } else {
-        setOrders([]);
-        setTotalPages(1);
-      }
-
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('⚠️ Request was aborted');
-        return;
-      }
-
-      console.error('❌ Error fetching orders:', err);
-
-      if (err instanceof ApiError) {
-        switch (err.status) {
-          case 0:
-            setError(!err.response
-              ? 'Network connection failed. Please check the API URL and your internet.'
-              : 'Unexpected response format from API.');
-            break;
-          case 401:
-            setError('Unauthorized. Please login again.');
-            break;
-          case 403:
-            setError('Access denied. You do not have permission to view order history.');
-            break;
-          case 404:
-            setError('Order history service not found.');
-            break;
-          case 500:
-            setError('Server error. Please try again later.');
-            break;
-          default:
-            setError(err.message || 'Failed to fetch order history');
-        }
-      } else {
-        setError('Network error. Please check your connection and try again.');
-      }
-
-      setOrders([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      abortControllerRef.current = null;
+  try {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  };
+
+    abortControllerRef.current = new AbortController();
+
+    if (showLoading) setLoading(true);
+    setError(null);
+
+    let response;
+    if (user?.role === 'user') {
+      response = await orderHistoryApi.getMyOrderHistory(pageNum, 20); // user API
+    } else {
+      response = await orderHistoryApi.getAllOrderHistory(pageNum, 20); // admin API
+    }
+
+    if (response.Data && Array.isArray(response.Data.orders)) {
+      const orders = response.Data.orders;
+      const pagination = response.Data.pagination;
+      console.log(`📦 Page ${pageNum} | Orders: ${orders.length}`);
+console.table(orders.map(o => ({
+  orderId: o.orderId,
+  symbol: o.symbol,
+  status: o.status,
+  price: o.price,
+})));
+
+      setOrders(orders);
+
+      if (pagination?.totalPages) {
+        setTotalPages(pagination.totalPages);
+      } else {
+        const estimatedPages = orders.length === 20 ? pageNum + 1 : pageNum;
+        setTotalPages(estimatedPages);
+      }
+    } else {
+      setOrders([]);
+      setTotalPages(1);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      return;
+    }
+
+    console.error('❌ Error fetching orders:', err);
+
+    if (err instanceof ApiError) {
+      setError(err.message || 'Failed to fetch order history');
+    } else {
+      setError('Network error. Please check your connection and try again.');
+    }
+
+    setOrders([]);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+    abortControllerRef.current = null;
+  }
+};
+
 
 
 
@@ -321,26 +304,17 @@ export default function OrderHistory() {
 
 
   useEffect(() => {
-    // Prevent double call on initial mount in development mode
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      fetchOrders(page);
-    }
+    
+  fetchOrders(page);
 
-    // Cleanup function to abort pending requests
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []); // Empty dependency array - only run once
-
-  // Separate useEffect for page changes (after initial mount)
-  useEffect(() => {
-    if (!isInitialMount.current) {
-      fetchOrders(page);
+  return () => {
+    
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [page]);
+  };
+}, [page]);
+
 
   // Filter orders based on search query
   const filteredOrders = orders.filter(order => {

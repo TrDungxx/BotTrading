@@ -8,7 +8,7 @@ interface SidebarProps {
   open: boolean;
   setOpen: (open: boolean) => void;
 }
-
+const accountStatsItem = { name: "Account Stats", href: '/account-stats', icon: BarChart3 };
 // Base navigation - available to all authenticated users
 const navigation = [
   //{ name: <FormattedMessage id="nav.dashboard" />, href: '/', icon: LayoutDashboard },
@@ -26,6 +26,7 @@ const authenticatedNavigation = [
   { name: "Binance Accounts", href: '/binance-accounts', icon: Building2 },
   { name: <FormattedMessage id="nav.orderHistory" />, href: '/history', icon: History },
   { name: <FormattedMessage id="nav.settings" />, href: '/settings', icon: Lock },
+  
 ];
 
 // Admin navigation - chỉ hiển thị cho type 1
@@ -33,6 +34,7 @@ const adminNavigation = [
   { name: "Admin Dashboard", href: '/admin', icon: Shield },
   { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
   { name:"System Dashboard", href:'/admin/dashboard',icon:LayoutDashboard},
+   
   //{ name: "User Management", href: '/admin/users', icon: Users },
   //{ name: "System Settings", href: '/admin/settings', icon: SettingsIcon },
 ];
@@ -49,6 +51,10 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
   if (isAuthenticated && user) {
     // Add authenticated user navigation
     finalNavigation = [...finalNavigation, ...authenticatedNavigation];
+    // Chỉ thêm AccountStats 1 lần dựa vào quyền
+  if ([0, 1, 2, 99].includes(user.type)) {
+    finalNavigation.push(accountStatsItem);
+  }
 
     // Type 1 (Admin) - có quyền cao nhất, thấy tất cả
     if ([1, 2, 99].includes(user.type)) {

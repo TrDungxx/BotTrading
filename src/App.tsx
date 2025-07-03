@@ -22,7 +22,8 @@ import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ConfigBot from './pages/ConfigBot';
 import MonitoringSystem from './pages/MonitoringSystem';
-import AdminDashBoard from './pages/AdminDashboard';
+import AdminDashBoard from './pages/AdminDashBoard';
+import AccountStats from './pages/AccountStats';
 function App() {
   return (
     <LanguageProvider>
@@ -33,23 +34,23 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/create-admin" element={<CreateAdmin />} />
-          
+
           {/* Guest mode routes - limited access */}
           <Route path="/guest" element={<GuestLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="market" element={<MarketAnalysis />} />
             <Route path="marketplace" element={<Marketplace />} />
           </Route>
-          
+
           {/* Protected routes - require full authentication */}
           <Route
-  path="/"
-  element={
-    <ProtectedRoute>
-      <AppLayout />
-    </ProtectedRoute>
-  }
->
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
 
             <Route index element={<Dashboard />} />
             <Route path="bots" element={<Bots />} />
@@ -61,14 +62,21 @@ function App() {
             <Route path="history" element={<OrderHistory />} />
             <Route path="indicators" element={<Indicators />} />
             <Route path="binance-accounts" element={<BinanceAccounts />} />
-            
-             
+
+            <Route
+              path="account-stats"
+              element={
+                <ProtectedRoute>
+                  <AccountStats />
+                </ProtectedRoute>
+              }
+            />
             {/* Admin routes - chỉ type 1 mới truy cập được */}
             <Route path="admin" element={<AdminSystem />} />
             <Route path="admin/users" element={<AdminSystem />} />
             <Route path="admin/settings" element={<AdminSystem />} />
             <Route path="admin/monitoring" element={<MonitoringSystem />} />
-            <Route path="admin/dashboard" element={<AdminDashBoard/>}/>
+            <Route path="admin/dashboard" element={<AdminDashBoard />} />
             <Route path="config-bot" element={<ConfigBot />} />
             <Route path="*" element={<NotFound />} />
           </Route>

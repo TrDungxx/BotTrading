@@ -15,6 +15,7 @@
     "axios": "^1.9.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.3.1",
+    "dayjs": "^1.11.13",
     "jwt-decode": "^4.0.0",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^0.344.0",
