@@ -79,6 +79,31 @@ export const apiRequest = async <T = any>(
   }
 };
 
+// Raw request: bỏ qua kiểm tra status === 1 hoặc 200
+export const rawRequest = async <T = any>(
+  endpoint: string,
+  options: ApiRequestOptions
+): Promise<T> => {
+  try {
+    const config = {
+      method: options.method,
+      url: endpoint,
+      data: options.body || undefined,
+      params: options.params,
+    };
+
+    const response = await axiosInstance.request(config);
+    return response.data; // ⚠️ Không kiểm tra status
+  } catch (error: any) {
+    console.error('❌ RAW API request error:', error);
+    throw new ApiError(
+      error?.message || 'Lỗi không xác định',
+      error?.response?.status || 0,
+      error?.response?.data
+    );
+  }
+};
+
 // -------------------- Auth API --------------------
 
 export const authApi = {
@@ -534,4 +559,15 @@ export const monitoringApi = {
   getSystemDashboard: () =>
     apiRequest('/m-sys/system-monitor/dashboard', { method: 'GET' }),
 };
+
+// -------------------- System Stat API --------------------
+export const systemStatApi = {
+  getSystemStats: () =>
+    rawRequest('/listen/indicator/stats', { method: 'GET' }),
+
+  getSystemHealth: () =>
+    rawRequest('/listen/indicator/health', { method: 'GET' }),
+};
+
+
 

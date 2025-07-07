@@ -24,6 +24,7 @@ import ConfigBot from './pages/ConfigBot';
 import MonitoringSystem from './pages/MonitoringSystem';
 import AdminDashBoard from './pages/AdminDashBoard';
 import AccountStats from './pages/AccountStats';
+import SystemStats from './pages/SystemStats';
 function App() {
   return (
     <LanguageProvider>
@@ -78,6 +79,7 @@ function App() {
             <Route path="admin/monitoring" element={<MonitoringSystem />} />
             <Route path="admin/dashboard" element={<AdminDashBoard />} />
             <Route path="config-bot" element={<ConfigBot />} />
+            <Route path="admin/system" element={<SystemStats/>}/>
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

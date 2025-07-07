@@ -1,5 +1,21 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, BarChart3, Bot, Briefcase, LayoutDashboard, Lock, ShoppingBag, History, X, Shield, LineChart, Users, Settings as SettingsIcon, Building2 } from 'lucide-react';
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  Briefcase,
+  LayoutDashboard,
+  Lock,
+  ShoppingBag,
+  History,
+  X,
+  Shield,
+  LineChart,
+  Users,
+  Settings as SettingsIcon,
+  Building2,
+  Cpu,
+} from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { FormattedMessage } from 'react-intl';
 import { useAuth } from '../../context/AuthContext';
@@ -8,9 +24,11 @@ interface SidebarProps {
   open: boolean;
   setOpen: (open: boolean) => void;
 }
+
 const accountStatsItem = { name: "Account Stats", href: '/account-stats', icon: BarChart3 };
+
 // Base navigation - available to all authenticated users
-const navigation = [
+const navigation: any[] = [
   //{ name: <FormattedMessage id="nav.dashboard" />, href: '/', icon: LayoutDashboard },
   //{ name: <FormattedMessage id="nav.marketAnalysis" />, href: '/market', icon: BarChart3 },
   //{ name: <FormattedMessage id="nav.marketplace" />, href: '/marketplace', icon: ShoppingBag },
@@ -26,39 +44,72 @@ const authenticatedNavigation = [
   { name: "Binance Accounts", href: '/binance-accounts', icon: Building2 },
   { name: <FormattedMessage id="nav.orderHistory" />, href: '/history', icon: History },
   { name: <FormattedMessage id="nav.settings" />, href: '/settings', icon: Lock },
-  
 ];
 
 // Admin navigation - chỉ hiển thị cho type 1
 const adminNavigation = [
   { name: "Admin Dashboard", href: '/admin', icon: Shield },
   { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
-  { name:"System Dashboard", href:'/admin/dashboard',icon:LayoutDashboard},
-   
+  { name: "System Dashboard", href: '/admin/dashboard', icon: LayoutDashboard },
+  { name: "System Stats", href: '/admin/system', icon: Cpu },
   //{ name: "User Management", href: '/admin/users', icon: Users },
   //{ name: "System Settings", href: '/admin/settings', icon: SettingsIcon },
 ];
 
-
+// Hàm render nhóm menu
+const renderNavSection = (title: string, items: typeof authenticatedNavigation) => (
+  <div className="mt-6">
+    <p className="text-xs font-semibold text-dark-500 px-3 uppercase tracking-wider mb-2">
+      {title}
+    </p>
+    <div className="space-y-1">
+      {items.map((item) => {
+        const isActive = location.pathname === item.href;
+        return (
+          <Link
+            key={item.href}
+            to={item.href}
+            className={cn(
+              "group flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium",
+              isActive
+                ? "bg-primary-500/10 text-primary-500"
+                : "text-dark-300 hover:bg-dark-700/50 hover:text-dark-200"
+            )}
+            onClick={() => setOpen(false)}
+          >
+            <item.icon
+              className={cn(
+                "h-5 w-5 flex-shrink-0",
+                isActive ? "text-primary-500" : "text-dark-400 group-hover:text-dark-300"
+              )}
+            />
+            {item.name}
+          </Link>
+        );
+      })}
+    </div>
+  </div>
+);
 
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
   const { user, isGuestMode, isAuthenticated } = useAuth();
 
-  // Xác định navigation items dựa trên authentication status và user type
   let finalNavigation = [...navigation];
+  const userNavItems: any[] = [];
+  const adminNavItems: any[] = [];
 
   if (isAuthenticated && user) {
     // Add authenticated user navigation
-    finalNavigation = [...finalNavigation, ...authenticatedNavigation];
+    userNavItems.push(...authenticatedNavigation);
     // Chỉ thêm AccountStats 1 lần dựa vào quyền
-  if ([0, 1, 2, 99].includes(user.type)) {
-    finalNavigation.push(accountStatsItem);
-  }
+    if ([0, 1, 2, 99].includes(user.type)) {
+      userNavItems.push(accountStatsItem);
+    }
 
     // Type 1 (Admin) - có quyền cao nhất, thấy tất cả
     if ([1, 2, 99].includes(user.type)) {
-      finalNavigation = [...finalNavigation, ...adminNavigation];
+      adminNavItems.push(...adminNavigation);
     }
 
     // Type 3 (User) - chỉ thấy navigation cơ bản + authenticated navigation
@@ -102,31 +153,13 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           </button>
         </div>
 
-        <nav className="mt-4 px-2 space-y-1">
-          {finalNavigation.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  "group flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium",
-                  isActive
-                    ? "bg-primary-500/10 text-primary-500"
-                    : "text-dark-300 hover:bg-dark-700/50 hover:text-dark-200"
-                )}
-                onClick={() => setOpen(false)}
-              >
-                <item.icon
-                  className={cn(
-                    "h-5 w-5 flex-shrink-0",
-                    isActive ? "text-primary-500" : "text-dark-400 group-hover:text-dark-300"
-                  )}
-                />
-                {item.name}
-              </Link>
-            );
-          })}
+        <nav className="mt-4 px-2">
+          {isAuthenticated && user && (
+            <>
+              {renderNavSection("User Navigation", userNavItems)}
+              {adminNavItems.length > 0 && renderNavSection("Admin Panel", adminNavItems)}
+            </>
+          )}
         </nav>
       </div>
 
@@ -144,30 +177,13 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
         </div>
 
         <div className="flex flex-1 flex-col overflow-y-auto">
-          <nav className="mt-4 px-3 space-y-1">
-            {finalNavigation.map((item) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  className={cn(
-                    "group flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium",
-                    isActive
-                      ? "bg-primary-500/10 text-primary-500"
-                      : "text-dark-300 hover:bg-dark-700/50 hover:text-dark-200"
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      "h-5 w-5 flex-shrink-0",
-                      isActive ? "text-primary-500" : "text-dark-400 group-hover:text-dark-300"
-                    )}
-                  />
-                  {item.name}
-                </Link>
-              );
-            })}
+          <nav className="mt-4 px-3">
+            {isAuthenticated && user && (
+              <>
+                {renderNavSection("User Navigation", userNavItems)}
+                {adminNavItems.length > 0 && renderNavSection("Admin Panel", adminNavItems)}
+              </>
+            )}
           </nav>
 
           {/* User info section */}
@@ -184,8 +200,8 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                       {user.type === 1
                         ? 'Admin'
                         : [2, 99].includes(user.type)
-                          ? 'SuperAdmin'
-                          : 'User'}
+                        ? 'SuperAdmin'
+                        : 'User'}
                     </p>
                   </div>
                 </div>
@@ -206,7 +222,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               </div>
             )}
 
-           {/* <div className="rounded-md bg-dark-700/50 p-3">
+            {/* <div className="rounded-md bg-dark-700/50 p-3">
               <div className="flex items-center gap-x-3">
                 <div className="h-10 w-10 rounded-md bg-dark-600 flex items-center justify-center">
                   <Bot className="h-5 w-5 text-primary-500" />
@@ -223,7 +239,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               <button className="mt-3 w-full rounded-md bg-primary-500 py-1.5 text-xs font-medium text-white hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-dark-800">
                 {isAuthenticated ? 'Upgrade Now' : 'Sign Up'}
               </button>
-            </div>*/}
+            </div> */}
           </div>
         </div>
       </div>

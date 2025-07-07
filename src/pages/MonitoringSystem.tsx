@@ -31,15 +31,15 @@ export default function MonitoringSystem() {
         const perfRes = await streamPerformanceApi.getAllStreamPerformance();
         console.log('🟢 STREAM DATA:', perfRes?.Data);
         const raw = perfRes?.Data?.performance || [];
-const formatted = raw.map((p: any) => ({
-  timestamp: p.update_time,
-  latency: parseFloat(p.LatencyMs || '0'),
-  cpu: parseFloat(p.CpuUsagePercent || '0'),
-  memory: parseFloat(p.MemoryUsageMb || '0'),
-}));
-setPerformanceStats(formatted);
-setIsConnected(raw[0]?.Status === 'active');
-setLastPing(raw[0]?.update_time || '');
+        const formatted = raw.map((p: any) => ({
+          timestamp: p.update_time,
+          latency: parseFloat(p.LatencyMs || '0'),
+          cpu: parseFloat(p.CpuUsagePercent || '0'),
+          memory: parseFloat(p.MemoryUsageMb || '0'),
+        }));
+        setPerformanceStats(formatted);
+        setIsConnected(raw[0]?.Status === 'active');
+        setLastPing(raw[0]?.update_time || '');
       } else {
         const res = await streamPerformanceApi.getMyStreamPerformance();
         setIsConnected(res?.data?.connected || false);
@@ -48,35 +48,35 @@ setLastPing(raw[0]?.update_time || '');
 
       // --- METRICS ---
       if (isAdmin) {
-  const metricsRes = await metricsApi.getAllMetrics();
-  const rawMetrics = metricsRes?.Data?.metrics || []; // ✅ sửa từ `data` thành `Data`
-  const latest = rawMetrics.slice(0, 6).map((m: any) => ({
-    CurrentConnections: m.CurrentConnections ?? 0,
-    ActivePositions: m.ActivePositions ?? 0,
-    PendingOrders: m.PendingOrders ?? 0,
-    ApiCallsPerMin: m.ApiCallsPerMin ?? 0,
-    CurrentWeight: m.CurrentWeight ?? 0,
-    MaxWeight: m.MaxWeight ?? 0,
-    TimeOffset: m.TimeOffset ?? '--',
-    BotStatus: m.BotStatus ?? '--',
-    updateTime: m.update_time ? new Date(m.update_time).toLocaleString() : 'N/A', // ✅ fix ngày
-  }));
-  setLatestMetrics(latest);
-} else {
-  const metricsRes = await metricsApi.getLatestMetrics();
-  const latest = (metricsRes?.Data?.metrics || []).slice(0, 6).map((m: any) => ({
-    CurrentConnections: m.CurrentConnections ?? 0,
-    ActivePositions: m.ActivePositions ?? 0,
-    PendingOrders: m.PendingOrders ?? 0,
-    ApiCallsPerMin: m.ApiCallsPerMin ?? 0,
-    CurrentWeight: m.CurrentWeight ?? 0,
-    MaxWeight: m.MaxWeight ?? 0,
-    TimeOffset: m.TimeOffset ?? '--',
-    BotStatus: m.BotStatus ?? '--',
-    updateTime: m.update_time ? new Date(m.update_time).toLocaleString() : 'N/A',
-  }));
-  setLatestMetrics(latest);
-}
+        const metricsRes = await metricsApi.getAllMetrics();
+        const rawMetrics = metricsRes?.Data?.metrics || []; // ✅ sửa từ `data` thành `Data`
+        const latest = rawMetrics.slice(0, 6).map((m: any) => ({
+          CurrentConnections: m.CurrentConnections ?? 0,
+          ActivePositions: m.ActivePositions ?? 0,
+          PendingOrders: m.PendingOrders ?? 0,
+          ApiCallsPerMin: m.ApiCallsPerMin ?? 0,
+          CurrentWeight: m.CurrentWeight ?? 0,
+          MaxWeight: m.MaxWeight ?? 0,
+          TimeOffset: m.TimeOffset ?? '--',
+          BotStatus: m.BotStatus ?? '--',
+          updateTime: m.update_time ? new Date(m.update_time).toLocaleString() : 'N/A', // ✅ fix ngày
+        }));
+        setLatestMetrics(latest);
+      } else {
+        const metricsRes = await metricsApi.getLatestMetrics();
+        const latest = (metricsRes?.Data?.metrics || []).slice(0, 6).map((m: any) => ({
+          CurrentConnections: m.CurrentConnections ?? 0,
+          ActivePositions: m.ActivePositions ?? 0,
+          PendingOrders: m.PendingOrders ?? 0,
+          ApiCallsPerMin: m.ApiCallsPerMin ?? 0,
+          CurrentWeight: m.CurrentWeight ?? 0,
+          MaxWeight: m.MaxWeight ?? 0,
+          TimeOffset: m.TimeOffset ?? '--',
+          BotStatus: m.BotStatus ?? '--',
+          updateTime: m.update_time ? new Date(m.update_time).toLocaleString() : 'N/A',
+        }));
+        setLatestMetrics(latest);
+      }
 
     } catch (err) {
       console.error('🚨 Monitoring load error:', err);
@@ -123,102 +123,88 @@ setLastPing(raw[0]?.update_time || '');
 
       {/* Chart */}
       {isAdmin && (
-  <ResponsiveContainer width="100%" height={300}>
-    <LineChart
-      data={performanceStats}
-      margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
-    >
-      <XAxis
-        dataKey="timestamp"
-        stroke="#94a3b8"
-        tickFormatter={(value) =>
-          new Date(value).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-        }
-        interval="preserveStartEnd"
-      />
-      <YAxis stroke="#94a3b8" />
-     <Tooltip
-  formatter={(value: any, name: string) => [`${value}`, name]}
-  labelFormatter={(label: any) => {
-    const date = new Date(label);
-    return date.toLocaleString('en-GB', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  }}
-  contentStyle={{
-    backgroundColor: '#1e293b', // bg-dark-800
-    border: '1px solid #334155', // border-dark-700
-    borderRadius: '8px',
-    color: '#e2e8f0', // text color
-    fontSize: '0.85rem'
-  }}
-  labelStyle={{ color: '#94a3b8' }} // nhạt hơn
-/>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart
+            data={performanceStats}
+            margin={{ top: 20, right: 20, left: 0, bottom: 10 }}
+          >
+            <XAxis
+              dataKey="timestamp"
+              stroke="#94a3b8"
+              tickFormatter={(value) =>
+                new Date(value).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              }
+              interval="preserveStartEnd"
+            />
+            <YAxis stroke="#94a3b8" />
+            <Tooltip
+              formatter={(value: any, name: string) => [`${value}`, name]}
+              labelFormatter={(label: any) => {
+                const date = new Date(label);
+                return date.toLocaleString('en-GB', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                });
+              }}
+              contentStyle={{
+                backgroundColor: '#1e293b', // bg-dark-800
+                border: '1px solid #334155', // border-dark-700
+                borderRadius: '8px',
+                color: '#e2e8f0', // text color
+                fontSize: '0.85rem'
+              }}
+              labelStyle={{ color: '#94a3b8' }} // nhạt hơn
+            />
 
-      <Legend />
-      <Line
-        type="monotone"
-        dataKey="latency"
-        stroke="#2C7BE5"
-        name="Latency (ms)"
-      />
-      <Line
-        type="monotone"
-        dataKey="cpu"
-        stroke="#E63757"
-        name="CPU (%)"
-      />
-      <Line
-        type="monotone"
-        dataKey="memory"
-        stroke="#00FF88"
-        name="Memory (MB)"
-      />
-    </LineChart>
-  </ResponsiveContainer>
-)}
+            <Legend />
+            <Line type="monotone" dataKey="latency" stroke="#2C7BE5" strokeWidth={2} name="Latency (ms)" />
+            <Line type="monotone" dataKey="cpu" stroke="#E63757" strokeWidth={2} name="CPU (%)" />
+            <Line type="monotone" dataKey="memory" stroke="#00FF88" strokeWidth={2} name="Memory (MB)" />
+
+          </LineChart>
+        </ResponsiveContainer>
+      )}
 
 
       {/* Latest Metrics */}
       <div className="card p-6">
         <h2 className="text-lg font-medium mb-4">Latest Metrics</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-  {latestMetrics.map((m, i) => (
-    <div key={i} className="rounded-md bg-dark-700 p-4 text-sm space-y-1 leading-relaxed">
-      <div className="flex justify-between font-semibold">
-        <span>Conn: {m.CurrentConnections}</span>
-        <span>ActivePos: {m.ActivePositions}</span>
-      </div>
-      <div className="text-dark-300">
-        Pending Orders: <span className="text-white">{m.PendingOrders}</span>
-      </div>
+          {latestMetrics.map((m, i) => (
+            <div key={i} className="rounded-md bg-dark-700 p-4 text-sm space-y-1 leading-relaxed">
+              <div className="flex justify-between font-semibold">
+                <span>Conn: {m.CurrentConnections}</span>
+                <span>ActivePos: {m.ActivePositions}</span>
+              </div>
+              <div className="text-dark-300">
+                Pending Orders: <span className="text-white">{m.PendingOrders}</span>
+              </div>
 
-      <div className="flex justify-between text-dark-300">
-        <span>API/min: <span className="text-white">{m.ApiCallsPerMin}</span></span>
-        <span>Weight: <span className="text-white">{m.CurrentWeight}</span> / {m.MaxWeight}</span>
-      </div>
+              <div className="flex justify-between text-dark-300">
+                <span>API/min: <span className="text-white">{m.ApiCallsPerMin}</span></span>
+                <span>Weight: <span className="text-white">{m.CurrentWeight}</span> / {m.MaxWeight}</span>
+              </div>
 
-      <div className="flex justify-between text-dark-300">
-        <span>Offset: <span className="text-white">{m.TimeOffset}</span></span>
-        <span>Status: <span className="text-white">{m.BotStatus}</span></span>
-      </div>
+              <div className="flex justify-between text-dark-300">
+                <span>Offset: <span className="text-white">{m.TimeOffset}</span></span>
+                <span>Status: <span className="text-white">{m.BotStatus}</span></span>
+              </div>
 
-      <div className="text-right text-xs text-dark-400 italic">
-        Update: {m.updateTime || 'N/A'}
+              <div className="text-right text-xs text-dark-400 italic">
+                Update: {m.updateTime || 'N/A'}
 
 
-      </div>
-    </div>
-  ))}
-</div>
+              </div>
+            </div>
+          ))}
+        </div>
 
 
       </div>
