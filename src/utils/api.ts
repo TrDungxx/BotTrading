@@ -500,7 +500,7 @@ export const metricsApi = {
 
   // 🛡️ Admin được xem toàn bộ
   getAllMetrics: () =>
-    apiRequest('/metrics/getAll', { method: 'GET' }),
+    apiRequest('/stream-performance/getAll', { method: 'GET' }),
 
   getMetricsById: (id: number) =>
     apiRequest(`/metrics/getById?id=${id}`, { method: 'GET' }),

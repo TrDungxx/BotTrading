@@ -1,5 +1,6 @@
+// AdminDashBoard.tsx - Cập nhật: Chỉ dropdown mới chuyển sang biểu đồ, nút View không làm gì
+
 import React, { useEffect, useState } from 'react';
-import { monitoringApi } from '../utils/api';
 import {
   Cpu,
   MemoryStick,
@@ -8,26 +9,30 @@ import {
   TimerReset,
   RotateCcw,
   AlertTriangle,
-  Plus,
-  RefreshCw,
-  Database,
-  Play,
-  Pause,
-  Trash2,
-  ShieldAlert,
-  Server,
 } from 'lucide-react';
+import { PieChart, Pie, Cell, Legend } from 'recharts';
+import { monitoringApi } from '../utils/api';
 
-interface SystemStats {
-  cpuUsage: number;
-  ramUsage: number;
-  diskUsage: number;
-  loadAvg: number;
-  uptime: string;
-  alerts: string[];
+interface Server {
+  id: number | string;
+  hostname: string;
+  cpu_usage_percent: string;
+  memory_usage_percent: string;
+  disk_usage_percent?: string;
+  uptime_seconds?: number;
+  load_average?: number;
 }
 
-// ✅ Đặt ngoài component
+interface ServerStats {
+  cpu_usage_percent: number;
+  memory_usage_percent: number;
+  memory_total_gb: number;
+  disk_usage_percent: number;
+  disk_total_gb: number;
+  load_average: number;
+  uptime_seconds: number;
+}
+
 const formatSeconds = (seconds: number): string => {
   const d = Math.floor(seconds / (3600 * 24));
   const h = Math.floor((seconds % (3600 * 24)) / 3600);
@@ -35,155 +40,230 @@ const formatSeconds = (seconds: number): string => {
 };
 
 export default function AdminDashBoard() {
-  const [stats, setStats] = useState<SystemStats | null>(null);
+  const [stats, setStats] = useState<ServerStats | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [servers, setServers] = useState<Server[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [tab, setTab] = useState<'list' | 'detail'>('list');
+  const [selectedHostnameFilter, setSelectedHostnameFilter] = useState<string | null>(null);
 
   const loadDashboard = async () => {
-  setLoading(true);
-  setError(null);
-
-  try {
-    // 1. Gọi API manual collect
-    const collectRes = await monitoringApi.manualCollect();
-    const alertsRes = await monitoringApi.getSystemAlerts();
-
-    console.log("📦 manualCollect:", collectRes);
-    console.log("🔔 alerts:", alertsRes);
-
-    const data = collectRes?.Data ?? {};
-
-    // 2. Gán vào state
-    setStats({
-      cpuUsage: parseFloat(data.cpu_usage_percent ?? "0"),
-      ramUsage: parseFloat(data.memory_usage_percent ?? "0"),
-      diskUsage: parseFloat(data.disk_usage_percent ?? "0"),
-      loadAvg: data.load_average?.[0] ?? 0,
-      uptime: formatSeconds(data.uptime_seconds ?? 0),
-      alerts: alertsRes?.Data?.alerts ?? [],
-    });
-  } catch (err) {
-    console.error("❌ Failed to load dashboard:", err);
-    setError("Unable to load system dashboard.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-  const handleManualCollect = async () => {
     try {
-      const res = await monitoringApi.manualCollect();
-      console.log('✅ manualCollect result:', res);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      await loadDashboard();
+      setLoading(true);
+      const collectRes = await monitoringApi.manualCollect();
+      const data = collectRes?.Data ?? {};
+      setStats({
+        cpu_usage_percent: parseFloat(data.cpu_usage_percent ?? '0'),
+        memory_usage_percent: parseFloat(data.memory_usage_percent ?? '0'),
+        memory_total_gb: parseFloat(data.memory_total_bytes ?? '0') / 1_000_000_000,
+        disk_usage_percent: parseFloat(data.disk_usage_percent ?? '0'),
+        disk_total_gb: parseFloat(data.disk_total_bytes ?? '0') / 1_000_000_000,
+        load_average: data.load_average?.[0] ?? 0,
+        uptime_seconds: data.uptime_seconds ?? 0,
+      });
     } catch (err) {
-      console.error('❌ Manual collect failed:', err);
+      console.error('❌ Failed to load dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadServers = async () => {
+    try {
+      const res = await monitoringApi.getAllSystemMonitors();
+      const raw = res?.Data?.monitors;
+      if (Array.isArray(raw)) {
+        const parsed = raw.map((m: any) => ({
+          id: m.id,
+          hostname: m.hostname,
+          cpu_usage_percent: parseFloat(m.cpu_usage_percent ?? '0').toFixed(2),
+          memory_usage_percent: parseFloat(m.memory_usage_percent ?? '0').toFixed(2),
+          disk_usage_percent: parseFloat(m.disk_usage_percent ?? '0').toFixed(2),
+          uptime_seconds: m.uptime_seconds,
+          load_average: m.load_average?.[0] ?? 0,
+        }));
+        setServers(parsed);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load servers:', err);
     }
   };
 
   useEffect(() => {
-    (async () => {
-      await monitoringApi.manualCollect();
-      await loadDashboard();
-    })();
+    loadDashboard();
+    loadServers();
   }, []);
 
- 
+  const uniqueHostnames = Array.from(new Set(servers.map((s) => s.hostname)));
+
+  const filteredServers = servers
+    .filter((s) => parseFloat(s.cpu_usage_percent) > 80 || parseFloat(s.memory_usage_percent) > 80)
+    .filter((s) => s.hostname.toLowerCase().includes(search.toLowerCase()))
+    .filter((s) => !selectedHostnameFilter || s.hostname === selectedHostnameFilter);
 
   return (
-    <div className="space-y-8">
-        
+    <div className="space-y-6">
+      {/* Stats Top Section */}
       <div className="flex justify-between items-center gap-4">
         <h1 className="text-xl font-bold">System Monitoring Dashboard</h1>
         <div className="ml-auto flex gap-2">
-        <button onClick={handleManualCollect} className="btn btn-outline">
-          📥 Collect Now
-        </button>
-        <button
-  onClick={loadDashboard}
-  disabled={loading}
-  className="btn btn-outline flex items-center gap-2"
->
-  {loading ? (
-    <>
-      <RotateCcw className="h-4 w-4 animate-spin" />
-      Refreshing...
-    </>
-  ) : (
-    <>
-      <RotateCcw className="h-4 w-4" />
-      Refresh
-    </>
-  )}
-</button>
-
+          <button
+            onClick={loadDashboard}
+            disabled={loading}
+            className="btn btn-outline flex items-center gap-2"
+          >
+            {loading ? <RotateCcw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-900/40 border border-red-500 px-4 py-2 text-red-300 rounded">
-          ⚠ {error}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 text-left">
+        <Card title="CPU Usage" value={`${stats?.cpu_usage_percent?.toFixed(2) ?? '0'}%`} icon={<Cpu className='text-blue-500' /> } />
+        <Card title="RAM Usage" value={`${stats?.memory_usage_percent?.toFixed(2) ?? '0'}%`} icon={<MemoryStick className='text-yellow-500' />} />
+        <Card title="Disk Usage" value={`${stats?.disk_usage_percent?.toFixed(2) ?? '0'}%`} icon={<HardDrive className='text-red-600' />} />
+        <Card title="Load Average" value={`${stats?.load_average?.toFixed(2) ?? '0'}`} icon={<ActivitySquare className='text-orange-500' />} />
+        <Card title="Uptime" value={stats ? formatSeconds(stats.uptime_seconds) : 'N/A'} icon={<TimerReset />} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex justify-between items-center pt-4">
+        <div className="flex gap-2">
+          <button onClick={() => setTab('list')} className={`btn ${tab === 'list' ? 'btn-primary' : 'btn-outline'}`}>🚨 Alerts</button>
+          <button onClick={() => setTab('detail')} disabled={!selectedServer} className={`btn ${tab === 'detail' ? 'btn-primary' : 'btn-outline'}`}>📈 Server Detail</button>
+        </div>
+        <select
+          className="form-select w-44 px-3 py-2 bg-dark-700 border border-dark-500 rounded text-sm text-white"
+          value={selectedHostnameFilter ?? ""}
+          onChange={async (e) => {
+            const value = e.target.value;
+            const hostname = value === "" ? null : value;
+            setSelectedHostnameFilter(hostname);
+
+            if (hostname) {
+              const serverToLoad = servers.find((s) => s.hostname === hostname);
+              if (serverToLoad) {
+                try {
+                  setLoading(true);
+                  const res = await monitoringApi.getSystemMonitorById(serverToLoad.id.toString());
+                  const data = res?.Data ?? {};
+                  setStats({
+                    cpu_usage_percent: parseFloat(data.cpu_usage_percent ?? '0'),
+                    memory_usage_percent: parseFloat(data.memory_usage_percent ?? '0'),
+                    memory_total_gb: parseFloat(data.memory_total_bytes ?? '0') / 1_000_000_000,
+                    disk_usage_percent: parseFloat(data.disk_usage_percent ?? '0'),
+                    disk_total_gb: parseFloat(data.disk_total_bytes ?? '0') / 1_000_000_000,
+                    load_average: data.load_average?.[0] ?? 0,
+                    uptime_seconds: data.uptime_seconds ?? 0,
+                  });
+                  setSelectedServer(serverToLoad);
+                  setTab('detail');
+                } finally {
+                  setLoading(false);
+                }
+              }
+            } else {
+              setTab('list');
+              loadDashboard();
+            }
+          }}
+        >
+          <option value="">📂 All Servers</option>
+          {uniqueHostnames.map((name, idx) => (
+            <option key={idx} value={name}>{name}</option>
+          ))}
+        </select>
+      </div>
+
+      {tab === 'list' && (
+        <div className="bg-dark-800 p-4 rounded-lg border border-dark-600">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-white font-bold">Alerted Servers</h2>
+            <input
+              type="text"
+              placeholder="🔍 Search by hostname"
+              className="form-input bg-dark-700 border-dark-500 text-white"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <table className="w-full text-sm text-left text-dark-300">
+            <thead className="text-xs uppercase text-dark-400 border-b border-dark-600">
+              <tr>
+                <th className="px-4 py-2">Hostname</th>
+                <th className="px-4 py-2">CPU</th>
+                <th className="px-4 py-2">RAM</th>
+                <th className="px-4 py-2">Disk</th>
+                <th className="px-4 py-2">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+  {filteredServers.map((s) => (
+    <tr key={s.id} className="hover:bg-dark-700 transition">
+      <td className="px-4 py-2">{s.hostname}</td>
+      <td className="px-4 py-2">{s.cpu_usage_percent}%</td>
+      <td className="px-4 py-2">{s.disk_usage_percent}%</td>
+      <td className="px-4 py-2">{s.memory_usage_percent}%</td>
+      <td className="px-4 py-2 text-yellow-400">
+        <AlertTriangle className="w-5 h-5" />
+      </td>
+    </tr>
+  ))}
+</tbody>
+          </table>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 text-left">
-  <Card title="CPU Usage" value={`${stats?.cpuUsage?.toFixed(2) ?? '0'}%`} icon={<Cpu size={20} className="text-blue-500"/>} />
-  <Card title="RAM Usage" value={`${stats?.ramUsage?.toFixed(2) ?? '0'}%`} icon={<MemoryStick className="text-yellow-500" size={20} />} />
-  <Card title="Disk Usage" value={`${stats?.diskUsage?.toFixed(2) ?? '0'}%`} icon={<HardDrive size={20} className='text-red-500' />} />
-  <Card title="Load Average" value={`${stats?.loadAvg?.toFixed(2) ?? '0'}`} icon={<ActivitySquare size={20} className='text-amber-800' />} />
-  <Card title="Uptime" value={stats?.uptime ?? 'N/A'} icon={<TimerReset size={20} />} />
-</div>
-
-
-      <div className="bg-dark-800 rounded px-4 py-4 border border-dark-600">
-        <p className="font-semibold text-red-400 mb-2">🚨 Alerts</p>
-        {stats?.alerts.length ? (
-          <div className="grid gap-2">
-  {stats.alerts.map((alert, idx) => (
-    <div key={idx} className="flex items-center gap-2 bg-dark-700 p-3 rounded-md shadow">
-      <span className="text-red-400 font-semibold">
-        {alert.hostname}
-      </span>
-      <span className="text-yellow-400">•</span>
-      <span className="text-orange-300 font-medium">
-        {alert.alert_types}
-      </span>
-      <span className="ml-auto text-dark-300 text-sm">
-        {new Date(alert.create_time).toLocaleString()}
-      </span>
-    </div>
-  ))}
-</div>
-
-        ) : (
-          <p className="text-dark-300">• No alerts</p>
-        )}
-      </div>
-
-      <div className="pt-2">
-        
-      </div>
+      {tab === 'detail' && selectedServer && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <PieChartCard title={`RAM Usage of ${selectedServer.hostname}`} used={parseFloat(selectedServer.memory_usage_percent)} free={100 - parseFloat(selectedServer.memory_usage_percent)} />
+          <PieChartCard title={`CPU Usage of ${selectedServer.hostname}`} used={parseFloat(selectedServer.cpu_usage_percent)} free={100 - parseFloat(selectedServer.cpu_usage_percent)} />
+          <PieChartCard title={`Disk Usage of ${selectedServer.hostname}`} used={parseFloat(selectedServer.disk_usage_percent ?? '0')} free={100 - parseFloat(selectedServer.disk_usage_percent ?? '0')} />
+        </div>
+      )}
     </div>
   );
 }
 
-function Card({
-  title,
-  value,
-  icon,
-}: {
-  title: string;
-  value: string;
-  icon: string;
-}) {
+function Card({ title, value, icon }: { title: string; value: string; icon: JSX.Element }) {
   return (
     <div className="bg-dark-800 p-4 rounded-lg border border-dark-600">
       <p className="text-sm text-dark-300">{title}</p>
       <div className="flex items-center justify-between mt-1">
         <span className="text-xl font-semibold text-white">{value}</span>
-        <span className="text-lg">{icon}</span>
+        <span>{icon}</span>
       </div>
+    </div>
+  );
+}
+
+function PieChartCard({ title, used, free }: { title: string; used: number; free: number }) {
+  const data = [
+    { name: 'Used', value: used },
+    { name: 'Free', value: free },
+  ];
+  const COLORS = ['#F87171', '#34D399'];
+
+  return (
+    <div className="bg-dark-800 p-4 rounded border border-dark-600">
+      <p className="text-white font-semibold mb-2">{title}</p>
+      <PieChart width={250} height={200}>
+        <Pie
+          data={data}
+          cx={120}
+          cy={100}
+          innerRadius={40}
+          outerRadius={70}
+          paddingAngle={3}
+          dataKey="value"
+        >
+          {data.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Legend />
+      </PieChart>
     </div>
   );
 }

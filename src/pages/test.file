@@ -1,421 +1,268 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import {
-  getAllIndicators,
-  createIndicator,
-  updateIndicator,
-  deleteIndicator
-} from '../api/indicatorService';
+// AdminDashBoard.tsx - Full Component Updated
 
-interface Indicator {
-  id: number;
-  Name: string;
-  Symbol: string;
-  Leverage: string;
-  MarginType: string;
-  Description: string;
-  LongText: string;
-  ShortText: string;
-  ExitText: string;
-  Status: number;
-  create_time: string;
-  update_time: string;
+import React, { useEffect, useState } from 'react';
+import {
+  Cpu,
+  MemoryStick,
+  HardDrive,
+  ActivitySquare,
+  TimerReset,
+  RotateCcw,
+  AlertTriangle,
+} from 'lucide-react';
+import { PieChart, Pie, Cell, Legend } from 'recharts';
+import { monitoringApi } from '../utils/api';
+
+interface Server {
+  id: number | string;
+  hostname: string;
+  cpu_usage_percent: string;
+  memory_usage_percent: string;
+  disk_usage_percent?: string;
+  uptime_seconds?: number;
+  load_average?: number;
 }
 
-export default function Indicators() {
-  const [indicators, setIndicators] = useState<Indicator[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingIndicator, setEditingIndicator] = useState<Indicator | null>(null);
-  const [deletingIndicator, setDeletingIndicator] = useState<Indicator | null>(null);
+interface ServerStats {
+  cpu_usage_percent: number;
+  memory_usage_percent: number;
+  memory_total_gb: number;
+  disk_usage_percent: number;
+  disk_total_gb: number;
+  load_average: number;
+  uptime_seconds: number;
+}
 
-  const [formData, setFormData] = useState<Omit<Indicator, 'id' | 'create_time' | 'update_time'>>({
-    Name: '',
-    Symbol: '',
-    Leverage: '1',
-    MarginType: 'ISOLATED',
-    Description: '',
-    LongText: '',
-    ShortText: '',
-    ExitText: '',
-    Status: 1
-  });
+const formatSeconds = (seconds: number): string => {
+  const d = Math.floor(seconds / (3600 * 24));
+  const h = Math.floor((seconds % (3600 * 24)) / 3600);
+  return `${d}d ${h}h`;
+};
 
-  const fetchData = async () => {
+export default function AdminDashBoard() {
+  const [stats, setStats] = useState<ServerStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [servers, setServers] = useState<Server[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedServer, setSelectedServer] = useState<Server | null>(null);
+  const [tab, setTab] = useState<'list' | 'detail'>('list');
+  const [selectedHostnameFilter, setSelectedHostnameFilter] = useState<string | null>(null);
+
+  const loadDashboard = async () => {
     try {
-      const res = await getAllIndicators();
-      const raw = Array.isArray(res.data.data) ? res.data.data : res.data;
-      setIndicators(raw);
+      setLoading(true);
+      const collectRes = await monitoringApi.manualCollect();
+      const data = collectRes?.Data ?? {};
+      setStats({
+        cpu_usage_percent: parseFloat(data.cpu_usage_percent ?? '0'),
+        memory_usage_percent: parseFloat(data.memory_usage_percent ?? '0'),
+        memory_total_gb: parseFloat(data.memory_total_bytes ?? '0') / 1_000_000_000,
+        disk_usage_percent: parseFloat(data.disk_usage_percent ?? '0'),
+        disk_total_gb: parseFloat(data.disk_total_bytes ?? '0') / 1_000_000_000,
+        load_average: data.load_average?.[0] ?? 0,
+        uptime_seconds: data.uptime_seconds ?? 0,
+      });
     } catch (err) {
-      console.error('❌ Failed to fetch indicators:', err);
+      console.error('❌ Failed to load dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadServers = async () => {
+    try {
+      const res = await monitoringApi.getAllSystemMonitors();
+      const raw = res?.Data?.monitors;
+      if (Array.isArray(raw)) {
+        const parsed = raw.map((m: any) => ({
+          id: m.id,
+          hostname: m.hostname,
+          cpu_usage_percent: parseFloat(m.cpu_usage_percent ?? '0').toFixed(2),
+          memory_usage_percent: parseFloat(m.memory_usage_percent ?? '0').toFixed(2),
+          disk_usage_percent: parseFloat(m.disk_usage_percent ?? '0').toFixed(2),
+          uptime_seconds: m.uptime_seconds,
+          load_average: m.load_average?.[0] ?? 0,
+        }));
+        setServers(parsed);
+      }
+    } catch (err) {
+      console.error('❌ Failed to load servers:', err);
     }
   };
 
   useEffect(() => {
-    fetchData();
+    loadDashboard();
+    loadServers();
   }, []);
 
-  const filteredIndicators = indicators.filter(indicator => {
-    const matchesSearch =
-      indicator.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      indicator.Symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      indicator.Description.toLowerCase().includes(searchQuery.toLowerCase());
+  const uniqueHostnames = Array.from(new Set(servers.map((s) => s.hostname)));
 
-    return matchesSearch;
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingIndicator) {
-        await updateIndicator({ ...formData, id: editingIndicator.id });
-      } else {
-        await createIndicator(formData);
-      }
-      await fetchData();
-    } catch (error) {
-      console.error('❌ Submit failed:', error);
-    }
-
-    setIsFormOpen(false);
-    setEditingIndicator(null);
-    setFormData({
-      Name: '',
-      Symbol: '',
-      Leverage: '1',
-      MarginType: 'ISOLATED',
-      Description: '',
-      LongText: '',
-      ShortText: '',
-      ExitText: '',
-      Status: 1
-    });
-  };
-
-  const handleEdit = (indicator: Indicator) => {
-    setEditingIndicator(indicator);
-    setFormData({
-      Name: indicator.Name,
-      Symbol: indicator.Symbol,
-      Leverage: indicator.Leverage,
-      MarginType: indicator.MarginType,
-      Description: indicator.Description,
-      LongText: indicator.LongText,
-      ShortText: indicator.ShortText,
-      ExitText: indicator.ExitText,
-      Status: indicator.Status
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (indicator: Indicator) => {
-    setDeletingIndicator(indicator);
-  };
-
-  const confirmDelete = async () => {
-    if (deletingIndicator) {
-      try {
-        await deleteIndicator(deletingIndicator.id);
-        await fetchData();
-      } catch (error) {
-        console.error('❌ Delete failed:', error);
-      } finally {
-        setDeletingIndicator(null);
-      }
-    }
-  };
+  const filteredServers = servers
+    .filter((s) => parseFloat(s.cpu_usage_percent) > 80 || parseFloat(s.memory_usage_percent) > 80)
+    .filter((s) => s.hostname.toLowerCase().includes(search.toLowerCase()))
+    .filter((s) => !selectedHostnameFilter || s.hostname === selectedHostnameFilter);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Indicators</h1>
-          <p className="text-dark-400">Manage trading indicators and signals</p>
+      {/* Stats Top Section */}
+      <div className="flex justify-between items-center gap-4">
+        <h1 className="text-xl font-bold">System Monitoring Dashboard</h1>
+        <div className="ml-auto flex gap-2">
+          <button
+            onClick={loadDashboard}
+            disabled={loading}
+            className="btn btn-outline flex items-center gap-2"
+          >
+            {loading ? <RotateCcw className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingIndicator(null);
-            setIsFormOpen(true);
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 text-left">
+        <Card title="CPU Usage" value={`${stats?.cpu_usage_percent?.toFixed(2) ?? '0'}%`} icon={<Cpu />} />
+        <Card title="RAM Usage" value={`${stats?.memory_usage_percent?.toFixed(2) ?? '0'}%`} icon={<MemoryStick />} />
+        <Card title="Disk Usage" value={`${stats?.disk_usage_percent?.toFixed(2) ?? '0'}%`} icon={<HardDrive />} />
+        <Card title="Load Average" value={`${stats?.load_average?.toFixed(2) ?? '0'}`} icon={<ActivitySquare />} />
+        <Card title="Uptime" value={stats ? formatSeconds(stats.uptime_seconds) : 'N/A'} icon={<TimerReset />} />
+      </div>
+
+      {/* Tabs + Select Server */}
+      <div className="flex justify-between items-center pt-4">
+        <div className="flex gap-2">
+          <button onClick={() => setTab('list')} className={`btn ${tab === 'list' ? 'btn-primary' : 'btn-outline'}`}>🚨 Alerts</button>
+          <button onClick={() => setTab('detail')} disabled={!selectedServer} className={`btn ${tab === 'detail' ? 'btn-primary' : 'btn-outline'}`}>📈 Server Detail</button>
+        </div>
+        <select
+          className="form-input bg-dark-700 border-dark-500 text-white"
+          value={selectedHostnameFilter ?? ""}
+          onChange={async (e) => {
+            const value = e.target.value;
+            const hostname = value === "" ? null : value;
+            setSelectedHostnameFilter(hostname);
+
+            if (hostname) {
+              const serverToLoad = servers.find((s) => s.hostname === hostname);
+              if (serverToLoad) {
+                try {
+                  setLoading(true);
+                  const res = await monitoringApi.getSystemMonitorById(serverToLoad.id.toString());
+                  const data = res?.Data ?? {};
+
+                  setStats({
+                    cpu_usage_percent: parseFloat(data.cpu_usage_percent ?? '0'),
+                    memory_usage_percent: parseFloat(data.memory_usage_percent ?? '0'),
+                    memory_total_gb: parseFloat(data.memory_total_bytes ?? '0') / 1_000_000_000,
+                    disk_usage_percent: parseFloat(data.disk_usage_percent ?? '0'),
+                    disk_total_gb: parseFloat(data.disk_total_bytes ?? '0') / 1_000_000_000,
+                    load_average: data.load_average?.[0] ?? 0,
+                    uptime_seconds: data.uptime_seconds ?? 0,
+                  });
+
+                  setSelectedServer(serverToLoad);
+                  setTab('detail');
+                } finally {
+                  setLoading(false);
+                }
+              }
+            } else {
+              setTab('list');
+              loadDashboard();
+            }
           }}
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Indicator
-        </button>
+          <option value="">📂 All Servers</option>
+          {uniqueHostnames.map((name, idx) => (
+            <option key={idx} value={name}>{name}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <Search className="h-4 w-4 text-dark-400" />
+      {tab === 'list' && (
+        <div className="bg-dark-800 p-4 rounded-lg border border-dark-600">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-white font-bold">Alerted Servers</h2>
+            <input
+              type="text"
+              placeholder="🔍 Search by hostname"
+              className="form-input bg-dark-700 border-dark-500 text-white"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-          <input
-            type="text"
-            className="form-input pl-10"
-            placeholder="Search indicators..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-dark-700">
-            <thead>
+          <table className="w-full text-sm text-left text-dark-300">
+            <thead className="text-xs uppercase text-dark-400 border-b border-dark-600">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Symbol</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Leverage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Margin Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Description</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-dark-400">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>
+                <th className="px-4 py-2">Hostname</th>
+                <th className="px-4 py-2">CPU</th>
+                <th className="px-4 py-2">RAM</th>
+                <th className="px-4 py-2">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-dark-700">
-              {filteredIndicators.map((indicator) => (
-                <tr key={indicator.id} className="hover:bg-dark-700/40">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium">{indicator.Name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {indicator.Symbol}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {indicator.Leverage}x
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {indicator.MarginType}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-dark-300">{indicator.Description}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      indicator.Status === 1
-                        ? 'bg-success-500/10 text-success-500'
-                        : 'bg-danger-500/10 text-danger-500'
-                    }`}>
-                      {indicator.Status === 1 ? (
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                      ) : (
-                        <XCircle className="mr-1 h-3 w-3" />
-                      )}
-                      {indicator.Status === 1 ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
-                    {indicator.update_time}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        className="text-dark-400 hover:text-primary-500"
-                        onClick={() => handleEdit(indicator)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        className="text-dark-400 hover:text-danger-500"
-                        onClick={() => handleDelete(indicator)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+            <tbody>
+              {filteredServers.map((s) => (
+                <tr key={s.id} className="hover:bg-dark-700 transition">
+                  <td className="px-4 py-2">{s.hostname}</td>
+                  <td className="px-4 py-2">{s.cpu_usage_percent}%</td>
+                  <td className="px-4 py-2">{s.memory_usage_percent}%</td>
+                  <td className="px-4 py-2 text-yellow-400">
+                    <AlertTriangle className="w-5 h-5" />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      {tab === 'detail' && selectedServer && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <PieChartCard title={`RAM Usage of ${selectedServer.hostname}`} used={parseFloat(selectedServer.memory_usage_percent)} free={100 - parseFloat(selectedServer.memory_usage_percent)} />
+          <PieChartCard title={`CPU Usage of ${selectedServer.hostname}`} used={parseFloat(selectedServer.cpu_usage_percent)} free={100 - parseFloat(selectedServer.cpu_usage_percent)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Card({ title, value, icon }: { title: string; value: string; icon: JSX.Element }) {
+  return (
+    <div className="bg-dark-800 p-4 rounded-lg border border-dark-600">
+      <p className="text-sm text-dark-300">{title}</p>
+      <div className="flex items-center justify-between mt-1">
+        <span className="text-xl font-semibold text-white">{value}</span>
+        <span>{icon}</span>
       </div>
+    </div>
+  );
+}
 
-      {/* Form Modal */}
-      {isFormOpen && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-2xl">
-            <div className="card-header flex justify-between items-center">
-              <h2 className="text-lg font-medium">
-                {editingIndicator ? 'Edit Indicator' : 'Add New Indicator'}
-              </h2>
-              <button
-                className="text-dark-400 hover:text-dark-300"
-                onClick={() => {
-                  setIsFormOpen(false);
-                  setEditingIndicator(null);
-                }}
-              >
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label htmlFor="name" className="form-label">Name</label>
-                <input
-                  type="text"
-                  id="name"
-                  className="form-input"
-                  value={formData.Name}
-                  onChange={(e) => setFormData({ ...formData, Name: e.target.value })}
-                  required
-                />
-              </div>
+function PieChartCard({ title, used, free }: { title: string; used: number; free: number }) {
+  const data = [
+    { name: 'Used', value: used },
+    { name: 'Free', value: free },
+  ];
+  const COLORS = ['#F87171', '#34D399'];
 
-              <div>
-                <label htmlFor="symbol" className="form-label">Symbol</label>
-                <input
-                  type="text"
-                  id="symbol"
-                  className="form-input"
-                  value={formData.Symbol}
-                  onChange={(e) => setFormData({ ...formData, Symbol: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="leverage" className="form-label">Leverage</label>
-                  <input
-                    type="text"
-                    id="leverage"
-                    className="form-input"
-                    value={formData.Leverage}
-                    onChange={(e) => setFormData({ ...formData, Leverage: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="marginType" className="form-label">Margin Type</label>
-                  <select
-                    id="marginType"
-                    className="form-select"
-                    value={formData.MarginType}
-                    onChange={(e) => setFormData({ ...formData, MarginType: e.target.value })}
-                    required
-                  >
-                    <option value="ISOLATED">ISOLATED</option>
-                    <option value="CROSSED">CROSSED</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="description" className="form-label">Description</label>
-                <textarea
-                  id="description"
-                  className="form-input"
-                  value={formData.Description}
-                  onChange={(e) => setFormData({ ...formData, Description: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="longText" className="form-label">Long Text</label>
-                <input
-                  type="text"
-                  id="longText"
-                  className="form-input"
-                  value={formData.LongText}
-                  onChange={(e) => setFormData({ ...formData, LongText: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="shortText" className="form-label">Short Text</label>
-                <input
-                  type="text"
-                  id="shortText"
-                  className="form-input"
-                  value={formData.ShortText}
-                  onChange={(e) => setFormData({ ...formData, ShortText: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="exitText" className="form-label">Exit Text</label>
-                <input
-                  type="text"
-                  id="exitText"
-                  className="form-input"
-                  value={formData.ExitText}
-                  onChange={(e) => setFormData({ ...formData, ExitText: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="status" className="form-label">Status</label>
-                <select
-                  id="status"
-                  className="form-select"
-                  value={formData.Status}
-                  onChange={(e) => setFormData({ ...formData, Status: Number(e.target.value) })}
-                >
-                  <option value={1}>Active</option>
-                  <option value={0}>Inactive</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => {
-                    setIsFormOpen(false);
-                    setEditingIndicator(null);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingIndicator ? 'Update' : 'Add'} Indicator
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deletingIndicator && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
-          <div className="card w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
-                <AlertTriangle className="h-6 w-6 text-danger-500" />
-              </div>
-              
-              <h3 className="text-lg font-medium text-center mb-2">Delete Indicator</h3>
-              
-              <p className="text-dark-400 text-center mb-6">
-                Are you sure you want to delete the indicator "{deletingIndicator.Name}"? This action cannot be undone.
-              </p>
-
-              <div className="flex justify-center space-x-3">
-                <button
-                  className="btn btn-outline"
-                  onClick={() => setDeletingIndicator(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="btn bg-danger-500 hover:bg-danger-600 text-white"
-                  onClick={confirmDelete}
-                >
-                  Delete Indicator
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+  return (
+    <div className="bg-dark-800 p-4 rounded border border-dark-600">
+      <p className="text-white font-semibold mb-2">{title}</p>
+      <PieChart width={250} height={200}>
+        <Pie
+          data={data}
+          cx={120}
+          cy={100}
+          innerRadius={40}
+          outerRadius={70}
+          paddingAngle={3}
+          dataKey="value"
+        >
+          {data.map((_, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Legend />
+      </PieChart>
     </div>
   );
 }
