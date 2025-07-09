@@ -7,12 +7,12 @@ import {
   Settings, TrendingUp, Activity
 } from 'lucide-react';
 import { FormattedDate, FormattedTime } from 'react-intl';
-import { configBotAPI } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
-import { binanceAccountApi } from '../utils/api';
-import { indicatorApi } from '../utils/api';
-import { adminApi } from '../utils/api';
-import { accountApi } from '../utils/api';
+import { configBotAPI } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import { binanceAccountApi } from '../../utils/api';
+import { indicatorApi } from '../../utils/api';
+import { adminApi } from '../../utils/api';
+import { accountApi } from '../../utils/api';
 interface TradingStream {
   id: number;
   InternalAccountId: number;

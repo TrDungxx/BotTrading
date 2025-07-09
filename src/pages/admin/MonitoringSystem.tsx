@@ -3,8 +3,8 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { Activity, AlertTriangle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { metricsApi, streamPerformanceApi } from '../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import { metricsApi, streamPerformanceApi } from '../../utils/api';
 
 export default function MonitoringSystem() {
   const { user } = useAuth();

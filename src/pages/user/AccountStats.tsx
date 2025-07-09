@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { binanceAccountApi, orderHistoryApi } from '../utils/api';
+import { binanceAccountApi, orderHistoryApi, binanceSyncApi } from '../../utils/api';
 import dayjs from 'dayjs';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import ReactApexChart from 'react-apexcharts';
 import { ArrowDown, ArrowUp, Calendar } from 'lucide-react';
 import { DateRange } from 'react-date-range';
@@ -24,35 +24,72 @@ interface AccountInfo {
   id: number;
   Name: string;
   Email: string;
+  internalAccountId: number;
 }
+
+const Card = ({ title, value, className = '' }: { title: string; value: any; className?: string }) => (
+  <div className="bg-dark-700 p-4 rounded-lg">
+    <div className="text-sm text-dark-300">{title}</div>
+    <div className={`text-lg font-semibold ${className}`}>{value}</div>
+  </div>
+);
 
 export default function AccountStats() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [selectedInternalAccountId, setSelectedInternalAccountId] = useState<number | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string>('');
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [range, setRange] = useState<any[]>([
-    { startDate: null, endDate: null, key: 'selection' },
-  ]);
+  const [range, setRange] = useState<any[]>([{ startDate: null, endDate: null, key: 'selection' }]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [activeTab, setActiveTab] = useState<'buySell' | 'pnl' | 'indicatorStats'>('buySell');
-
   const calendarRef = useRef<HTMLDivElement>(null);
 
   const startDate = range[0].startDate;
   const endDate = range[0].endDate;
+  const selectedAccountObj = accounts.find(acc => acc.id.toString() === selectedAccountId);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-        setShowCalendar(false);
+    if (!user) return;
+
+    const fetch = async () => {
+      if (user.type === 0) {
+        const res = await binanceAccountApi.getMyAccounts();
+        const accs = res?.Data?.accounts || [];
+        setAccounts(accs);
+        const acc = accs[0];
+        if (acc) {
+          setSelectedInternalAccountId(acc.internalAccountId);
+          setSelectedAccountId(acc.id.toString());
+        }
+      } else {
+        const res = await binanceAccountApi.getListAccounts();
+        const accs = res?.Data?.accounts || [];
+        setAccounts(accs);
+        const acc = accs[0];
+        if (acc) {
+          setSelectedInternalAccountId(acc.internalAccountId);
+          setSelectedAccountId(acc.id.toString());
+        }
       }
+    };
+    fetch();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !selectedInternalAccountId || (!selectedAccountObj && user.type !== 0)) return;
+
+    if (user.type === 0) {
+      binanceSyncApi.getMyAnalytics().then((res) => setAnalyticsData(res?.Data || null));
+    } else {
+      binanceSyncApi.getAccountAnalytics(selectedAccountObj.id).then((res) => {
+        setAnalyticsData(res?.Data || null);
+      });
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [user, selectedInternalAccountId, selectedAccountObj]);
 
   useEffect(() => {
     if (!user) return;
@@ -86,6 +123,7 @@ export default function AccountStats() {
     });
   }, [selectedAccountId, user]);
 
+
   const filteredOrders = orders.filter((order) => {
     const orderDate = dayjs(order.create_time);
     if (startDate && orderDate.isBefore(dayjs(startDate).startOf('day'))) return false;
@@ -115,14 +153,14 @@ export default function AccountStats() {
     if (order.side === 'BUY') buyMap.set(date, (buyMap.get(date) || 0) + value);
     else if (order.side === 'SELL') sellMap.set(date, (sellMap.get(date) || 0) + value);
   });
+
   const indicatorCountMap = new Map<string, number>();
-filteredOrders.forEach((order) => {
-  const indicator = (order as any)?.indicatorCall || 'Không rõ';
-  indicatorCountMap.set(indicator, (indicatorCountMap.get(indicator) || 0) + 1);
-});
+  filteredOrders.forEach((order) => {
+    const indicator = (order as any)?.indicatorCall || 'Không rõ';
+    indicatorCountMap.set(indicator, (indicatorCountMap.get(indicator) || 0) + 1);
+  });
 
-const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count]) => ({ name, count }));
-
+  const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count]) => ({ name, count }));
 
   const dates = Array.from(new Set([...buyMap.keys(), ...sellMap.keys()])).sort();
   const buySeries = dates.map((d) => ({ x: d, y: buyMap.get(d) || 0 }));
@@ -133,6 +171,10 @@ const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count
   const change = lastBuy - firstBuy;
   const changePercent = firstBuy > 0 ? (change / firstBuy) * 100 : 0;
   const isPositive = change >= 0;
+
+  const symbolKey = `future_${selectedSymbol}_BOTH`;
+  const symbolAnalytics = analyticsData?.bySymbol?.[symbolKey];
+  const summary = analyticsData?.overall?.summary;
 
   const indicatorMap: Record<string, Record<string, number>> = {};
   filteredOrders.forEach((order) => {
@@ -161,8 +203,7 @@ const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count
     <div>
       <h2 className="text-xl font-semibold text-white mb-4">Account Statistics</h2>
 
-      {/* Restore account & symbol selection */}
-      {user?.type !== 0 && (
+      {user?.type !== 0 && accounts.length > 0 && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-white mb-1">Chọn tài khoản:</label>
           <select
@@ -291,36 +332,23 @@ const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count
 )}
 
 
-      {activeTab === 'pnl' && (
-        <div className="mt-4">
-          <table className="min-w-full text-sm text-white border border-dark-600">
-            <thead className="bg-dark-700">
-              <tr>
-                <th className="px-4 py-2 border-b border-dark-600 text-left">Ngày</th>
-                <th className="px-4 py-2 border-b border-dark-600 text-right">Tổng BUY</th>
-                <th className="px-4 py-2 border-b border-dark-600 text-right">Tổng SELL</th>
-                <th className="px-4 py-2 border-b border-dark-600 text-right">PNL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dates.map(date => {
-                const buy = buyMap.get(date) || 0;
-                const sell = sellMap.get(date) || 0;
-                const pnl = buy - sell;
-                return (
-                  <tr key={date} className="border-b border-dark-700">
-                    <td className="px-4 py-2">{date}</td>
-                    <td className="px-4 py-2 text-right">{buy.toFixed(2)}</td>
-                    <td className="px-4 py-2 text-right">{sell.toFixed(2)}</td>
-                    <td className={`px-4 py-2 text-right ${pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{pnl.toFixed(2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            
-          </table>
+      {activeTab === 'pnl' && summary && (
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-white">
+          <Card title="Tổng khối lượng" value={`${summary.totalVolume?.toFixed(2)} USDT`} />
+          <Card
+            title="Realized PnL"
+            value={`${summary.totalRealizedPL?.toFixed(4)} USDT`}
+            className={summary.totalRealizedPL >= 0 ? 'text-green-400' : 'text-red-400'}
+          />
+          <Card title="Phí (Commission)" value={`${summary.totalCommission?.toFixed(4)} USDT`} />
+          <Card title="Net PnL" value={`${summary.netPL?.toFixed(4)} USDT`} className={summary.netPL >= 0 ? 'text-green-400' : 'text-red-400'} />
+          <Card title="ROI trung bình" value={`${summary.avgROI?.toFixed(2)}%`} />
+          <Card title="Tổng lệnh" value={summary.totalTrades} />
         </div>
       )}
+
+
+
       {activeTab === 'indicatorStats' && (
   <div className="mt-4">
     <table className="min-w-full text-sm text-white border border-dark-600">

@@ -11,7 +11,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { PieChart, Pie, Cell, Legend } from 'recharts';
-import { monitoringApi } from '../utils/api';
+import { monitoringApi } from '../../utils/api';
 
 interface Server {
   id: number | string;

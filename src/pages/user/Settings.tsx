@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, CreditCard, Key, Lock, Save, Shield, User, Camera, Globe, Clock, AlertCircle, CheckCircle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
-import { authApi, ApiError } from '../utils/api';
-import { accountApi } from '../utils/api';
+import { authApi, ApiError } from '../../utils/api';
+import { accountApi } from '../../utils/api';
 
 interface UserProfile {
   id: number;

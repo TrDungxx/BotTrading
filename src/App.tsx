@@ -8,11 +8,11 @@ import TradingTerminal from './pages/TradingTerminal';
 import MarketAnalysis from './pages/MarketAnalysis';
 import Marketplace from './pages/Marketplace';
 import NotFound from './pages/NotFound';
-import Settings from './pages/Settings';
-import OrderHistory from './pages/OrderHistory';
-import AdminSystem from './pages/AdminSystem';
-import Indicators from './pages/Indicators';
-import BinanceAccounts from './pages/BinanceAccounts';
+import Settings from './pages/user/Settings';
+import OrderHistory from './pages/user/OrderHistory';
+import AdminSystem from './pages/admin/AdminSystem';
+import Indicators from './pages/user/Indicators';
+import BinanceAccounts from './pages/user/BinanceAccounts';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -20,11 +20,11 @@ import CreateAdmin from './pages/CreateAdmin';
 import GuestLayout from './components/layout/GuestLayout';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
-import ConfigBot from './pages/ConfigBot';
-import MonitoringSystem from './pages/MonitoringSystem';
-import AdminDashBoard from './pages/AdminDashBoard';
-import AccountStats from './pages/AccountStats';
-import SystemStats from './pages/SystemStats';
+import ConfigBot from './pages/user/ConfigBot';
+import MonitoringSystem from './pages/admin/MonitoringSystem';
+import AdminDashBoard from './pages/admin/AdminDashBoard';
+import AccountStats from './pages/user/AccountStats';
+import SystemStats from './pages/admin/SystemStats';
 function App() {
   return (
     <LanguageProvider>

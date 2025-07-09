@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, Save, XCircle, AlertTriangle, CheckCircle, Building2 } from 'lucide-react';
 import { FormattedDate, FormattedTime } from 'react-intl';
-import { binanceAccountApi } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import { binanceAccountApi } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
 

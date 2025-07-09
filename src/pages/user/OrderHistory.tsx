@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowDown, ArrowUp, Search, Filter, Calendar, RefreshCw, Plus, Edit, Trash2, Save, XCircle, AlertTriangle } from 'lucide-react';
 import { FormattedMessage, FormattedNumber, FormattedDate } from 'react-intl';
-import { orderHistoryApi, ApiError, API_BASE_URL } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
-import { binanceAccountApi } from '../utils/api';
+import { orderHistoryApi, ApiError, API_BASE_URL } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
+import { binanceAccountApi } from '../../utils/api';
 import { User, Link2 } from 'lucide-react';
 interface Order {
   orderId: string;

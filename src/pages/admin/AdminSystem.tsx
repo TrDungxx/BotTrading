@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Shield, Activity, Settings, Search, Filter, MoreVertical, CheckCircle, XCircle, AlertCircle, UserPlus, UserMinus, Edit, Trash2, Clock, UserCheck, UserX, Plus, Save } from 'lucide-react';
 import { FormattedMessage, FormattedNumber, FormattedDate, FormattedTime, FormattedRelativeTime } from 'react-intl';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { adminApi, accountApi } from '../utils/api';
+import { adminApi, accountApi } from '../../utils/api';
 
 // Mock data for users với type system
 

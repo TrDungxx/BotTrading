@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, RefreshCw, BarChart3, Settings, Info, Activity } from 'lucide-react';
-import { systemStatApi } from '../utils/api';
+import { systemStatApi } from '../../utils/api';
 
 export default function SystemStats() {
   const [stats, setStats] = useState<any>(null);

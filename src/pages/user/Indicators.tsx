@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
-import { indicatorApi } from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import { indicatorApi } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { FormattedDate, FormattedTime } from 'react-intl';
 interface Indicator {
   id: number;

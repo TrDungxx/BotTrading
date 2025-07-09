@@ -569,5 +569,28 @@ export const systemStatApi = {
     rawRequest('/listen/indicator/health', { method: 'GET' }),
 };
 
+// -------------------- Binance Sync API --------------------
+
+export const binanceSyncApi = {
+  // USER
+  getMyAnalytics: (accountId: number) =>
+  apiRequest(`/binance/sync/analytics?accountId=${accountId}`, { method: 'GET' }),
+
+
+  syncMyTradeHistory: () =>
+    apiRequest('/binance/sync/my-trade-history', { method: 'POST' }),
+
+  getMyTradeHistoryStatus: () =>
+    apiRequest('/binance/sync/my-trade-history-status', { method: 'GET' }),
+
+  // ADMIN
+  getAccountAnalytics: (accountId: number) =>
+    apiRequest(`/binance/sync/analytics?accountId=${accountId}`, { method: 'GET' }),
+
+
+
+  getPortfolioOverview: () =>
+    apiRequest('/binance/sync/portfolio', { method: 'GET' }),
+};
 
 
