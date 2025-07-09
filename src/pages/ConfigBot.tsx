@@ -94,6 +94,8 @@ export default function ConfigBot() {
   const [page, setPage] = useState(1);
   const [limit] = useState(10); // số dòng mỗi trang, bạn có thể chỉnh
   const [totalPages, setTotalPages] = useState(1);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+
 
 
 
@@ -278,119 +280,116 @@ export default function ConfigBot() {
 
 
   const handleSubmit = async (e: React.FormEvent) => {
-    if (formData.Description?.length > 255) {
-      alert("🛑 Mô tả không được vượt quá 255 ký tự!");
-      return;
-    }
-    e.preventDefault(); // Ngăn reload form
+  e.preventDefault(); // ⛔ Ngăn reload form
 
-    const errors = validateForm(formData);
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      console.log("⛔ Validation errors:", errors);
-      return;
-    }
+  if (formData.Description?.length > 255) {
+    alert("🛑 Mô tả không được vượt quá 255 ký tự!");
+    return;
+  }
 
-    setValidationErrors([]);
-    setIsSaving(true);
-    const cleanDescription =
-      formData.Description?.includes('Config Warning')
-        ? ''
-        : formData.Description
-          ?.replace(/\[.*?Warning:.*?\]/g, '') // lọc Warning từ đoạn giữa []
+  const errors = validateForm(formData);
+  if (errors.length > 0) {
+    setValidationErrors(errors);
+    console.log("⛔ Validation errors:", errors);
+    return;
+  }
+
+  // Nếu đang edit → mở confirm popup
+  if (editingStream) {
+    setShowUpdateConfirm(true);
+    return;
+  }
+
+  // Nếu là tạo mới → gửi luôn
+  await submitStream();
+};
+
+
+const submitStream = async () => {
+  setValidationErrors([]);
+  setIsSaving(true);
+
+  const cleanDescription =
+    formData.Description?.includes('Config Warning')
+      ? ''
+      : formData.Description
+          ?.replace(/\[.*?Warning:.*?\]/g, '')
           .trim()
           .slice(0, 250) || 'No description';
-    console.log('🧪 Symbol hiện tại:', formData.Symbol);
 
-    const payload = {
-      // 🧩 Tài khoản và trạng thái cơ bảna
-      InternalAccountId: Number(formData.InternalAccountId),
-      BinanceAccountId: Number(formData.BinanceAccountId),
-      Status: formData.Status,
-      Type: formData.Type,
-      StrategyId: formData.StrategyId ? Number(formData.StrategyId) : null,
-      indicatorId: Number(formData.indicatorId),
-      StreamType: 0,
-      Description: cleanDescription,
-      Symbol: formData.Symbol || '',
-
-
-      // ⏳ Trạng thái stream
-      StreamStatus: SHOW_STREAM_STATUS ? formData.StreamStatus : 'waiting for setup',
-
-      // 🛑 Risk Config
-      StopLost: Number(formData.StopLost),
-      TakeProfit: Number(formData.TakeProfit),
-      CapitalUsageRatio: Number(formData.CapitalUsageRatio),
-      Leverage: Number(formData.Leverage?.replace('x1', '') || '1'),
-      MarginType: formData.MarginType === 'CROSS' ? 'CROSSED' : 'ISOLATED',
-
-      // 💸 Trailing Stop
-      TrailingStop: formData.TrailingStop,
-      TrailingStopPercent: formData.TrailingStopPercent ? Number(formData.TrailingStopPercent) : null,
-      TrailingStopValue: formData.TrailingStopValue ? Number(formData.TrailingStopValue) : null,
-
-      // 📊 ATR
-      ATR: formData.ATR,
-      ATRPercent: formData.ATRPercent ? Number(formData.ATRPercent) : null,
-      ATRValue: formData.ATRValue ? Number(formData.ATRValue) : null,
-
-      // ⚠️ Threshold
-      thresholdPercent: formData.thresholdPercent ? Number(formData.thresholdPercent) : null,
-
-      // 📈 Trend Config
-      ...(SHOW_TREND
-        ? {
+  const payload = {
+    InternalAccountId: Number(formData.InternalAccountId),
+    BinanceAccountId: Number(formData.BinanceAccountId),
+    Status: formData.Status,
+    Type: formData.Type,
+    StrategyId: formData.StrategyId ? Number(formData.StrategyId) : null,
+    indicatorId: Number(formData.indicatorId),
+    StreamType: 0,
+    Description: cleanDescription,
+    Symbol: formData.Symbol || '',
+    StreamStatus: SHOW_STREAM_STATUS ? formData.StreamStatus : 'waiting for setup',
+    StopLost: Number(formData.StopLost),
+    TakeProfit: Number(formData.TakeProfit),
+    CapitalUsageRatio: Number(formData.CapitalUsageRatio),
+    Leverage: Number(formData.Leverage?.replace('x1', '') || '1'),
+    MarginType: formData.MarginType === 'CROSS' ? 'CROSSED' : 'ISOLATED',
+    TrailingStop: formData.TrailingStop,
+    TrailingStopPercent: formData.TrailingStopPercent ? Number(formData.TrailingStopPercent) : null,
+    TrailingStopValue: formData.TrailingStopValue ? Number(formData.TrailingStopValue) : null,
+    ATR: formData.ATR,
+    ATRPercent: formData.ATRPercent ? Number(formData.ATRPercent) : null,
+    ATRValue: formData.ATRValue ? Number(formData.ATRValue) : null,
+    thresholdPercent: formData.thresholdPercent ? Number(formData.thresholdPercent) : null,
+    ...(SHOW_TREND
+      ? {
           TrendStatus: formData.TrendStatus,
           TrendType: formData.TrendType
         }
-        : {
+      : {
           TrendStatus: 0,
           TrendType: 'SIDEWAYS'
         }),
-
-      // 🧾 Order Price (ẩn hoặc hiện)
-      OrderId: formData.OrderId,
-      OrderPrice: SHOW_ORDER_PRICE ? Number(formData.OrderPrice) : 1,
-    };
-
-
-    console.log('📤 Payload gửi đi:', JSON.stringify(payload, null, 2));
-
-    try {
-      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-
-      if (editingStream) {
-        isAdmin
-          ? await configBotAPI.updateTradingStream(editingStream.id, payload)
-          : await configBotAPI.updateMyTradingStream(editingStream.id, payload);
-
-        setMessage({ type: 'success', text: 'Updated successfully' });
-      } else {
-        isAdmin
-          ? await configBotAPI.createTradingStream(payload)
-          : await configBotAPI.createMyTradingStream(payload);
-
-        setMessage({ type: 'success', text: 'Created successfully' });
-      }
-
-      setIsFormOpen(false);
-      setEditingStream(null);
-      resetForm();
-      await loadStreams();
-    } catch (error: any) {
-      console.error('❌ Submit failed:', error);
-      console.log('📥 Server response:', error.response);
-
-      if (error.response?.data?.Errors?.length) {
-        setValidationErrors(error.response.data.Errors);
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save stream' });
-      }
-    } finally {
-      setIsSaving(false);
-    }
+    OrderId: formData.OrderId,
+    OrderPrice: SHOW_ORDER_PRICE ? Number(formData.OrderPrice) : 1,
   };
+
+  console.log('📤 Payload gửi đi:', JSON.stringify(payload, null, 2));
+
+  try {
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+    if (editingStream) {
+      await (isAdmin
+        ? configBotAPI.updateTradingStream(editingStream.id, payload)
+        : configBotAPI.updateMyTradingStream(editingStream.id, payload));
+      setMessage({ type: 'success', text: 'Updated successfully' });
+    } else {
+      await (isAdmin
+        ? configBotAPI.createTradingStream(payload)
+        : configBotAPI.createMyTradingStream(payload));
+      setMessage({ type: 'success', text: 'Created successfully' });
+    }
+
+    setIsFormOpen(false);
+    setEditingStream(null);
+    resetForm();
+    await loadStreams();
+  } catch (error: any) {
+    console.error('❌ Submit failed:', error);
+    console.log('📥 Server response:', error.response);
+
+    if (error.response?.data?.Errors?.length) {
+      setValidationErrors(error.response.data.Errors);
+    } else {
+      setMessage({ type: 'error', text: 'Failed to save stream' });
+    }
+  } finally {
+    setIsSaving(false);
+    setShowUpdateConfirm(false);
+  }
+};
+
+
 
 
   const validateForm = (form: TradingStreamForm): string[] => {
@@ -1857,6 +1856,37 @@ export default function ConfigBot() {
               </div>
             </div>
           )}
+          {showUpdateConfirm && (
+  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+    <div className="card w-full max-w-md">
+      <div className="p-6">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+          <AlertTriangle className="h-6 w-6 text-warning-500" />
+        </div>
+        <h3 className="text-lg font-medium text-center text-danger-600 mb-2">Xác nhận cập nhật Stream</h3>
+        <p className="text-dark-400 text-center mb-6">
+          Bạn có chắc chắn muốn <span className="text-warning-300 font-semibold">cập nhật</span> stream{' '}
+          {/* <span className="text-white font-semibold">{formData.Description}</span>?*/}
+        </p>
+        <div className="flex justify-center space-x-3">
+          <button
+            className="btn btn-outline"
+            onClick={() => setShowUpdateConfirm(false)}
+          >
+            Hủy
+          </button>
+          <button
+            className="btn bg-primary-500 hover:bg-danger-900 text-white"
+            onClick={submitStream}
+          >
+            Xác nhận cập nhật
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
         </div>
       </div>
     </div>

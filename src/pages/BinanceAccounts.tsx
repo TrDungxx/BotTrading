@@ -41,6 +41,9 @@ export default function BinanceAccounts() {
   const [limit] = useState(10); // số dòng mỗi trang
   const [totalPages, setTotalPages] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
+  const [hasUserChangedApiKey, setHasUserChangedApiKey] = useState(false);
+  const [hasUserChangedSecretKey, setHasUserChangedSecretKey] = useState(false);
   const [selectedAccountStatus, setSelectedAccountStatus] = useState<'all' | 1 | 0>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const { user } = useAuth(); // lấy thông tin user hiện tại
@@ -52,8 +55,8 @@ export default function BinanceAccounts() {
     }
   };
   const handleAccountStatusCardClick = (status: 'all' | 1 | 0) => {
-  setSelectedAccountStatus(status);
-};
+    setSelectedAccountStatus(status);
+  };
 
   const [formData, setFormData] = useState<BinanceAccountForm>({
     Name: '',
@@ -115,16 +118,16 @@ export default function BinanceAccounts() {
   const query = searchQuery.trim().toLowerCase();
 
   const filteredAccounts = accounts
-  .filter(account => {
-    if (selectedAccountStatus === 'all') return true;
-    return account.Status === selectedAccountStatus;
-  })
-  .filter(account =>
-    (account.Name ?? '').toLowerCase().includes(query) ||
-    (account.Email ?? '').toLowerCase().includes(query) ||
-    (account.BinanceId ?? '').toLowerCase().includes(query) ||
-    (account.Description ?? '').toLowerCase().includes(query)
-  );
+    .filter(account => {
+      if (selectedAccountStatus === 'all') return true;
+      return account.Status === selectedAccountStatus;
+    })
+    .filter(account =>
+      (account.Name ?? '').toLowerCase().includes(query) ||
+      (account.Email ?? '').toLowerCase().includes(query) ||
+      (account.BinanceId ?? '').toLowerCase().includes(query) ||
+      (account.Description ?? '').toLowerCase().includes(query)
+    );
 
 
 
@@ -180,54 +183,67 @@ export default function BinanceAccounts() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (editingAccount) {
-      handleUpdateAccount();
+      setShowUpdateConfirm(true); // ✅ Hiện popup xác nhận
     } else {
       handleCreateAccount();
     }
   };
 
+
   const handleUpdateAccount = async () => {
-    if (!editingAccount?.id) return;
-    setIsSaving(true);
-    try {
-      const payload = {
-        Name: formData.Name,
-        Email: formData.Email,
-        ApiKey: formData.ApiKey,
-        SecretKey: formData.SecretKey,
-        Status: Number(formData.Status),
-        internalAccountId: Number(formData.internalAccountId),
-        BinanceId: formData.BinanceId || null,
-        Description: formData.Description || null
-      };
+  if (!editingAccount?.id) return;
+  setIsSaving(true);
 
-      if (user?.role === 'user') {
-        await binanceAccountApi.updateMyAccount(editingAccount.id, payload);
-      } else {
-        await binanceAccountApi.updateAccount(editingAccount.id, payload);
-      }
+  try {
+    const payload: any = {
+      Name: formData.Name,
+      Email: formData.Email,
+      Status: Number(formData.Status),
+      internalAccountId: Number(formData.internalAccountId),
+      BinanceId: formData.BinanceId || null,
+      Description: formData.Description || null
+    };
 
-      setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
-      fetchAccounts();
-      setIsFormOpen(false);
-      setEditingAccount(null);
-      resetForm();
-    } catch (error: any) {
-      console.error('❌ Lỗi khi cập nhật account:', error);
+    // ✅ Gửi ApiKey/SecretKey chỉ khi user sửa
+    if (hasUserChangedApiKey && formData.ApiKey && formData.ApiKey !== '********') {
+  payload.ApiKey = formData.ApiKey.trim();
+}
 
-      // ✅ Xử lý lỗi token hết hạn
-      if (error?.response?.status === 401) {
-        setMessage({ type: 'error', text: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
-        logout(); // Gọi từ useAuth
-        return;
-      }
+if (hasUserChangedSecretKey && formData.SecretKey && formData.SecretKey !== '********') {
+  payload.SecretKey = formData.SecretKey.trim();
+}
 
-      setMessage({ type: 'error', text: 'Cập nhật tài khoản thất bại' });
-    } finally {
-      setIsSaving(false);
+    // ✅ Gửi API
+    if (user?.role === 'user') {
+      await binanceAccountApi.updateMyAccount(editingAccount.id, payload);
+    } else {
+      await binanceAccountApi.updateAccount(editingAccount.id, payload);
     }
-  };
+setHasUserChangedApiKey(false);
+setHasUserChangedSecretKey(false);
+    setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
+    fetchAccounts();
+    setIsFormOpen(false);
+    setEditingAccount(null);
+    resetForm();
+  } catch (error: any) {
+    console.error('❌ Lỗi khi cập nhật account:', error);
+
+    if (error?.response?.status === 401) {
+      setMessage({ type: 'error', text: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
+      logout();
+      return;
+    }
+
+    setMessage({ type: 'error', text: 'Cập nhật tài khoản thất bại' });
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+
 
 
 
@@ -241,8 +257,8 @@ export default function BinanceAccounts() {
       Name: account.Name,
       BinanceId: account.BinanceId || '',
       Description: account.Description || '',
-      ApiKey: '',
-      SecretKey: ''
+      ApiKey: '********',
+      SecretKey: '********'
     });
     setIsFormOpen(true);
   };
@@ -318,8 +334,8 @@ export default function BinanceAccounts() {
       {/* Global message */}
       {message && (
         <div className={`flex items-center gap-3 p-4 rounded-lg ${message.type === 'success'
-            ? 'bg-success-500/10 border border-success-500/20'
-            : 'bg-danger-500/10 border border-danger-500/20'
+          ? 'bg-success-500/10 border border-success-500/20'
+          : 'bg-danger-500/10 border border-danger-500/20'
           }`}>
           {message.type === 'success' ? (
             <CheckCircle className="h-5 w-5 text-success-500 flex-shrink-0" />
@@ -334,11 +350,10 @@ export default function BinanceAccounts() {
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <div
-  className={`card p-4 cursor-pointer transition ${
-    selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
-  }`}
-  onClick={() => handleAccountStatusCardClick('all')}
->
+          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
+            }`}
+          onClick={() => handleAccountStatusCardClick('all')}
+        >
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
@@ -353,11 +368,10 @@ export default function BinanceAccounts() {
         </div>
 
         <div
-  className={`card p-4 cursor-pointer transition ${
-    selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
-  }`}
-  onClick={() => handleAccountStatusCardClick(1)}
->
+          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
+            }`}
+          onClick={() => handleAccountStatusCardClick(1)}
+        >
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
@@ -386,11 +400,10 @@ export default function BinanceAccounts() {
         </div>
 
         <div
-  className={`card p-4 cursor-pointer transition ${
-    selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
-  }`}
-  onClick={() => handleAccountStatusCardClick(0)}
->
+          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
+            }`}
+          onClick={() => handleAccountStatusCardClick(0)}
+        >
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
@@ -570,8 +583,8 @@ export default function BinanceAccounts() {
                 key={i + 1}
                 onClick={() => setPage(i + 1)}
                 className={`px-3 py-2 text-sm rounded-md ${i + 1 === page
-                    ? 'bg-primary-500 text-white'
-                    : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
+                  ? 'bg-primary-500 text-white'
+                  : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
                   }`}
               >
                 {i + 1}
@@ -640,12 +653,14 @@ export default function BinanceAccounts() {
                 <div>
                   <label htmlFor="apiKey" className="form-label">API Key *</label>
                   <input
-                    type="text"
+                    type="password"
                     id="apiKey"
                     className="form-input"
                     value={formData.ApiKey}
-                    onChange={(e) => setFormData({ ...formData, ApiKey: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, ApiKey: e.target.value });
+                      setHasUserChangedApiKey(true); // ✅ đánh dấu user đã sửa
+                    }}
                     placeholder="Nhập Binance API Key"
                   />
                 </div>
@@ -653,12 +668,14 @@ export default function BinanceAccounts() {
                 <div>
                   <label htmlFor="secretKey" className="form-label">Secret Key *</label>
                   <input
-                    type="text"
+                    type="password"
                     id="secretKey"
                     className="form-input"
                     value={formData.SecretKey}
-                    onChange={(e) => setFormData({ ...formData, SecretKey: e.target.value })}
-                    required
+                    onChange={(e) => {
+                      setFormData({ ...formData, SecretKey: e.target.value });
+                      setHasUserChangedSecretKey(true); // ✅ đánh dấu user đã sửa
+                    }}
                     placeholder="Nhập Binance Secret Key"
                   />
                 </div>
@@ -690,7 +707,7 @@ export default function BinanceAccounts() {
                 </div>
               </div>
 
-            {/*  <div>
+              {/*  <div>
                 <label htmlFor="binanceId" className="form-label">Binance ID</label>
                 <input
                   type="text"
@@ -770,6 +787,38 @@ export default function BinanceAccounts() {
               <button className="btn bg-danger-500 hover:bg-danger-600 text-white" onClick={confirmDelete}>
                 Confirm Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showUpdateConfirm && (
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+          <div className="card w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+                <AlertTriangle className="h-6 w-6 text-warning-500" />
+              </div>
+              <h3 className="text-lg font-medium text-center text-danger-600 mb-2">Xác nhận cập nhật Binance</h3>
+              <p className="text-dark-400 text-center mb-6">
+                Bạn có chắc chắn muốn <span className="text-warning-300 font-semibold">cập nhật</span> Binance?
+              </p>
+              <div className="flex justify-center space-x-3">
+                <button
+                  className="btn btn-outline"
+                  onClick={() => setShowUpdateConfirm(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  className="btn bg-primary-500 hover:bg-danger-900 text-white"
+                  onClick={() => {
+                    setShowUpdateConfirm(false); // đóng modal
+                    handleUpdateAccount();        // ✅ chỉ gọi sau xác nhận
+                  }}
+                >
+                  Xác nhận cập nhật
+                </button>
+              </div>
             </div>
           </div>
         </div>
