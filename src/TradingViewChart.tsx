@@ -20,7 +20,7 @@ export default function TradingViewChart({ data }: TradingViewChartProps) {
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#1e293b' },
+        background: { type: ColorType.Solid, color: '#1e293b' }, // fallback, vẫn giữ
         textColor: '#94a3b8',
       },
       grid: {
@@ -70,7 +70,6 @@ export default function TradingViewChart({ data }: TradingViewChartProps) {
     });
 
     candlestickSeries.setData(data);
-
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
@@ -93,6 +92,19 @@ export default function TradingViewChart({ data }: TradingViewChartProps) {
       }
     };
   }, [data]);
+setTimeout(() => {
+  if (chartContainerRef.current && chartRef.current) {
+    chartRef.current.applyOptions({
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight,
+    });
+  }
+}, 0);
 
-  return <div ref={chartContainerRef} className="w-full h-full" />;
+  return (
+    <div
+  ref={chartContainerRef}
+  className="trading-chart-container w-full relative isolate z-0 overflow-hidden bg-dark-800"
+/>
+  );
 }

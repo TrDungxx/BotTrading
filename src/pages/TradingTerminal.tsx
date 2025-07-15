@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2 } from 'lucide-react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import TradingViewChart from '../TradingViewChart';
+import TradingForm from '../components/common/TradingForm';
 // Generate mock candlestick data
 const generateCandlestickData = (days: number) => {
   const data = [];
   let date = new Date();
   date.setDate(date.getDate() - days);
-  
+
   let price = 38000;
-  
+
   for (let i = 0; i < days * 24; i++) {
     const open = price + (Math.random() - 0.5) * 200;
     const high = open + Math.random() * 100;
     const low = open - Math.random() * 100;
     const close = (high + low) / 2;
-    
+
     date.setHours(date.getHours() + 1);
-    
+
     data.push({
       time: Math.floor(date.getTime() / 1000),
       open,
@@ -25,10 +26,10 @@ const generateCandlestickData = (days: number) => {
       low,
       close,
     });
-    
+
     price = close;
   }
-  
+
   return data;
 };
 
@@ -36,27 +37,27 @@ const generateCandlestickData = (days: number) => {
 const generateOrderbook = () => {
   const asks = [];
   const bids = [];
-  
+
   let askPrice = 38500;
   let bidPrice = 38450;
-  
+
   for (let i = 0; i < 10; i++) {
     askPrice += Math.random() * 15 + 5;
     bidPrice -= Math.random() * 15 + 5;
-    
+
     asks.push({
       price: askPrice,
       amount: Math.random() * 2 + 0.1,
       total: Math.random() * 100000 + 10000,
     });
-    
+
     bids.push({
       price: bidPrice,
       amount: Math.random() * 2 + 0.1,
       total: Math.random() * 100000 + 10000,
     });
   }
-  
+
   return { asks, bids };
 };
 
@@ -107,7 +108,7 @@ export default function TradingTerminal() {
   const [price, setPrice] = useState('38452.12');
   const [amount, setAmount] = useState('');
   const [total, setTotal] = useState('');
-  
+
   // Calculate total based on price and amount
   const calculateTotal = (price: string, amount: string) => {
     if (price && amount) {
@@ -116,26 +117,26 @@ export default function TradingTerminal() {
     }
     return '';
   };
-  
+
   // Handle amount change
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newAmount = e.target.value;
     setAmount(newAmount);
     setTotal(calculateTotal(price, newAmount));
   };
-  
+
   // Handle price change
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPrice = e.target.value;
     setPrice(newPrice);
     setTotal(calculateTotal(newPrice, amount));
   };
-  
+
   // Handle total change
   const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTotal = e.target.value;
     setTotal(newTotal);
-    
+
     if (newTotal && price && parseFloat(price) !== 0) {
       const calculatedAmount = (parseFloat(newTotal) / parseFloat(price)).toFixed(8);
       setAmount(calculatedAmount);
@@ -143,7 +144,7 @@ export default function TradingTerminal() {
       setAmount('');
     }
   };
-  
+
   return (
     <div className="h-[calc(100vh-6rem)]">
       <div className="grid grid-cols-12 gap-4 h-full">
@@ -184,7 +185,7 @@ export default function TradingTerminal() {
               </div>
             </div>
           </div>
-          
+
           {/* Orderbook */}
           <div className="card flex-1 overflow-hidden">
             <div className="card-header py-3">
@@ -200,36 +201,44 @@ export default function TradingTerminal() {
                 {/* Asks (sell orders) */}
                 <div className="space-y-1 mb-4">
                   {asks.map((ask, index) => (
-                    <div key={`ask-${index}`} className="flex text-xs">
-                      <div className="w-1/3 text-danger-500">
+                    <div key={`ask-${index}`} className="relative flex text-xs h-5">
+                      {/* Thanh nền màu dưới */}
+                      <div
+                        className="absolute right-0 top-0 h-full bg-danger-500/10"
+                        style={{
+                          width: `${(ask.total / 200000) * 100}%`,
+                          maxWidth: '100%',
+                        }}
+                      ></div>
+
+                      {/* Text content */}
+                      <div className="w-1/3 text-danger-500 z-10">
                         <FormattedNumber
                           value={ask.price}
                           minimumFractionDigits={2}
                           maximumFractionDigits={2}
                         />
                       </div>
-                      <div className="w-1/3 text-right">
+                      <div className="w-1/3 text-right z-10">
                         <FormattedNumber
                           value={ask.amount}
                           minimumFractionDigits={4}
                           maximumFractionDigits={4}
                         />
                       </div>
-                      <div className="w-1/3 text-right text-dark-400">
+                      <div className="w-1/3 text-right text-dark-400 z-10">
                         <FormattedNumber
                           value={ask.total / 1000}
                           minimumFractionDigits={1}
                           maximumFractionDigits={1}
-                        />K
+                        />
+                        K
                       </div>
-                      <div
-                        className="absolute right-0 h-5 bg-danger-500/10"
-                        style={{ width: `${(ask.total / 200000) * 100}%`, maxWidth: '100%' }}
-                      ></div>
                     </div>
                   ))}
                 </div>
-                
+
+
                 {/* Current price */}
                 <div className="flex justify-between items-center py-2 border-y border-dark-700">
                   <span className="text-sm font-medium">
@@ -249,43 +258,48 @@ export default function TradingTerminal() {
                     />
                   </span>
                 </div>
-                
+
                 {/* Bids (buy orders) */}
                 <div className="space-y-1 mt-4">
-                  {bids.map((bid, index) => (
-                    <div key={`bid-${index}`} className="flex text-xs">
-                      <div className="w-1/3 text-success-500">
-                        <FormattedNumber
-                          value={bid.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right">
-                        <FormattedNumber
-                          value={bid.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right text-dark-400">
-                        <FormattedNumber
-                          value={bid.total / 1000}
-                          minimumFractionDigits={1}
-                          maximumFractionDigits={1}
-                        />K
-                      </div>
-                      <div
-                        className="absolute right-0 h-5 bg-success-500/10"
-                        style={{ width: `${(bid.total / 200000) * 100}%`, maxWidth: '100%' }}
-                      ></div>
-                    </div>
-                  ))}
-                </div>
+  {bids.map((bid, index) => (
+    <div key={`bid-${index}`} className="relative flex text-xs h-5">
+      {/* Background xanh nhạt */}
+      <div
+        className="absolute right-0 top-0 h-full bg-success-500/10"
+        style={{ width: `${(bid.total / 200000) * 100}%`, maxWidth: '100%' }}
+      />
+
+      {/* Text content */}
+      <div className="w-1/3 text-success-500 z-10">
+        <FormattedNumber
+          value={bid.price}
+          minimumFractionDigits={2}
+          maximumFractionDigits={2}
+        />
+      </div>
+      <div className="w-1/3 text-right z-10">
+        <FormattedNumber
+          value={bid.amount}
+          minimumFractionDigits={4}
+          maximumFractionDigits={4}
+        />
+      </div>
+      <div className="w-1/3 text-right text-dark-400 z-10">
+        <FormattedNumber
+          value={bid.total / 1000}
+          minimumFractionDigits={1}
+          maximumFractionDigits={1}
+        />
+        K
+      </div>
+    </div>
+  ))}
+</div>
+
               </div>
             </div>
           </div>
-          
+
           {/* Recent trades */}
           <div className="card flex-1 overflow-hidden">
             <div className="card-header py-3">
@@ -333,7 +347,7 @@ export default function TradingTerminal() {
             </div>
           </div>
         </div>
-        
+
         {/* Center - Chart */}
         <div className="col-span-12 lg:col-span-6 card flex flex-col h-full overflow-hidden">
           <div className="border-b border-dark-700 p-3 flex justify-between items-center">
@@ -364,183 +378,16 @@ export default function TradingTerminal() {
               </button>
             </div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 relative z-0 overflow-hidden bg-dark-800 rounded">
             <TradingViewChart data={generateCandlestickData(7)} />
           </div>
         </div>
-        
+
         {/* Right sidebar - Trading form and open orders */}
         <div className="col-span-12 lg:col-span-3 flex flex-col h-full gap-4">
           {/* Trading form */}
-          <div className="card overflow-hidden">
-            <div className="border-b border-dark-700">
-              <div className="flex">
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'limit'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('limit')}
-                >
-                  <FormattedMessage id="terminal.limit" />
-                </button>
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'market'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('market')}
-                >
-                  <FormattedMessage id="terminal.market" />
-                </button>
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'stop'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('stop')}
-                >
-                  <FormattedMessage id="terminal.stop" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-4">
-              <div className="flex space-x-2 mb-4">
-                <button
-                  className={`w-1/2 py-2 rounded-md text-sm font-medium ${
-                    tradeSide === 'buy'
-                      ? 'bg-success-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-                  }`}
-                  onClick={() => setTradeSide('buy')}
-                >
-                  <FormattedMessage id="common.buy" />
-                </button>
-                <button
-                  className={`w-1/2 py-2 rounded-md text-sm font-medium ${
-                    tradeSide === 'sell'
-                      ? 'bg-danger-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-                  }`}
-                  onClick={() => setTradeSide('sell')}
-                >
-                  <FormattedMessage id="common.sell" />
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {activeTab !== 'market' && (
-                  <div>
-                    <label htmlFor="price\" className="form-label">
-                      <FormattedMessage id="common.price" />
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        id="price"
-                        className="form-input pr-16"
-                        placeholder="0.00"
-                        value={price}
-                        onChange={handlePriceChange}
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <span className="text-dark-400 text-sm">USDT</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div>
-                  <label htmlFor="amount" className="form-label">
-                    <FormattedMessage id="common.amount" />
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="amount"
-                      className="form-input pr-16"
-                      placeholder="0.00000000"
-                      value={amount}
-                      onChange={handleAmountChange}
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <span className="text-dark-400 text-sm">BTC</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="total" className="form-label">
-                    <FormattedMessage id="common.total" />
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="total"
-                      className="form-input pr-16"
-                      placeholder="0.00"
-                      value={total}
-                      onChange={handleTotalChange}
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <span className="text-dark-400 text-sm">USDT</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-4 gap-2">
-                  {[25, 50, 75, 100].map((percent) => (
-                    <button
-                      key={percent}
-                      className="py-1 text-xs bg-dark-700 rounded text-dark-300 hover:bg-dark-600"
-                    >
-                      {percent}%
-                    </button>
-                  ))}
-                </div>
-                
-                <button
-                  className={`w-full py-3 rounded-md font-medium ${
-                    tradeSide === 'buy'
-                      ? 'bg-success-500 hover:bg-success-600 text-white'
-                      : 'bg-danger-500 hover:bg-danger-600 text-white'
-                  }`}
-                >
-                  {tradeSide === 'buy' ? (
-                    <FormattedMessage id="terminal.buyAmount" values={{ symbol: 'BTC' }} />
-                  ) : (
-                    <FormattedMessage id="terminal.sellAmount" values={{ symbol: 'BTC' }} />
-                  )}
-                </button>
-              </div>
-              
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-dark-400">
-                    <FormattedMessage id="terminal.available" />:
-                  </span>
-                  <span>
-                    <FormattedNumber
-                      value={12500}
-                      minimumFractionDigits={2}
-                      maximumFractionDigits={2}
-                    /> USDT
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-dark-400">
-                    <FormattedMessage id="terminal.available" />:
-                  </span>
-                  <span>0.4892 BTC</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
+          <TradingForm />
+
           {/* Open orders */}
           <div className="card flex-1 overflow-hidden">
             <div className="card-header py-3">
@@ -553,7 +400,7 @@ export default function TradingTerminal() {
                 </button>
               )}
             </div>
-            
+
             <div className="overflow-y-auto h-[calc(100%-3rem)]">
               {openOrders.length > 0 ? (
                 <table className="min-w-full divide-y divide-dark-700">

@@ -22,7 +22,7 @@ import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import ConfigBot from './pages/user/ConfigBot';
 import MonitoringSystem from './pages/admin/MonitoringSystem';
-import AdminDashBoard from './pages/admin/AdminDashBoard';
+import AdminDashBoard from './pages/admin/AdminDashboard';
 import AccountStats from './pages/user/AccountStats';
 import SystemStats from './pages/admin/SystemStats';
 function App() {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, CheckCircle, XCircle, AlertTriangle,ViewIcon } from 'lucide-react';
 import { indicatorApi } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { FormattedDate, FormattedTime } from 'react-intl';
@@ -101,15 +101,14 @@ export default function Indicators() {
 
 
   const filteredIndicators = indicators
-    .filter(indicator => indicator.Status === 1) // 🟢 chỉ lấy indicator đang active
-    .filter(indicator => {
-      const matchesSearch =
-        indicator.Name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        indicator.Symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        indicator.Description.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchesSearch;
-    });
+  .filter(ind => {
+    const query = searchQuery.toLowerCase();
+    return (
+      ind.Name.toLowerCase().includes(query) ||
+      ind.Symbol.toLowerCase().includes(query) ||
+      ind.Description.toLowerCase().includes(query)
+    );
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -286,7 +285,28 @@ await indicatorApi.updateIndicatorConfig({
     setSelectedType(null); // reset lại selectedType mỗi lần mở mới
   };
 
+const getCoinIcon = (symbol: string): string => {
+  const normalized = symbol.toUpperCase();
 
+  if (normalized.includes('PEPE')) return '/icons/pepe.png';
+  if (normalized.includes('DOGE')) return '/icons/doge.png';
+  if (normalized.includes('BTC')) return '/icons/btc.png';
+  if (normalized.includes('ETH')) return '/icons/eth.png';
+  if (normalized.includes('SOL')) return '/icons/sol.png';
+  if (normalized.includes('SHIB')) return '/icons/shib.png';
+
+  return '/icons/default-coin.png'; // fallback
+};
+
+const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
+  const s = symbol.toUpperCase();
+
+  if (s.includes('PEPE')) return { icon: '/icons/binance.svg', label: 'Binance Futures USDT-M' };
+  if (s.includes('DOGE')) return { icon: '/icons/binance.svg', label: 'Binance Futures USDT-M' };
+  if (s.includes('BTC')) return { icon: '/icons/binance.svg', label: 'Binance Spot' };
+
+  return { icon: '/icons/default-exchange.svg', label: 'Unknown Exchange' };
+};
 
 
   return (
@@ -326,113 +346,78 @@ await indicatorApi.updateIndicatorConfig({
           </div>
         </div>
 
-        <div className="card overflow-hidden">
-          <div className="card overflow-x-auto w-full">
-            <table className="min-w-[800px] w-full table-auto divide-y divide-dark-700">
-              <thead>
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Symbol</th>
-                  {/*<th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Leverage</th>*/}
-                  {/* <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Margin Type</th>*/}
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Description</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-dark-400">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
-                  {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                    <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>)}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-700">
-                {filteredIndicators.map((indicator) => (
-                  <tr key={indicator.id} className="hover:bg-dark-700/40">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium">{indicator.Name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {indicator.Symbol}
-                    </td>
-                    {/* <td className="px-6 py-4 whitespace-nowrap">
-                    {indicator.Leverage}x
-                  </td>*/}
-                    {/* <td className="px-6 py-4 whitespace-nowrap">
-                    {indicator.MarginType}
-                  </td>*/}
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-dark-300">{indicator.Description}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${indicator.Status === 1
-                        ? 'bg-success-500/10 text-success-500'
-                        : 'bg-danger-500/10 text-danger-500'
-                        }`}>
-                        {indicator.Status === 1 ? (
-                          <CheckCircle className="mr-1 h-3 w-3" />
-                        ) : (
-                          <XCircle className="mr-1 h-3 w-3" />
-                        )}
-                        {indicator.Status === 1 ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
-                      {indicator.update_time && !isNaN(new Date(indicator.update_time).getTime()) ? (
-                        <>
-                          <div>
-                            <FormattedDate
-                              value={new Date(indicator.update_time)}
-                              day="2-digit"
-                              month="2-digit"
-                              year="numeric"
-                            />
-                          </div>
-                          <div className="text-xs">
-                            <FormattedTime
-                              value={new Date(indicator.update_time)}
-                              hour="2-digit"
-                              minute="2-digit"
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-xs text-dark-500 italic">No data</span>
-                      )}
-                    </td>
+        <div className="overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+  {filteredIndicators.map((indicator) => (
+    <div
+      key={indicator.id}
+      className="card bg-dark-800 border border-dark-700 rounded-lg p-4 relative hover:ring-2 hover:ring-primary-500 transition"
+    >
+      {/* Header: Name */}
+      <div className="flex items-center space-x-2 mb-1">
+        <div className="text-xl">🤖</div>
+        <h3 className="text-lg font-semibold">{indicator.Name}</h3>
+      </div>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex justify-end space-x-2">
-                        {/* Nút mở TV preview luôn hiển thị */}
-                        {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                          <button
-                            className="text-dark-400 hover:text-yellow-500"
-                            onClick={() => openTvPopup(indicator)}
-                          >
-                            📈
-                          </button>
-                        )}
-                        {/* Chỉ hiện nếu là admin/superadmin */}
-                        {(user?.role === 'admin' || user?.role === 'superadmin') && (
-                          <>
-                            <button
-                              className="text-dark-400 hover:text-primary-500"
-                              onClick={() => handleEdit(indicator)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button
-                              className="text-dark-400 hover:text-danger-500"
-                              onClick={() => handleDelete(indicator)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+      {/* Description */}
+      <p className="text-sm text-dark-400 mb-2 line-clamp-2">
+        {indicator.Description || 'No description provided'}
+      </p>
 
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Placeholder Sparkline */}
+     {/* <div className="h-[45px] bg-dark-600 rounded flex items-center justify-center text-dark-400 text-xs mb-3">
+        Sparkline
+      </div>*/}
+
+      {/* Symbol + Status */}
+      <div className="flex justify-between text-sm text-dark-300">
+        <div>{indicator.Symbol}</div>
+        <div className={`${indicator.Status === 1 ? 'text-success-500' : 'text-danger-500'}`}>
+          {indicator.Status === 1 ? 'Active' : 'Inactive'}
+        </div>
+      </div>
+      {/* Exchange info */}
+<div className="mt-4 flex items-center justify-center space-x-2 text-xs text-dark-300">
+  <img
+    src={getExchangeLabel(indicator.Symbol).icon}
+    alt="exchange"
+    className="h-4 w-4"
+  />
+  <span>{getExchangeLabel(indicator.Symbol).label}</span>
+</div>
+
+      {/* Last updated */}
+      <div className="mt-3 text-xs text-dark-500 mt-1">
+  {indicator.update_time && !isNaN(Date.parse(indicator.update_time)) ? (
+    <>
+      <FormattedDate value={new Date(indicator.update_time)} />{' '}
+      <FormattedTime value={new Date(indicator.update_time)} />
+    </>
+  ) : (
+    'N/A'
+  )}
+</div>
+
+      {/* 3 buttons: 📈 ✏️ 🗑️ */}
+      <div className="absolute bottom-3 right-3 flex space-x-3 text-dark-400">
+        <button onClick={() => openTvPopup(indicator)} className="hover:text-primary-500">
+          📈
+        </button>
+        <button onClick={() => handleEdit(indicator)} className="hover:text-yellow-500">
+          <Edit className="h-4 w-4" />
+        </button>
+        <button onClick={() => handleDelete(indicator)} className="hover:text-danger-500">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  ))}
+
+  {filteredIndicators.length === 0 && (
+    <div className="text-center col-span-full text-dark-400 italic">No indicators found.</div>
+  )}
+</div>
+
         </div>
 
         {/* Form Modal */}

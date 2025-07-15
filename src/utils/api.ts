@@ -21,6 +21,7 @@ export interface ApiRequestOptions {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: any;
   params?: Record<string, any>; // 👈 rất quan trọng!
+  data?: any;
 }
 
 export class ApiError extends Error {
@@ -49,25 +50,26 @@ export const apiRequest = async <T = any>(
 ): Promise<ApiResponse<T>> => {
   try {
     const config = {
-      method: options.method,
-      url: endpoint,
-      data: options.body || undefined,
-      params: options.params, // 👈 thêm dòng này để axios encode ?page= & limit=
-    };
+  method: options.method,
+  url: endpoint,
+  data: options.data ?? options.body ?? undefined, // ✅ Ưu tiên "data", fallback "body"
+  params: options.params,
+};
 
     console.log('📡 Making API request to:', API_BASE_URL + endpoint);
     console.log('📥 Params gửi đi:', options.params);
 
     const response = await axiosInstance.request(config);
-    const data = response.data;
+const data = response.data;
 
-    console.log('📥 Response data:', data);
+console.log('🔁 Response data:', data);
 
-    if (!data || ('status' in data && data.status !== 1 && data.status !== 200)) {
-      throw new ApiError(data?.message || 'API request failed', data?.status || 0, data);
-    }
+// ✅ Sửa lại phần check này
+if (!data || (data.ResponseCode !== undefined && data.ResponseCode !== 1)) {
+  throw new ApiError(data?.Description || 'API request failed', data?.ResponseCode || 0, data);
+}
 
-    return data;
+return data;
   } catch (error: any) {
     console.error('❌ API request error:', error);
 
@@ -85,12 +87,12 @@ export const rawRequest = async <T = any>(
   options: ApiRequestOptions
 ): Promise<T> => {
   try {
-    const config = {
-      method: options.method,
-      url: endpoint,
-      data: options.body || undefined,
-      params: options.params,
-    };
+   const config = {
+  method: options.method,
+  url: endpoint,
+  data: options.data ?? options.body ?? undefined, // ✅ Ưu tiên "data", fallback "body"
+  params: options.params,
+};
 
     const response = await axiosInstance.request(config);
     return response.data; // ⚠️ Không kiểm tra status
@@ -544,9 +546,9 @@ export const monitoringApi = {
   getSystemAlerts: () =>
     apiRequest('/m-sys/system-monitor/alerts', { method: 'GET' }),
 
-  getPerformanceMetrics: () =>
-    apiRequest('/m-sys/system-monitor/metrics', { method: 'GET' }),
-
+  getPerformanceMetrics: (hostname: string) =>
+  apiRequest(`/m-sys/system-monitor/metrics?hostname=${hostname}`, { method: 'GET' }),
+  
   getLatestSystemStatus: () =>
     apiRequest('/m-sys/system-monitor/latest', { method: 'GET' }),
 
@@ -556,9 +558,13 @@ export const monitoringApi = {
   cleanupOldRecords: () =>
     apiRequest('/m-sys/system-monitor/cleanup', { method: 'DELETE' }),
 
+  getSystemAlertsFrom: (from: string) =>
+  apiRequest(`/m-sys/system-monitor/alerts?from=${from}`, { method: 'GET' }),
+  
   getSystemDashboard: () =>
     apiRequest('/m-sys/system-monitor/dashboard', { method: 'GET' }),
 };
+
 
 // -------------------- System Stat API --------------------
 export const systemStatApi = {
@@ -574,7 +580,36 @@ export const systemStatApi = {
 export const binanceSyncApi = {
   // USER
   getMyAnalytics: (accountId: number) =>
-  apiRequest(`/binance/sync/analytics?accountId=${accountId}`, { method: 'GET' }),
+  apiRequest(`/binance/sync/my-analytics?accountId=${accountId}`, { method: 'GET' }),
+
+ syncMyAccount: (accountId: number) =>
+  apiRequest('/binance/sync/my-account', {
+    method: 'POST',
+    data: { accountId },
+  }),
+
+
+  getMySyncStatus: () =>
+    apiRequest('/binance/sync/my-status', {
+      method: 'GET',
+    }),
+
+  cancelMySyncAccount: (accountId: number) =>
+  apiRequest('/binance/sync/cancel-my-account', {
+    method: 'POST',
+    data: { accountId }, 
+  }),
+  
+
+  quickSyncMyAccount: () =>
+    apiRequest('/binance/sync/quick-my-account', {
+      method: 'POST',
+    }),
+
+  fullSyncMyAccount: () =>
+    apiRequest('/binance/sync/full-my-account', {
+      method: 'POST',
+    }),
 
 
   syncMyTradeHistory: () =>
@@ -593,4 +628,64 @@ export const binanceSyncApi = {
     apiRequest('/binance/sync/portfolio', { method: 'GET' }),
 };
 
+// ---------------- Indicator Analytics API ----------------
+export const indicatorAnalyticsApi = {
+  // ==== USER ====
+  getMyIndicatorPerformance: (params: { startDate: string; endDate: string }) =>
+  apiRequest('/trading-analytics/my-indicators/performance', {
+    method: 'GET',
+    params,
+  }),
+
+  getMyIndicatorComparison: (data: any) =>
+    apiRequest('/trading-analytics/my-indicators/compare', {
+      method: 'POST',
+      data,
+    }),
+
+  getMyIndicatorTrend: (indicator: string) =>
+    apiRequest(`/trading-analytics/my-indicators/${indicator}/trend`, { method: 'GET' }),
+
+  getMyIndicatorRisk: (indicator: string) =>
+    apiRequest(`/trading-analytics/my-indicators/${indicator}/risk`, { method: 'GET' }),
+
+  getMyIndicatorsList: () =>
+    apiRequest('/trading-analytics/my-indicators/list', { method: 'GET' }),
+
+  // ==== ADMIN ====
+  getIndicatorPerformance: (params: { startDate: string; endDate: string }) =>
+  apiRequest('/trading-analytics/indicators/performance', {
+    method: 'GET',
+    params,
+  }),
+
+
+  getIndicatorComparison: (data: any) =>
+    apiRequest('/trading-analytics/indicators/compare', {
+      method: 'POST',
+      data,
+    }),
+
+  getIndicatorTrend: (indicator: string) =>
+    apiRequest(`/trading-analytics/indicators/${indicator}/trend`, { method: 'GET' }),
+
+  getIndicatorsBySymbol: () =>
+    apiRequest('/trading-analytics/indicators/by-symbol', { method: 'GET' }),
+
+  getTopPerformingIndicators: () =>
+    apiRequest('/trading-analytics/indicators/top-performers', { method: 'GET' }),
+
+  getIndicatorRiskMetrics: (indicator: string) =>
+    apiRequest(`/trading-analytics/indicators/${indicator}/risk`, { method: 'GET' }),
+
+  getIndicatorOverview: () =>
+    apiRequest('/trading-analytics/indicators/overview', { method: 'GET' }),
+
+  getAllIndicatorsList: () =>
+    apiRequest('/trading-analytics/indicators/list', { method: 'GET' }),
+
+  // ==== SUPERADMIN ====
+  getGlobalIndicatorStats: () =>
+    apiRequest('/trading-analytics/global/stats', { method: 'GET' }),
+};
 

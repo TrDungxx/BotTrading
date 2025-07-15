@@ -1,26 +1,31 @@
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import React, { ReactNode } from 'react';
+import { useAuth } from '../context/AuthContext';
+import FancyLoading from '../components/common/FancyLoading';
 
-interface ProtectedRouteProps {
-  children: ReactNode;
-  allowedRoles?: ('admin' | 'superadmin')[];
-}
 
-const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticating } = useAuth();
+  const [delayPassed, setDelayPassed] = useState(false);
 
-  if (isAuthenticating) return <div>🔐 Đang xác minh đăng nhập...</div>;
+  useEffect(() => {
+    const timer = setTimeout(() => setDelayPassed(true), 1000); // ⏱️ 2s delay
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isAuthenticating || !delayPassed) {
+    return <FancyLoading />;
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Nếu có yêu cầu role cụ thể → kiểm tra quyền
   if (allowedRoles) {
-    const userRole = user.type === 1
-      ? 'admin'
-      : [2, 99].includes(user.type)
+    const userRole =
+      user.type === 1
+        ? 'admin'
+        : [2, 99].includes(user.type)
         ? 'superadmin'
         : 'user';
 

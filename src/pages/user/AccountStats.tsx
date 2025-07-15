@@ -1,31 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { binanceAccountApi, orderHistoryApi, binanceSyncApi } from '../../utils/api';
+import { binanceAccountApi, binanceSyncApi } from '../../utils/api';
 import dayjs from 'dayjs';
 import { useAuth } from '../../context/AuthContext';
-import ReactApexChart from 'react-apexcharts';
-import { ArrowDown, ArrowUp, Calendar } from 'lucide-react';
+import { Calendar, Loader, CheckCircle, Clock } from 'lucide-react';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
+import { indicatorAnalyticsApi } from '../../utils/api';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
+import { toast } from 'react-hot-toast';
+import ModalOverlay from '../../components/common/ModalOverlay';
 
-interface Order {
-  orderId: string;
-  binanceAccount: string;
-  create_time: string;
-  side: 'BUY' | 'SELL';
-  executedQty: string;
-  origQty: string;
-  price: string;
-  symbol: string;
-  indicatorCall?: string;
-}
 
-interface AccountInfo {
-  id: number;
-  Name: string;
-  Email: string;
-  internalAccountId: number;
-}
+dayjs.extend(isSameOrAfter);
+dayjs.extend(isSameOrBefore);
 
 const Card = ({ title, value, className = '' }: { title: string; value: any; className?: string }) => (
   <div className="bg-dark-700 p-4 rounded-lg">
@@ -36,17 +25,30 @@ const Card = ({ title, value, className = '' }: { title: string; value: any; cla
 
 export default function AccountStats() {
   const { user } = useAuth();
-  const [accounts, setAccounts] = useState<AccountInfo[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedInternalAccountId, setSelectedInternalAccountId] = useState<number | null>(null);
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('');
   const [analyticsData, setAnalyticsData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [range, setRange] = useState<any[]>([{ startDate: null, endDate: null, key: 'selection' }]);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [activeTab, setActiveTab] = useState<'buySell' | 'pnl' | 'indicatorStats'>('buySell');
+  const [indicatorPerf, setIndicatorPerf] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'pnl' | 'indicatorStats'>('pnl');
   const calendarRef = useRef<HTMLDivElement>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [syncSummary, setSyncSummary] = useState<any>(null);
+  const syncInterval = useRef<NodeJS.Timeout | null>(null);
+
+
+
+  const today = new Date();
+  const last7Days = new Date();
+  last7Days.setDate(today.getDate() - 6);
+
+  const [range, setRange] = useState<any[]>([{
+    startDate: last7Days,
+    endDate: today,
+    key: 'selection'
+  }]);
 
   const startDate = range[0].startDate;
   const endDate = range[0].endDate;
@@ -54,292 +56,260 @@ export default function AccountStats() {
 
   useEffect(() => {
     if (!user) return;
-
     const fetch = async () => {
-      if (user.type === 0) {
-        const res = await binanceAccountApi.getMyAccounts();
-        const accs = res?.Data?.accounts || [];
-        setAccounts(accs);
-        const acc = accs[0];
-        if (acc) {
-          setSelectedInternalAccountId(acc.internalAccountId);
-          setSelectedAccountId(acc.id.toString());
-        }
-      } else {
-        const res = await binanceAccountApi.getListAccounts();
-        const accs = res?.Data?.accounts || [];
-        setAccounts(accs);
-        const acc = accs[0];
-        if (acc) {
-          setSelectedInternalAccountId(acc.internalAccountId);
-          setSelectedAccountId(acc.id.toString());
-        }
+      const res = user.type === 0 ? await binanceAccountApi.getMyAccounts() : await binanceAccountApi.getListAccounts();
+      const accs = res?.Data?.accounts || [];
+      setAccounts(accs);
+      const acc = accs[0];
+      if (acc) {
+        setSelectedInternalAccountId(acc.internalAccountId);
+        setSelectedAccountId(acc.id.toString());
       }
     };
     fetch();
   }, [user]);
 
   useEffect(() => {
-    if (!user || !selectedInternalAccountId || (!selectedAccountObj && user.type !== 0)) return;
+    if (!user || !selectedAccountObj || !selectedAccountObj.id) return;
+
+    const accountId = selectedAccountObj.id;
 
     if (user.type === 0) {
-      binanceSyncApi.getMyAnalytics().then((res) => setAnalyticsData(res?.Data || null));
-    } else {
-      binanceSyncApi.getAccountAnalytics(selectedAccountObj.id).then((res) => {
+      // 👤 USER → dùng getMyAnalytics(accountId)
+      binanceSyncApi.getMyAnalytics(accountId).then((res) => {
         setAnalyticsData(res?.Data || null);
-      });
-    }
-  }, [user, selectedInternalAccountId, selectedAccountObj]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    if (user.type === 0) {
-      orderHistoryApi.getMyOrderHistory(1, 1000).then((res) => {
-        const all = res?.Data?.orders || [];
-        const userAccountId = all[0]?.binanceAccount;
-        if (userAccountId) {
-          setSelectedAccountId(userAccountId);
-          setOrders(all.filter((o: Order) => o.binanceAccount === userAccountId));
-        }
-        setIsLoading(false);
+      }).catch((err) => {
+        console.error('User analytics error:', err);
+        setAnalyticsData(null);
       });
     } else {
-      binanceAccountApi.getListAccounts().then((res) => {
-        const accs = res?.Data?.accounts || [];
-        setAccounts(accs);
-        if (accs.length > 0) setSelectedAccountId(accs[0].id.toString());
+      // 👑 ADMIN → dùng getAccountAnalytics(accountId)
+      binanceSyncApi.getAccountAnalytics(accountId).then((res) => {
+        setAnalyticsData(res?.Data || null);
+      }).catch((err) => {
+        console.error('Admin analytics error:', err);
+        setAnalyticsData(null);
       });
     }
-  }, [user]);
+  }, [user, selectedAccountObj]);
+
+
+
 
   useEffect(() => {
-    if (!selectedAccountId || user?.type === 0) return;
-    setIsLoading(true);
-    orderHistoryApi.getAllOrderHistory(1, 1000).then((res) => {
-      const all = res?.Data?.orders || [];
-      setOrders(all.filter((o: Order) => o.binanceAccount === selectedAccountId));
-      setIsLoading(false);
-    });
-  }, [selectedAccountId, user]);
+    if (!user || !selectedAccountId || !startDate || !endDate) return;
+    const fetchPerf = async () => {
+      try {
+        const params = {
+          startDate: dayjs(startDate).format('YYYY-MM-DD'),
+          endDate: dayjs(endDate).format('YYYY-MM-DD'),
+        };
+        const res = user.type === 0
+          ? await indicatorAnalyticsApi.getMyIndicatorPerformance(params)
+          : await indicatorAnalyticsApi.getIndicatorPerformance(params);
+        const indicators = user.type === 0 ? res?.Data?.accounts?.[0]?.indicators || [] : res?.Data?.indicators || [];
+        const filtered = indicators.filter((ind: any) => {
+          const tradeTime = dayjs(ind.lastTrade);
+          return tradeTime.isSameOrAfter(dayjs(startDate).startOf('day')) &&
+            tradeTime.isSameOrBefore(dayjs(endDate).endOf('day')) &&
+            (user.type === 0 || ind.accounts?.includes(selectedAccountId));
+        });
+        setIndicatorPerf(filtered);
+      } catch (err) {
+        console.error('Indicator performance fetch error:', err);
+      }
+    };
+    fetchPerf();
+  }, [user, selectedAccountId, startDate, endDate]);
 
-
-  const filteredOrders = orders.filter((order) => {
-    const orderDate = dayjs(order.create_time);
-    if (startDate && orderDate.isBefore(dayjs(startDate).startOf('day'))) return false;
-    if (endDate && orderDate.isAfter(dayjs(endDate).endOf('day'))) return false;
-    return true;
-  });
-
-  const availableSymbols = Array.from(new Set(filteredOrders.map((o) => o.symbol)));
-
-  useEffect(() => {
-    if (!selectedSymbol && availableSymbols.length > 0) {
-      setSelectedSymbol(availableSymbols[0]);
-    }
-  }, [availableSymbols]);
-
-  const ordersBySymbol = filteredOrders.filter((o) => o.symbol === selectedSymbol);
-  const symbol = selectedSymbol || 'USDT';
-  const buyMap = new Map<string, number>();
-  const sellMap = new Map<string, number>();
-
-  ordersBySymbol.forEach((order) => {
-    const date = dayjs(order.create_time).format('YYYY-MM-DD');
-    const price = parseFloat(order.price);
-    const qty = parseFloat(order.origQty) || parseFloat(order.executedQty);
-    if (!qty || isNaN(qty)) return;
-    const value = (!price || isNaN(price) ? 1 : price) * qty;
-    if (order.side === 'BUY') buyMap.set(date, (buyMap.get(date) || 0) + value);
-    else if (order.side === 'SELL') sellMap.set(date, (sellMap.get(date) || 0) + value);
-  });
-
-  const indicatorCountMap = new Map<string, number>();
-  filteredOrders.forEach((order) => {
-    const indicator = (order as any)?.indicatorCall || 'Không rõ';
-    indicatorCountMap.set(indicator, (indicatorCountMap.get(indicator) || 0) + 1);
-  });
-
-  const indicatorStats = Array.from(indicatorCountMap.entries()).map(([name, count]) => ({ name, count }));
-
-  const dates = Array.from(new Set([...buyMap.keys(), ...sellMap.keys()])).sort();
-  const buySeries = dates.map((d) => ({ x: d, y: buyMap.get(d) || 0 }));
-  const sellSeries = dates.map((d) => ({ x: d, y: sellMap.get(d) || 0 }));
-
-  const lastBuy = buySeries[buySeries.length - 1]?.y || 0;
-  const firstBuy = buySeries[0]?.y || 0;
-  const change = lastBuy - firstBuy;
-  const changePercent = firstBuy > 0 ? (change / firstBuy) * 100 : 0;
-  const isPositive = change >= 0;
-
-  const symbolKey = `future_${selectedSymbol}_BOTH`;
-  const symbolAnalytics = analyticsData?.bySymbol?.[symbolKey];
   const summary = analyticsData?.overall?.summary;
 
-  const indicatorMap: Record<string, Record<string, number>> = {};
-  filteredOrders.forEach((order) => {
-    const date = dayjs(order.create_time).format('YYYY-MM-DD');
-    const indicator = order.indicatorCall || 'Unknown';
-    if (!indicatorMap[indicator]) indicatorMap[indicator] = {};
-    indicatorMap[indicator][date] = (indicatorMap[indicator][date] || 0) + 1;
-  });
+  const handleSyncAccount = async () => {
+    if (!selectedAccountObj?.id) {
+      toast.error('Không tìm thấy tài khoản để đồng bộ.');
+      return;
+    }
 
-  const indicatorDates = Array.from(new Set(filteredOrders.map(o => dayjs(o.create_time).format('YYYY-MM-DD')))).sort();
-  const indicators = Object.keys(indicatorMap);
+    setSyncLoading(true);
+    setSyncProgress(0);
+    setSyncSummary(null);
 
-  const options: ApexCharts.ApexOptions = {
-    chart: { type: 'area', height: 300, toolbar: { show: false }, animations: { enabled: true, easing: 'easeinout', speed: 800 }, background: 'transparent' },
-    colors: ['#0ea5e9', '#ef4444'],
-    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.1, stops: [0, 100] } },
-    dataLabels: { enabled: false },
-    stroke: { curve: 'smooth', width: 2 },
-    grid: { borderColor: '#1e293b', strokeDashArray: 4, yaxis: { lines: { show: true } }, padding: { top: 0, right: 0, bottom: 0, left: 10 } },
-    xaxis: { type: 'datetime', labels: { style: { colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-    yaxis: { labels: { style: { colors: '#64748b' }, formatter: (value: number) => `${value.toFixed(0)} ${symbol}` } },
-    tooltip: { x: { format: 'yyyy-MM-dd' }, y: { formatter: (value: number) => `${value.toFixed(2)} ${symbol}` }, theme: 'dark' },
+    // Bắt đầu chạy tiến trình loading giả lập
+    syncInterval.current = setInterval(() => {
+      setSyncProgress(prev => {
+        const next = prev + Math.random() * 8;
+        return next >= 95 ? 95 : next;
+      });
+    }, 200);
+
+    try {
+      const res = await binanceSyncApi.syncMyAccount(selectedAccountObj.id);
+      const data = res?.Data;
+
+      // Dừng interval khi API trả về
+      if (syncInterval.current) {
+        clearInterval(syncInterval.current);
+        syncInterval.current = null;
+      }
+
+      setSyncProgress(100);
+
+      if (data?.summary) {
+        setSyncSummary(data.summary);
+        toast.success(
+          `Đồng bộ thành công sau ${data.summary.durationFormatted}`,
+          {
+            icon: <CheckCircle className="text-green-500 w-5 h-5" />,
+          }
+        );
+      } else {
+        toast.error('Đồng bộ thành công nhưng không có dữ liệu.');
+      }
+    } catch (err) {
+      if (syncInterval.current) {
+        clearInterval(syncInterval.current);
+        syncInterval.current = null;
+      }
+      setSyncProgress(0);
+      toast.error('Đồng bộ thất bại!');
+      console.error('Sync error:', err);
+    } finally {
+      setTimeout(() => {
+        setSyncLoading(false);
+        setSyncProgress(0);
+      }, 800);
+    }
   };
+
+
+  const handleCancelSync = async () => {
+    try {
+      await binanceSyncApi.cancelMySyncAccount(selectedAccountObj.id);
+      toast.error('⛔ Đã huỷ đồng bộ!');
+    } catch (err) {
+      toast.error('Không thể huỷ đồng bộ.');
+    } finally {
+      if (syncInterval.current) {
+        clearInterval(syncInterval.current);
+        syncInterval.current = null;
+      }
+      setSyncLoading(false);
+      setSyncProgress(0);
+    }
+  };
+
+
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-white mb-4">Account Statistics</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-white">Account Statistics</h2>
+
+        {user?.type === 0 && (
+          <button
+            onClick={handleSyncAccount}
+            disabled={syncLoading}
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white text-sm px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncLoading ? (
+              <>
+                <Loader className="animate-spin w-4 h-4" />
+                Đang đồng bộ...
+              </>
+            ) : (
+              'Đồng bộ dữ liệu'
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* ✅ Modal blocking UI khi đang sync */}
+      {syncLoading && (
+        <ModalOverlay
+          progress={syncProgress}
+          onCancel={handleCancelSync }
+        />
+      )}
+
+      {/* ✅ Hiển thị thời gian sau khi sync */}
+      {syncSummary && (
+        <p className="text-sm text-dark-300 mt-2 flex items-center gap-1">
+          <Clock className="w-4 h-4 text-primary-500" />
+          Đã đồng bộ trong: <strong>{syncSummary.durationFormatted}</strong>
+        </p>
+      )}
 
       {user?.type !== 0 && accounts.length > 0 && (
         <div className="mb-4">
           <label className="block text-sm font-medium text-white mb-1">Chọn tài khoản:</label>
           <select
-            className="bg-dark-700 border border-dark-500 text-white rounded-md px-3 py-2 text-sm focus:ring focus:outline-none"
+            className="bg-dark-700 border border-dark-500 text-white rounded-md px-3 py-2 text-sm"
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
           >
             {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.Name} ({acc.Email})
-              </option>
+              <option key={acc.id} value={acc.id}>{acc.Name} ({acc.Email})</option>
             ))}
           </select>
         </div>
       )}
 
-      {availableSymbols.length > 0 && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-white mb-1">Chọn symbol:</label>
-          <select
-            className="bg-dark-700 border border-dark-500 text-white rounded-md px-3 py-2 text-sm focus:ring focus:outline-none"
-            value={selectedSymbol}
-            onChange={(e) => setSelectedSymbol(e.target.value)}
-          >
-            {availableSymbols.map((sym) => (
-              <option key={sym} value={sym}>{sym}</option>
-            ))}
-          </select>
-        </div>
-      )}
       <div className="flex flex-wrap gap-2 items-center mb-4">
-  {['1 ngày', '1 Tuần', '1 Tháng', '3 Tháng'].map((label, idx) => (
-    <button
-      key={idx}
-      onClick={() => {
-        const now = dayjs();
-        let start, end = now.endOf('day');
-        switch (label) {
-          case '1 ngày':
-            start = now.subtract(1, 'day').startOf('day');
-            break;
-          case '1 Tuần':
-            start = now.subtract(7, 'day').startOf('day');
-            break;
-          case '1 Tháng':
-            start = now.subtract(30, 'day').startOf('day');
-            break;
-          case '3 Tháng':
-            start = now.subtract(90, 'day').startOf('day');
-            break;
-          default:
-            start = null;
-        }
-        setRange([{ ...range[0], startDate: start?.toDate(), endDate: end.toDate() }]);
-      }}
-      className="bg-dark-700 text-white text-sm px-3 py-1 rounded-md hover:bg-primary-500"
-    >
-      {label}
-    </button>
-  ))}
+        {['1 ngày', '1 Tuần', '1 Tháng', '3 Tháng'].map((label, idx) => {
+          const now = dayjs();
+          let start;
+          switch (label) {
+            case '1 ngày': start = now.subtract(1, 'day'); break;
+            case '1 Tuần': start = now.subtract(7, 'day'); break;
+            case '1 Tháng': start = now.subtract(30, 'day'); break;
+            case '3 Tháng': start = now.subtract(90, 'day'); break;
+            default: start = now;
+          }
+          return (
+            <button
+              key={idx}
+              onClick={() => setRange([{ ...range[0], startDate: start.toDate(), endDate: now.toDate() }])}
+              className="bg-dark-700 text-white text-sm px-3 py-1 rounded-md hover:bg-primary-500"
+            >
+              {label}
+            </button>
+          );
+        })}
 
-  <div className="relative">
-    <button
-      onClick={() => setShowCalendar(!showCalendar)}
-      className="flex items-center px-3 py-1 bg-dark-700 text-white rounded-md text-sm hover:bg-dark-600"
-    >
-      <Calendar className="w-4 h-4 mr-1" />
-      {startDate && endDate
-        ? `${dayjs(startDate).format('YYYY-MM-DD')} → ${dayjs(endDate).format('YYYY-MM-DD')}`
-        : 'Chọn ngày'}
-    </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowCalendar(!showCalendar)}
+            className="flex items-center px-3 py-1 bg-dark-700 text-white rounded-md text-sm hover:bg-dark-600"
+          >
+            <Calendar className="w-4 h-4 mr-1" />
+            {startDate && endDate
+              ? `${dayjs(startDate).format('YYYY-MM-DD')} → ${dayjs(endDate).format('YYYY-MM-DD')}`
+              : 'Chọn ngày'}
+          </button>
 
-    {showCalendar && (
-      <div ref={calendarRef} className="absolute z-50 mt-2">
-        <DateRange
-          editableDateInputs
-          onChange={(item) => setRange([item.selection])}
-          moveRangeOnFirstSelection={false}
-          ranges={range}
-          maxDate={new Date()}
-        />
+          {showCalendar && (
+            <div ref={calendarRef} className="absolute z-50 mt-2">
+              <DateRange
+                editableDateInputs
+                onChange={(item) => setRange([item.selection])}
+                moveRangeOnFirstSelection={false}
+                ranges={range}
+                maxDate={new Date()}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
-
 
       <div className="flex gap-6 border-b border-dark-500 mb-4">
-        <button onClick={() => setActiveTab('buySell')} className={`pb-2 text-sm font-medium ${activeTab === 'buySell' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>Tổng BUY SELL</button>
         <button onClick={() => setActiveTab('pnl')} className={`pb-2 text-sm font-medium ${activeTab === 'pnl' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>PNL</button>
         <button onClick={() => setActiveTab('indicatorStats')} className={`pb-2 text-sm font-medium ${activeTab === 'indicatorStats' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>Indicator Stats</button>
       </div>
-      {activeTab === 'buySell' && (
-  <>
-    <div className="mb-4">
-      <span className="text-xl font-bold text-white">{lastBuy.toLocaleString()} {symbol}</span>
-      <div className="flex items-center mt-1">
-        <span className={`flex items-center text-sm font-medium ${isPositive ? 'text-success-500' : 'text-danger-500'}`}>
-          {isPositive ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
-          {Math.abs(change).toFixed(2)} {symbol} ({Math.abs(changePercent).toFixed(2)}%) so với đầu kỳ
-        </span>
-      </div>
-    </div>
-
-    <ReactApexChart
-      options={options}
-      series={[
-        { name: 'Tổng BUY', data: buySeries },
-        { name: 'Tổng SELL', data: sellSeries },
-      ]}
-      type="area"
-      height={300}
-    />
-
-    <div className="flex items-center justify-center space-x-4 mt-4">
-      <div className="flex items-center space-x-2">
-        <span className="w-3 h-3 bg-sky-500 rounded-full"></span>
-        <span className="text-sm text-white">Tổng BUY</span>
-      </div>
-      <div className="flex items-center space-x-2">
-        <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-        <span className="text-sm text-white">Tổng SELL</span>
-      </div>
-    </div>
-  </>
-)}
-
 
       {activeTab === 'pnl' && summary && (
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-white">
           <Card title="Tổng khối lượng" value={`${summary.totalVolume?.toFixed(2)} USDT`} />
-          <Card
-            title="Realized PnL"
-            value={`${summary.totalRealizedPL?.toFixed(4)} USDT`}
-            className={summary.totalRealizedPL >= 0 ? 'text-green-400' : 'text-red-400'}
-          />
+          <Card title="Realized PnL" value={`${summary.totalRealizedPL?.toFixed(4)} USDT`} className={summary.totalRealizedPL >= 0 ? 'text-green-400' : 'text-red-400'} />
           <Card title="Phí (Commission)" value={`${summary.totalCommission?.toFixed(4)} USDT`} />
           <Card title="Net PnL" value={`${summary.netPL?.toFixed(4)} USDT`} className={summary.netPL >= 0 ? 'text-green-400' : 'text-red-400'} />
           <Card title="ROI trung bình" value={`${summary.avgROI?.toFixed(2)}%`} />
@@ -347,31 +317,36 @@ export default function AccountStats() {
         </div>
       )}
 
-
-
       {activeTab === 'indicatorStats' && (
-  <div className="mt-4">
-    <table className="min-w-full text-sm text-white border border-dark-600">
-      <thead className="bg-dark-700">
-        <tr>
-          <th className="px-4 py-2 border-b border-dark-600 text-left">Chỉ báo</th>
-          <th className="px-4 py-2 border-b border-dark-600 text-right">Số lệnh</th>
-        </tr>
-      </thead>
-      <tbody>
-        {indicatorStats.map((row) => (
-          <tr key={row.name} className="border-b border-dark-700">
-            <td className="px-4 py-2">{row.name}</td>
-            <td className="px-4 py-2 text-right">{row.count}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-)}
-
-      
+        <div className="mt-4 overflow-x-auto">
+          <table className="min-w-full text-sm text-white border border-dark-600">
+            <thead className="bg-dark-700 text-left">
+              <tr>
+                <th className="px-4 py-2">Chỉ báo</th>
+                <th className="px-4 py-2 text-right">Số lệnh</th>
+                <th className="px-4 py-2 text-right">Winrate</th>
+                <th className="px-4 py-2 text-right">PnL</th>
+                <th className="px-4 py-2 text-right">ROI TB</th>
+                <th className="px-4 py-2 text-right">Profit Factor</th>
+                <th className="px-4 py-2 text-right">Drawdown</th>
+              </tr>
+            </thead>
+            <tbody>
+              {indicatorPerf.map((row, index) => (
+                <tr key={index} className="border-b border-dark-700">
+                  <td className="px-4 py-2">{row.indicatorCall}</td>
+                  <td className="px-4 py-2 text-right">{row.totalTrades}</td>
+                  <td className="px-4 py-2 text-right">{row.winRate?.toFixed(2)}%</td>
+                  <td className={`px-4 py-2 text-right ${row.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{row.netPnl?.toFixed(4)} USDT</td>
+                  <td className="px-4 py-2 text-right">{row.avgPnl?.toFixed(4)}</td>
+                  <td className="px-4 py-2 text-right">{row.profitFactor?.toFixed(2)}</td>
+                  <td className="px-4 py-2 text-right">{row.maxDrawdown?.toFixed(2)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
-    
   );
 }

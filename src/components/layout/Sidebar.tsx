@@ -38,7 +38,7 @@ const navigation: any[] = [
 const authenticatedNavigation = [
   //{ name: <FormattedMessage id="nav.tradingBots" />, href: '/bots', icon: Bot },
   //{ name: <FormattedMessage id="nav.portfolio" />, href: '/portfolio', icon: Briefcase },
-  //{ name: <FormattedMessage id="nav.tradingTerminal" />, href: '/terminal', icon: Activity },
+  { name: <FormattedMessage id="nav.tradingTerminal" />, href: '/terminal', icon: Activity },
   { name: "Config Bot", href: '/config-bot', icon: SettingsIcon },
   { name: "Indicators", href: '/indicators', icon: LineChart },
   { name: "Binance Accounts", href: '/binance-accounts', icon: Building2 },
@@ -48,9 +48,9 @@ const authenticatedNavigation = [
 
 // Admin navigation - chỉ hiển thị cho type 1
 const adminNavigation = [
-  { name: "Admin Dashboard", href: '/admin', icon: Shield },
+  { name: "Admin System", href: '/admin', icon: Shield },
+  { name: "Admin Dashboard", href: '/admin/dashboard', icon: LayoutDashboard },
   { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
-  { name: "System Dashboard", href: '/admin/dashboard', icon: LayoutDashboard },
   { name: "System Stats", href: '/admin/system', icon: Cpu },
   //{ name: "User Management", href: '/admin/users', icon: Users },
   //{ name: "System Settings", href: '/admin/settings', icon: SettingsIcon },
