@@ -3,6 +3,8 @@ import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart,
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import TradingViewChart from '../TradingViewChart';
 import TradingForm from '../components/common/TradingForm';
+import TradingViewWidget from '../components/common/TradingViewWidget';
+import RealTimeChart from './RealTimeChart';
 // Generate mock candlestick data
 const generateCandlestickData = (days: number) => {
   const data = [];
@@ -146,341 +148,234 @@ export default function TradingTerminal() {
   };
 
   return (
-    <div className="h-[calc(100vh-6rem)]">
-      <div className="grid grid-cols-12 gap-4 h-full">
-        {/* Left sidebar - Orderbook and trades */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col h-full gap-4">
-          {/* Market selector */}
-          <div className="card p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-dark-700 flex items-center justify-center mr-2">
-                  <span className="text-xs font-medium">B</span>
-                </div>
-                <div>
-                  <div className="flex items-center">
-                    <span className="font-medium">BTC/USDT</span>
-                    <ChevronDown className="h-4 w-4 ml-1 text-dark-400" />
-                  </div>
-                  <div className="text-xs text-dark-400">Bitcoin</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium">
-                  <FormattedNumber
-                    value={38452.12}
-                    style="currency"
-                    currency="USD"
-                    minimumFractionDigits={2}
-                  />
-                </div>
-                <div className="flex items-center justify-end text-xs text-success-500">
-                  <ArrowUp className="h-3 w-3 mr-0.5" />
-                  <FormattedNumber
-                    value={0.0234}
-                    style="percent"
-                    minimumFractionDigits={2}
-                  />
-                </div>
-              </div>
-            </div>
+  <div className="h-screen overflow-hidden">
+    <div className="grid grid-cols-9 gap-4 h-full min-h-0 p-4">
+
+      {/* Chart (chiếm 6 cột) */}
+      <div className="col-span-6 card flex flex-col h-full overflow-hidden min-h-0">
+        <div className="border-b border-dark-700 p-3 flex justify-between items-center">
+          <div className="flex space-x-4">
+            <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
+              <Calendar className="h-4 w-4 mr-1" /> 1D
+            </button>
+            <button className="flex items-center text-sm text-primary-500 border-b-2 border-primary-500 pb-1">
+              <Clock className="h-4 w-4 mr-1" /> 4H
+            </button>
+            <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
+              <Clock className="h-4 w-4 mr-1" /> 1H
+            </button>
+            <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
+              <Clock className="h-4 w-4 mr-1" /> 15m
+            </button>
           </div>
-
-          {/* Orderbook */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.orderbook" />
-              </h2>
-              <button className="text-dark-400 hover:text-dark-300">
-                <RefreshCw className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
-              <div className="px-4 py-2">
-                {/* Asks (sell orders) */}
-                <div className="space-y-1 mb-4">
-                  {asks.map((ask, index) => (
-                    <div key={`ask-${index}`} className="relative flex text-xs h-5">
-                      {/* Thanh nền màu dưới */}
-                      <div
-                        className="absolute right-0 top-0 h-full bg-danger-500/10"
-                        style={{
-                          width: `${(ask.total / 200000) * 100}%`,
-                          maxWidth: '100%',
-                        }}
-                      ></div>
-
-                      {/* Text content */}
-                      <div className="w-1/3 text-danger-500 z-10">
-                        <FormattedNumber
-                          value={ask.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right z-10">
-                        <FormattedNumber
-                          value={ask.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right text-dark-400 z-10">
-                        <FormattedNumber
-                          value={ask.total / 1000}
-                          minimumFractionDigits={1}
-                          maximumFractionDigits={1}
-                        />
-                        K
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-
-                {/* Current price */}
-                <div className="flex justify-between items-center py-2 border-y border-dark-700">
-                  <span className="text-sm font-medium">
-                    <FormattedNumber
-                      value={38452.12}
-                      style="currency"
-                      currency="USD"
-                      minimumFractionDigits={2}
-                    />
-                  </span>
-                  <span className="text-xs text-dark-400">
-                    <FormattedNumber
-                      value={38452.12}
-                      style="currency"
-                      currency="USD"
-                      minimumFractionDigits={2}
-                    />
-                  </span>
-                </div>
-
-                {/* Bids (buy orders) */}
-                <div className="space-y-1 mt-4">
-  {bids.map((bid, index) => (
-    <div key={`bid-${index}`} className="relative flex text-xs h-5">
-      {/* Background xanh nhạt */}
-      <div
-        className="absolute right-0 top-0 h-full bg-success-500/10"
-        style={{ width: `${(bid.total / 200000) * 100}%`, maxWidth: '100%' }}
-      />
-
-      {/* Text content */}
-      <div className="w-1/3 text-success-500 z-10">
-        <FormattedNumber
-          value={bid.price}
-          minimumFractionDigits={2}
-          maximumFractionDigits={2}
-        />
+          <div className="flex space-x-2">
+            <button className="text-dark-400 hover:text-dark-300 p-1">
+              <BarChart className="h-4 w-4" />
+            </button>
+            <button className="text-dark-400 hover:text-dark-300 p-1">
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 relative z-0 overflow-hidden bg-dark-800 rounded min-h-0">
+          <TradingViewWidget />
+        </div>
       </div>
-      <div className="w-1/3 text-right z-10">
-        <FormattedNumber
-          value={bid.amount}
-          minimumFractionDigits={4}
-          maximumFractionDigits={4}
-        />
+
+      {/* Trading Sidebar - col-span-3 bên phải */}
+<div className="col-span-3 flex flex-col gap-4 h-full min-h-0 overflow-hidden">
+  
+  {/* Market Header */}
+  <div className="card p-4">
+    <div className="flex items-center justify-between">
+      {/* Left - Icon + Symbol */}
+      <div className="flex items-center">
+        <div className="h-8 w-8 rounded-full bg-dark-700 flex items-center justify-center mr-2">
+          <span className="text-xs font-medium">B</span>
+        </div>
+        <div>
+          <div className="flex items-center">
+            <span className="font-medium">BTC/USDT</span>
+            <ChevronDown className="h-4 w-4 ml-1 text-dark-400" />
+          </div>
+          <div className="text-xs text-dark-400">Bitcoin</div>
+        </div>
       </div>
-      <div className="w-1/3 text-right text-dark-400 z-10">
-        <FormattedNumber
-          value={bid.total / 1000}
-          minimumFractionDigits={1}
-          maximumFractionDigits={1}
-        />
-        K
+
+      {/* Right - Price */}
+      <div className="text-right">
+        <div className="font-medium">
+          <FormattedNumber value={38452.12} style="currency" currency="USD" />
+        </div>
+        <div className="flex items-center justify-end text-xs text-success-500">
+          <ArrowUp className="h-3 w-3 mr-0.5" />
+          <FormattedNumber value={0.0234} style="percent" minimumFractionDigits={2} />
+        </div>
       </div>
     </div>
-  ))}
+  </div>
+
+  {/* Trading Form Tay (Limit / Market / Stop) */}
+  <div className="card flex-1 flex flex-col overflow-hidden min-h-0">
+    <TradingForm />
+  </div>
 </div>
 
-              </div>
+
+      {/* Bottom Row: Orderbook + Recent Trades + Open Orders (3 cột đều nhau) */}
+      <div className="col-span-9 grid grid-cols-9 gap-4">
+        {/* Orderbook */}
+        <div className="col-span-3 card flex flex-col overflow-hidden min-h-0">
+          <div className="card-header py-3 flex justify-between items-center">
+            <h2 className="text-sm font-medium"><FormattedMessage id="terminal.orderbook" /></h2>
+            <button className="text-dark-400 hover:text-dark-300">
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 px-4 py-2 min-h-0">
+            {/* Asks */}
+            <div className="space-y-1 mb-4">
+              {asks.map((ask, index) => (
+                <div key={`ask-${index}`} className="relative flex text-xs h-5">
+                  <div className="absolute right-0 top-0 h-full bg-danger-500/10" style={{ width: `${(ask.total / 200000) * 100}%` }} />
+                  <div className="w-1/3 text-danger-500 z-10">
+                    <FormattedNumber value={ask.price} minimumFractionDigits={2} />
+                  </div>
+                  <div className="w-1/3 text-right z-10">
+                    <FormattedNumber value={ask.amount} minimumFractionDigits={4} />
+                  </div>
+                  <div className="w-1/3 text-right text-dark-400 z-10">
+                    <FormattedNumber value={ask.total / 1000} />K
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Price Line */}
+            <div className="flex justify-between items-center py-2 border-y border-dark-700">
+              <span className="text-sm font-medium">
+                <FormattedNumber value={38452.12} style="currency" currency="USD" />
+              </span>
+              <span className="text-xs text-dark-400">
+                <FormattedNumber value={38452.12} style="currency" currency="USD" />
+              </span>
+            </div>
+
+            {/* Bids */}
+            <div className="space-y-1 mt-4">
+              {bids.map((bid, index) => (
+                <div key={`bid-${index}`} className="relative flex text-xs h-5">
+                  <div className="absolute right-0 top-0 h-full bg-success-500/10" style={{ width: `${(bid.total / 200000) * 100}%` }} />
+                  <div className="w-1/3 text-success-500 z-10">
+                    <FormattedNumber value={bid.price} minimumFractionDigits={2} />
+                  </div>
+                  <div className="w-1/3 text-right z-10">
+                    <FormattedNumber value={bid.amount} minimumFractionDigits={4} />
+                  </div>
+                  <div className="w-1/3 text-right text-dark-400 z-10">
+                    <FormattedNumber value={bid.total / 1000} />K
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* Recent trades */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.recentTrades" />
-              </h2>
-            </div>
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
+        {/* Recent Trades */}
+        <div className="col-span-3 card flex flex-col overflow-hidden min-h-0">
+          <div className="card-header py-3">
+            <h2 className="text-sm font-medium"><FormattedMessage id="terminal.recentTrades" /></h2>
+          </div>
+          <div className="overflow-y-auto flex-1 min-h-0">
+            <table className="min-w-full divide-y divide-dark-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-dark-400"><FormattedMessage id="common.price" /></th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-dark-400"><FormattedMessage id="common.amount" /></th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-dark-400"><FormattedMessage id="common.time" /></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-dark-700">
+                {recentTrades.map((trade) => (
+                  <tr key={trade.id}>
+                    <td className={`px-4 py-2 text-xs ${trade.type === 'buy' ? 'text-success-500' : 'text-danger-500'}`}>
+                      <FormattedNumber value={trade.price} minimumFractionDigits={2} />
+                    </td>
+                    <td className="px-4 py-2 text-xs text-right">
+                      <FormattedNumber value={trade.amount} minimumFractionDigits={4} />
+                    </td>
+                    <td className="px-4 py-2 text-xs text-right text-dark-400">{trade.time}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Open Orders */}
+        <div className="col-span-3 card flex flex-col overflow-hidden min-h-0">
+          <div className="card-header py-3 flex justify-between items-center">
+            <h2 className="text-sm font-medium"><FormattedMessage id="terminal.openOrders" /></h2>
+            {openOrders.length > 0 && (
+              <button className="text-xs text-danger-500 hover:text-danger-400">
+                <FormattedMessage id="terminal.cancelAll" />
+              </button>
+            )}
+          </div>
+          <div className="overflow-y-auto flex-1 min-h-0">
+            {openOrders.length > 0 ? (
               <table className="min-w-full divide-y divide-dark-700">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.price" />
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.amount" />
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.time" />
-                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-dark-400"><FormattedMessage id="common.pair" /></th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400"><FormattedMessage id="common.price" /></th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400"><FormattedMessage id="common.amount" /></th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400"><FormattedMessage id="common.action" /></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-dark-700">
-                  {recentTrades.map((trade) => (
-                    <tr key={trade.id}>
-                      <td className={`px-4 py-2 text-xs ${trade.type === 'buy' ? 'text-success-500' : 'text-danger-500'}`}>
-                        <FormattedNumber
-                          value={trade.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
+                  {openOrders.map((order) => (
+                    <tr key={order.id}>
+                      <td className="px-4 py-2 text-xs">
+                        <div>
+                          <div className={order.side === 'buy' ? 'text-success-500' : 'text-danger-500'}>
+                            <FormattedMessage id={`common.${order.side}`} />
+                          </div>
+                          <div className="text-dark-400">{order.pair}</div>
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-xs text-right">
-                        <FormattedNumber
-                          value={trade.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
+                        <FormattedNumber value={order.price} minimumFractionDigits={2} />
                       </td>
-                      <td className="px-4 py-2 text-xs text-right text-dark-400">{trade.time}</td>
+                      <td className="px-4 py-2 text-xs text-right">
+                        <FormattedNumber value={order.amount} minimumFractionDigits={order.amount < 1 ? 4 : 2} />
+                        <div className="text-dark-400">
+                          <FormattedNumber value={order.total} style="currency" currency="USD" />
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-xs text-right">
+                        <button className="text-danger-500 hover:text-danger-400">
+                          <FormattedMessage id="terminal.cancel" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Center - Chart */}
-        <div className="col-span-12 lg:col-span-6 card flex flex-col h-full overflow-hidden">
-          <div className="border-b border-dark-700 p-3 flex justify-between items-center">
-            <div className="flex space-x-4">
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Calendar className="h-4 w-4 mr-1" />
-                1D
-              </button>
-              <button className="flex items-center text-sm text-primary-500 border-b-2 border-primary-500 pb-1">
-                <Clock className="h-4 w-4 mr-1" />
-                4H
-              </button>
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Clock className="h-4 w-4 mr-1" />
-                1H
-              </button>
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Clock className="h-4 w-4 mr-1" />
-                15m
-              </button>
-            </div>
-            <div className="flex space-x-2">
-              <button className="text-dark-400 hover:text-dark-300 p-1">
-                <BarChart className="h-4 w-4" />
-              </button>
-              <button className="text-dark-400 hover:text-dark-300 p-1">
-                <Share2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 relative z-0 overflow-hidden bg-dark-800 rounded">
-            <TradingViewChart data={generateCandlestickData(7)} />
-          </div>
-        </div>
-
-        {/* Right sidebar - Trading form and open orders */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col h-full gap-4">
-          {/* Trading form */}
-          <TradingForm />
-
-          {/* Open orders */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.openOrders" />
-              </h2>
-              {openOrders.length > 0 && (
-                <button className="text-xs text-danger-500 hover:text-danger-400">
-                  <FormattedMessage id="terminal.cancelAll" />
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
-              {openOrders.length > 0 ? (
-                <table className="min-w-full divide-y divide-dark-700">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.pair" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.price" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.amount" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.action" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-dark-700">
-                    {openOrders.map((order) => (
-                      <tr key={order.id}>
-                        <td className="px-4 py-2 text-xs">
-                          <div>
-                            <div className={order.side === 'buy' ? 'text-success-500' : 'text-danger-500'}>
-                              <FormattedMessage id={`common.${order.side}`} />
-                            </div>
-                            <div className="text-dark-400">{order.pair}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <FormattedNumber
-                            value={order.price}
-                            minimumFractionDigits={2}
-                            maximumFractionDigits={2}
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <div>
-                            <div>
-                              <FormattedNumber
-                                value={order.amount}
-                                minimumFractionDigits={order.amount < 1 ? 4 : 2}
-                                maximumFractionDigits={order.amount < 1 ? 4 : 2}
-                              />
-                            </div>
-                            <div className="text-dark-400">
-                              <FormattedNumber
-                                value={order.total}
-                                style="currency"
-                                currency="USD"
-                                minimumFractionDigits={2}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <button className="text-danger-500 hover:text-danger-400">
-                            <FormattedMessage id="terminal.cancel" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <DollarSign className="h-8 w-8 text-dark-600 mb-2" />
-                  <p className="text-sm text-dark-400">
-                    <FormattedMessage id="terminal.noOrders" />
-                  </p>
-                  <p className="text-xs text-dark-500 mt-1">
-                    <FormattedMessage id="terminal.ordersWillAppear" />
-                  </p>
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+                <DollarSign className="h-8 w-8 text-dark-600 mb-2" />
+                <p className="text-sm text-dark-400"><FormattedMessage id="terminal.noOrders" /></p>
+                <p className="text-xs text-dark-500 mt-1"><FormattedMessage id="terminal.ordersWillAppear" /></p>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
-  );
+  </div>
+);
+
+
+
 }

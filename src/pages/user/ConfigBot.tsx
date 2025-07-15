@@ -1772,54 +1772,48 @@ const submitStream = async () => {
             </div>
           )}
 
-          {/* Pause & Resume Confirmation Modal */}
+         {/* Pause/Resume Confirmation Modal */}
+{togglingStream !== null && (
+  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+    <div className="card w-full max-w-md bg-dark-800 text-white rounded-lg shadow-lg border border-dark-600">
+      <div className="p-6">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+          <AlertTriangle className="h-6 w-6 text-warning-500" />
+        </div>
 
-          {/* Pause/Resume Confirmation Modal */}
+        <h3 className="text-lg font-semibold text-center mb-2 text-white">
+          {togglingStream.Status === 1 ? 'Pause Trading Stream' : 'Resume Trading Stream'}
+        </h3>
 
-          {togglingStream !== null && (
-            <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
-              <div className="card w-full max-w-md bg-white dark:bg-dark-800 rounded-lg shadow-lg">
-                <div className="p-6">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
-                    <AlertTriangle className="h-6 w-6 text-warning-500" />
-                  </div>
+        <p className="text-gray-300 text-center mb-6 leading-relaxed">
+          Are you sure you want to {togglingStream.Status === 1 ? 'pause' : 'resume'} the stream{' '}
+          <span className="text-primary-400 font-semibold break-words">{togglingStream.Description}</span>?
+        </p>
 
-                  <h3 className="text-lg font-medium text-center mb-2">
-                    {togglingStream.Status === 1 ? 'Pause Trading Stream' : 'Resume Trading Stream'}
-                  </h3>
+        <div className="flex justify-center space-x-3">
+          <button
+            className="btn btn-outline border-gray-500 text-gray-300 hover:bg-dark-700"
+            onClick={() => setTogglingStream(null)}
+          >
+            Cancel
+          </button>
 
-                  <p className="text-dark-400 text-center mb-6">
-                    Are you sure you want to {togglingStream.Status === 1 ? 'pause' : 'resume'} the stream{' '}
-                    <span className="text-white font-semibold">{togglingStream.Description}</span>?
-                  </p>
-
-                  <div className="flex justify-center space-x-3">
-                    <button
-                      className="btn btn-outline"
-                      onClick={() => setTogglingStream(null)}
-                    >
-                      Cancel
-                    </button>
-
-                    <button
-                      className="btn bg-primary-500 hover:bg-primary-600 text-white"
-                      onClick={async () => {
-                        if (!togglingStream) return;
-                        const nextStatus = togglingStream.Status === 1 ? 0 : 1;
-                        await handleStatusToggle(togglingStream, nextStatus);
-                        setTogglingStream(null);
-                      }}
-                    >
-                      {togglingStream.Status === 1 ? 'Pause Stream' : 'Resume Stream'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-
-
+          <button
+            className="btn bg-primary-500 hover:bg-primary-600 text-white"
+            onClick={async () => {
+              if (!togglingStream) return;
+              const nextStatus = togglingStream.Status === 1 ? 0 : 1;
+              await handleStatusToggle(togglingStream, nextStatus);
+              setTogglingStream(null);
+            }}
+          >
+            {togglingStream.Status === 1 ? 'Pause Stream' : 'Resume Stream'}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
 
 
