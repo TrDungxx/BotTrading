@@ -1,137 +1,458 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2, Star, Settings, Maximize2, TrendingUp, Volume2, Activity, Wifi, WifiOff } from 'lucide-react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
 import TradingViewChart from '../TradingViewChart';
-// Generate mock candlestick data
-const generateCandlestickData = (days: number) => {
-  const data = [];
-  let date = new Date();
-  date.setDate(date.getDate() - days);
-  
-  let price = 38000;
-  
-  for (let i = 0; i < days * 24; i++) {
-    const open = price + (Math.random() - 0.5) * 200;
-    const high = open + Math.random() * 100;
-    const low = open - Math.random() * 100;
-    const close = (high + low) / 2;
-    
-    date.setHours(date.getHours() + 1);
-    
-    data.push({
-      time: Math.floor(date.getTime() / 1000),
-      open,
-      high,
-      low,
-      close,
-    });
-    
-    price = close;
+import SymbolSelector from '../components/common/SymbolSelector';
+// WebSocket connection status
+type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+// Market data interfaces
+interface KlineData {
+  symbol: string;
+  openTime: number;
+  closeTime: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  trades: number;
+}
+
+interface TickerData {
+  symbol: string;
+  priceChange: string;
+  priceChangePercent: string;
+  weightedAvgPrice: string;
+  prevClosePrice: string;
+  lastPrice: string;
+  lastQty: string;
+  bidPrice: string;
+  askPrice: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  volume: string;
+  quoteVolume: string;
+  openTime: number;
+  closeTime: number;
+  count: number;
+}
+
+interface OrderBookEntry {
+  price: string;
+  quantity: string;
+  total?: number;
+}
+
+interface OrderBookData {
+  lastUpdateId: number;
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+}
+
+interface TradeData {
+  id: number;
+  price: string;
+  qty: string;
+  time: number;
+  isBuyerMaker: boolean;
+}
+
+interface BookTickerData {
+  symbol: string;
+  bidPrice: string;
+  bidQty: string;
+  askPrice: string;
+  askQty: string;
+}
+
+interface MiniTickerData {
+  symbol: string;
+  close: string;
+  open: string;
+  high: string;
+  low: string;
+  volume: string;
+  quoteVolume: string;
+}
+
+// Account interfaces (for authenticated streams)
+interface AccountInfo {
+  makerCommission: number;
+  takerCommission: number;
+  buyerCommission: number;
+  sellerCommission: number;
+  canTrade: boolean;
+  canWithdraw: boolean;
+  canDeposit: boolean;
+  balances: Array<{
+    asset: string;
+    free: string;
+    locked: string;
+  }>;
+}
+
+interface OrderUpdate {
+  symbol: string;
+  orderId: number;
+  orderListId: number;
+  clientOrderId: string;
+  price: string;
+  origQty: string;
+  executedQty: string;
+  cummulativeQuoteQty: string;
+  status: string;
+  timeInForce: string;
+  type: string;
+  side: string;
+  stopPrice: string;
+  icebergQty: string;
+  time: number;
+  updateTime: number;
+  isWorking: boolean;
+}
+interface SymbolItem {
+  symbol: string;
+}
+
+// Clean WebSocket service structure
+class BinanceWebSocketService {
+  private ws: WebSocket | null = null;
+  private subscriptions: Set<string> = new Set();
+  private callbacks: Map<string, (data: any) => void> = new Map();
+  private isAuthenticated = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private isConnected = false;
+
+  public onStatusChange: (status: ConnectionStatus) => void = () => {};
+
+  constructor() {
+    this.connect();
   }
-  
-  return data;
-};
+private handleMessage(data: any) {
+  console.log('📩 Raw Incoming:', data);
 
-// Mock data for the orderbook
-const generateOrderbook = () => {
-  const asks = [];
-  const bids = [];
-  
-  let askPrice = 38500;
-  let bidPrice = 38450;
-  
-  for (let i = 0; i < 10; i++) {
-    askPrice += Math.random() * 15 + 5;
-    bidPrice -= Math.random() * 15 + 5;
-    
-    asks.push({
-      price: askPrice,
-      amount: Math.random() * 2 + 0.1,
-      total: Math.random() * 100000 + 10000,
-    });
-    
-    bids.push({
-      price: bidPrice,
-      amount: Math.random() * 2 + 0.1,
-      total: Math.random() * 100000 + 10000,
-    });
+  // Trường hợp có "stream" (thường thấy khi server trả về kiểu mới)
+  if (data.stream) {
+    console.log('🧪 Detected stream:', data.stream);
+    const callback = this.callbacks.get(data.stream);
+    if (callback) {
+      console.log('✅ Found callback for stream:', data.stream);
+      callback(data.data);
+    } else {
+      console.warn('⚠️ No callback found for stream:', data.stream);
+    }
+
+  // Trường hợp có "symbol" và "eventType" (fallback nếu không có stream)
+  } else if (data.symbol && data.eventType) {
+    const streamKey = `${data.symbol.toLowerCase()}@${data.eventType}`;
+    console.log('🧪 Detected eventType:', data.eventType, '→ streamKey:', streamKey);
+    const callback = this.callbacks.get(streamKey);
+    if (callback) {
+      console.log('✅ Found callback for streamKey:', streamKey);
+      callback(data);
+    } else {
+      console.warn('⚠️ No callback found for streamKey:', streamKey);
+    }
+
+  } else {
+    console.warn('❓ Unknown message format:', data);
   }
-  
-  return { asks, bids };
-};
+}
 
-const { asks, bids } = generateOrderbook();
+  private connect() {
+  try {
+    this.onStatusChange('connecting');
 
-// Mock data for recent trades
-const recentTrades = [
-  { id: 1, price: 38456.78, amount: 0.12, time: '14:32:45', type: 'buy' },
-  { id: 2, price: 38450.23, amount: 0.05, time: '14:32:30', type: 'sell' },
-  { id: 3, price: 38455.12, amount: 0.08, time: '14:32:15', type: 'buy' },
-  { id: 4, price: 38449.87, amount: 0.15, time: '14:32:00', type: 'sell' },
-  { id: 5, price: 38452.34, amount: 0.03, time: '14:31:45', type: 'buy' },
-  { id: 6, price: 38447.92, amount: 0.22, time: '14:31:30', type: 'sell' },
-  { id: 7, price: 38451.67, amount: 0.11, time: '14:31:15', type: 'buy' },
-];
+    this.ws = new WebSocket('ws://45.77.33.141/w-binance-socket/signalr/connect');
 
-// Mock data for open orders
-const openOrders = [
-  {
-    id: 1,
-    pair: 'BTC/USDT',
-    type: 'limit',
-    side: 'buy',
-    price: 37500.00,
-    amount: 0.1,
-    filled: 0,
-    total: 3750.00,
-    status: 'open',
-    date: '2023-03-15 14:22:45',
-  },
-  {
-    id: 2,
-    pair: 'ETH/USDT',
-    type: 'limit',
-    side: 'sell',
-    price: 2400.00,
-    amount: 2,
-    filled: 0,
-    total: 4800.00,
-    status: 'open',
-    date: '2023-03-15 13:45:12',
-  },
-];
+    this.ws.onopen = () => {
+      console.log('✅ WebSocket connected');
+      this.onStatusChange('connected');
+      this.isConnected = true;
+
+      const subs = [
+        { action: 'subscribePublicTicker', symbol: 'BTCUSDT' },
+        { action: 'subscribePublicKline', symbol: 'BTCUSDT', interval: '1m' },
+        { action: 'subscribePublicTrade', symbol: 'BTCUSDT' }
+      ];
+
+      for (const msg of subs) {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify(msg));
+          console.log('📤 Sent:', msg);
+        }
+      }
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📥 Incoming:', data);
+        this.handleMessage(data); // ✅ xử lý tại đây luôn
+      } catch (error) {
+        console.error('❌ Error parsing message:', error);
+      }
+    };
+
+    this.ws.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
+      this.onStatusChange('error');
+      this.isConnected = false;
+    };
+
+    this.ws.onclose = () => {
+      console.warn('🔌 WebSocket closed. Reconnecting...');
+      this.onStatusChange('disconnected');
+      this.isConnected = false;
+      this.attemptReconnect();
+    };
+  } catch (error) {
+    console.error('❌ Failed to connect WebSocket:', error);
+    this.onStatusChange('error');
+  }
+}
+
+
+  private attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      setTimeout(() => {
+        console.log(`Reconnecting... Attempt ${this.reconnectAttempts}`);
+        this.connect();
+      }, this.reconnectDelay * this.reconnectAttempts);
+    }
+  }
+
+  public unsubscribe(stream: string) {
+  this.subscriptions.delete(stream);
+  this.callbacks.delete(stream);
+
+  const symbol = stream.split('@')[0].toUpperCase();
+
+  let message: any = null;
+  if (stream.includes('@kline')) {
+    const interval = stream.split('@kline_')[1];
+    message = { action: 'unsubscribe', stream: 'kline', symbol, interval };
+  } else if (stream.includes('@ticker')) {
+    message = { action: 'unsubscribe', stream: 'ticker', symbol };
+  } else if (stream.includes('@depth')) {
+    message = { action: 'unsubscribe', stream: 'depth', symbol };
+  } else if (stream.includes('@trade')) {
+    message = { action: 'unsubscribe', stream: 'trade', symbol };
+  } else if (stream.includes('@bookTicker')) {
+    message = { action: 'unsubscribe', stream: 'bookTicker', symbol };
+  } else if (stream.includes('@miniTicker')) {
+    message = { action: 'unsubscribe', stream: 'miniTicker', symbol };
+  }
+
+  if (this.ws && this.ws.readyState === WebSocket.OPEN && message) {
+    this.ws.send(JSON.stringify(message));
+    console.log('📡 Sent unsubscribe:', message);
+  }
+}
+
+  public setStatusCallback(callback: (status: ConnectionStatus) => void) {
+    this.onStatusChange = callback;
+  }
+
+ public subscribe(stream: string, callback?: (data: any) => void) {
+  if (callback) this.callbacks.set(stream, callback);
+  this.subscriptions.add(stream);
+
+  // Tùy theo loại stream, tạo JSON message phù hợp
+  let message: any = null;
+
+  if (stream.includes('@kline')) {
+    const [symbol, interval] = stream.split('@kline_');
+    message = { action: 'subscribePublicKline', symbol: symbol.toUpperCase(), interval };
+  } else if (stream.includes('@ticker')) {
+    const symbol = stream.split('@')[0];
+    message = { action: 'subscribePublicTicker', symbol: symbol.toUpperCase() };
+  } else if (stream.includes('@depth')) {
+    const [symbol] = stream.split('@');
+    message = { action: 'subscribePublicDepth', symbol: symbol.toUpperCase(), levels: '20', speed: '1000ms' };
+  } else if (stream.includes('@trade')) {
+    const symbol = stream.split('@')[0];
+    message = { action: 'subscribePublicTrade', symbol: symbol.toUpperCase() };
+  } else if (stream.includes('@bookTicker')) {
+    const symbol = stream.split('@')[0];
+    message = { action: 'subscribePublicBookTicker', symbol: symbol.toUpperCase() };
+  } else if (stream.includes('@miniTicker')) {
+    const symbol = stream.split('@')[0];
+    message = { action: 'subscribePublicMiniTicker', symbol: symbol.toUpperCase() };
+  }
+
+  if (this.isConnected && this.ws && message) {
+  this.ws.send(JSON.stringify(message));
+  console.log('📡 Sent subscribe:', message);
+} else {
+  console.warn('⚠️ WebSocket not ready. Retrying subscribe for:', stream);
+
+  // 🕒 Thử lại sau 1 giây nếu WebSocket chưa sẵn sàng
+  setTimeout(() => this.subscribe(stream, callback), 1000);
+}
+
+
+  console.log(`Subscribed to ${stream}`);
+}
+
+
+  public getSubscriptions(): string[] {
+    return Array.from(this.subscriptions);
+  }
+
+  public authenticate(apiKey: string, signature: string) {
+    // TODO: Implement authentication
+    this.isAuthenticated = true;
+    console.log('WebSocket authenticated');
+  }
+
+  public disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.subscriptions.clear();
+    this.callbacks.clear();
+    this.onStatusChange('disconnected');
+  }
+}
 
 export default function TradingTerminal() {
-  const [activeTab, setActiveTab] = useState<'limit' | 'market' | 'stop'>('limit');
+
+
+  const [currentSymbol, setCurrentSymbol] = useState('BTCUSDT');
+  const [symbols, setSymbols] = useState([]);
+  // State management
+  const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [wsService] = useState(() => new BinanceWebSocketService());
+  
+  // Market data states
+  const [klineData, setKlineData] = useState<KlineData | null>(null);
+  const [tickerData, setTickerData] = useState<TickerData | null>(null);
+  const [orderBook, setOrderBook] = useState<OrderBookData | null>(null);
+  const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
+  const [bookTicker, setBookTicker] = useState<BookTickerData | null>(null);
+  const [miniTicker, setMiniTicker] = useState<MiniTickerData | null>(null);
+  
+  // Account data states (for authenticated users)
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [orderUpdates, setOrderUpdates] = useState<OrderUpdate[]>([]);
+  
+  // UI states
+  const [activeOrderTab, setActiveOrderTab] = useState<'limit' | 'market' | 'stop'>('limit');
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
-  const [price, setPrice] = useState('38452.12');
+  const [subscriptions, setSubscriptions] = useState<string[]>([]);
+  
+  // Trading form states
+  const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [total, setTotal] = useState('');
-  
-  // Calculate total based on price and amount
+  const [klineSeries, setKlineSeries] = useState<any[]>([]);
+
+
+  // Initialize WebSocket connections
+  useEffect(() => {
+    wsService.setStatusCallback(setConnectionStatus);
+    
+    // Subscribe to public streams
+    const streams = [
+      `${selectedSymbol.toLowerCase()}@kline_1m`,
+      `${selectedSymbol.toLowerCase()}@ticker`,
+      `${selectedSymbol.toLowerCase()}@depth20`,
+      `${selectedSymbol.toLowerCase()}@trade`,
+      `${selectedSymbol.toLowerCase()}@bookTicker`,
+      `${selectedSymbol.toLowerCase()}@miniTicker`
+    ];
+    
+    streams.forEach(stream => {
+      wsService.subscribe(stream, (data) => {
+        handleStreamData(stream, data);
+      });
+    });
+    
+    setSubscriptions(wsService.getSubscriptions());
+    
+    return () => {
+      wsService.disconnect();
+    };
+  }, [selectedSymbol]);
+
+  const handleStreamData = (stream: string, data: any) => {
+    // TODO: Handle real WebSocket data
+    if (stream.includes('@kline') && data?.k) {
+  const k = data.k;
+
+  const candle = {
+    time: Math.floor(k.t / 1000),
+    open: parseFloat(k.o),
+    high: parseFloat(k.h),
+    low: parseFloat(k.l),
+    close: parseFloat(k.c),
+  };
+
+  setKlineSeries(prev => {
+    const updated = [...prev, candle];
+    return updated.slice(-200); // giữ tối đa 200 cây nến gần nhất
+  });
+
+  setKlineData({
+    symbol: k.s,
+    openTime: k.t,
+    closeTime: k.T,
+    open: k.o,
+    high: k.h,
+    low: k.l,
+    close: k.c,
+    volume: k.v,
+    trades: k.n,
+  });
+} else if (stream.includes('@ticker')) {
+      setTickerData(data);
+    } else if (stream.includes('@depth')) {
+      setOrderBook(data);
+    } else if (stream.includes('@trade')) {
+      setRecentTrades(prev => {
+        const newTrades = [data, ...prev.slice(0, 49)];
+        return newTrades.sort((a, b) => b.time - a.time);
+      });
+    } else if (stream.includes('@bookTicker')) {
+      setBookTicker(data);
+    } else if (stream.includes('@miniTicker')) {
+      setMiniTicker(data);
+    }
+  };
+
+  const handleUnsubscribe = (stream: string) => {
+    wsService.unsubscribe(stream);
+    setSubscriptions(wsService.getSubscriptions());
+  };
+
   const calculateTotal = (price: string, amount: string) => {
     if (price && amount) {
       const calculatedTotal = parseFloat(price) * parseFloat(amount);
-      return calculatedTotal.toFixed(2);
+      return calculatedTotal.toFixed(8);
     }
     return '';
   };
-  
-  // Handle amount change
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newAmount = e.target.value;
     setAmount(newAmount);
     setTotal(calculateTotal(price, newAmount));
   };
-  
-  // Handle price change
+
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPrice = e.target.value;
     setPrice(newPrice);
     setTotal(calculateTotal(newPrice, amount));
   };
-  
-  // Handle total change
+
   const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTotal = e.target.value;
     setTotal(newTotal);
@@ -143,493 +464,527 @@ export default function TradingTerminal() {
       setAmount('');
     }
   };
-  
+
+   useEffect(() => {
+    // Giả sử bạn có API gọi được symbol list
+    fetch('/api/symbols') // hoặc get từ context/cache
+      .then((res) => res.json())
+      .then((data) => setSymbols(data));
+  }, []);
+  const reSubscribeWebSocket = (symbol: string) => {
+  const oldStreams = [
+    `${selectedSymbol.toLowerCase()}@kline_1m`,
+    `${selectedSymbol.toLowerCase()}@ticker`,
+    `${selectedSymbol.toLowerCase()}@depth20`,
+    `${selectedSymbol.toLowerCase()}@trade`,
+    `${selectedSymbol.toLowerCase()}@bookTicker`,
+    `${selectedSymbol.toLowerCase()}@miniTicker`
+  ];
+
+  // Unsubscribe
+  oldStreams.forEach(stream => wsService.unsubscribe(stream));
+
+  // Update state
+  setSelectedSymbol(symbol);
+
+  // Subscribe to new streams
+  const newStreams = [
+    `${symbol.toLowerCase()}@kline_1m`,
+    `${symbol.toLowerCase()}@ticker`,
+    `${symbol.toLowerCase()}@depth20`,
+    `${symbol.toLowerCase()}@trade`,
+    `${symbol.toLowerCase()}@bookTicker`,
+    `${symbol.toLowerCase()}@miniTicker`
+  ];
+
+  newStreams.forEach(stream => {
+    wsService.subscribe(stream, (data) => handleStreamData(stream, data));
+  });
+
+  setSubscriptions(wsService.getSubscriptions());
+};
+
+useEffect(() => {
+  setSymbols([
+    { symbol: 'BTCUSDT' },
+    { symbol: 'ETHUSDT' },
+    { symbol: 'DOGEUSDT' },
+    { symbol: 'BNBUSDT' },
+  ]);
+}, []);
   return (
-    <div className="h-[calc(100vh-6rem)]">
-      <div className="grid grid-cols-12 gap-4 h-full">
-        {/* Left sidebar - Orderbook and trades */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col h-full gap-4">
-          {/* Market selector */}
-          <div className="card p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="h-8 w-8 rounded-full bg-dark-700 flex items-center justify-center mr-2">
-                  <span className="text-xs font-medium">B</span>
-                </div>
-                <div>
-                  <div className="flex items-center">
-                    <span className="font-medium">BTC/USDT</span>
-                    <ChevronDown className="h-4 w-4 ml-1 text-dark-400" />
-                  </div>
-                  <div className="text-xs text-dark-400">Bitcoin</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium">
-                  <FormattedNumber
-                    value={38452.12}
-                    style="currency"
-                    currency="USD"
-                    minimumFractionDigits={2}
-                  />
-                </div>
-                <div className="flex items-center justify-end text-xs text-success-500">
-                  <ArrowUp className="h-3 w-3 mr-0.5" />
-                  <FormattedNumber
-                    value={0.0234}
-                    style="percent"
-                    minimumFractionDigits={2}
-                  />
-                </div>
-              </div>
+    <div className="h-[calc(100vh-6rem)] bg-dark-900">
+      {/* Top Bar - Symbol selector and stats */}
+      <div className="border-b border-dark-700 bg-dark-800">
+        <div className="flex items-center justify-between px-4 py-2">
+          {/* Left: Symbol and basic info */}
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center">
+<SymbolSelector
+  symbols={symbols}
+  currentSymbol={selectedSymbol}
+  onChange={(symbol) => {
+    setSelectedSymbol(symbol);
+    reSubscribeWebSocket(symbol);
+  }}
+/>
+
+  <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
+              <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
             </div>
-          </div>
-          
-          {/* Orderbook */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.orderbook" />
-              </h2>
-              <button className="text-dark-400 hover:text-dark-300">
-                <RefreshCw className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
-              <div className="px-4 py-2">
-                {/* Asks (sell orders) */}
-                <div className="space-y-1 mb-4">
-                  {asks.map((ask, index) => (
-                    <div key={`ask-${index}`} className="flex text-xs">
-                      <div className="w-1/3 text-danger-500">
-                        <FormattedNumber
-                          value={ask.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right">
-                        <FormattedNumber
-                          value={ask.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right text-dark-400">
-                        <FormattedNumber
-                          value={ask.total / 1000}
-                          minimumFractionDigits={1}
-                          maximumFractionDigits={1}
-                        />K
-                      </div>
-                      <div
-                        className="absolute right-0 h-5 bg-danger-500/10"
-                        style={{ width: `${(ask.total / 200000) * 100}%`, maxWidth: '100%' }}
-                      ></div>
-                    </div>
-                  ))}
+            
+            {/* Price display - will show when data is available */}
+            {tickerData && (
+              <>
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold">
+                    {parseFloat(tickerData.lastPrice).toFixed(4)}
+                  </span>
+                  <span className="text-xs text-dark-400">≈ ${parseFloat(tickerData.lastPrice).toFixed(2)}</span>
                 </div>
                 
-                {/* Current price */}
-                <div className="flex justify-between items-center py-2 border-y border-dark-700">
-                  <span className="text-sm font-medium">
-                    <FormattedNumber
-                      value={38452.12}
-                      style="currency"
-                      currency="USD"
-                      minimumFractionDigits={2}
-                    />
+                <div className="flex flex-col">
+                  <span className={`text-sm font-medium ${
+                    parseFloat(tickerData.priceChange) >= 0 ? 'text-success-500' : 'text-danger-500'
+                  }`}>
+                    {parseFloat(tickerData.priceChange) >= 0 ? '+' : ''}{parseFloat(tickerData.priceChange).toFixed(4)}
                   </span>
-                  <span className="text-xs text-dark-400">
-                    <FormattedNumber
-                      value={38452.12}
-                      style="currency"
-                      currency="USD"
-                      minimumFractionDigits={2}
-                    />
+                  <span className={`text-xs ${
+                    parseFloat(tickerData.priceChangePercent) >= 0 ? 'text-success-500' : 'text-danger-500'
+                  }`}>
+                    {parseFloat(tickerData.priceChangePercent) >= 0 ? '+' : ''}{tickerData.priceChangePercent}%
                   </span>
                 </div>
-                
-                {/* Bids (buy orders) */}
-                <div className="space-y-1 mt-4">
-                  {bids.map((bid, index) => (
-                    <div key={`bid-${index}`} className="flex text-xs">
-                      <div className="w-1/3 text-success-500">
-                        <FormattedNumber
-                          value={bid.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right">
-                        <FormattedNumber
-                          value={bid.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
-                      </div>
-                      <div className="w-1/3 text-right text-dark-400">
-                        <FormattedNumber
-                          value={bid.total / 1000}
-                          minimumFractionDigits={1}
-                          maximumFractionDigits={1}
-                        />K
-                      </div>
-                      <div
-                        className="absolute right-0 h-5 bg-success-500/10"
-                        style={{ width: `${(bid.total / 200000) * 100}%`, maxWidth: '100%' }}
-                      ></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
           
-          {/* Recent trades */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.recentTrades" />
-              </h2>
+          {/* Right: Connection status and controls */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              {connectionStatus === 'connected' ? (
+                <Wifi className="h-4 w-4 text-success-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-danger-500" />
+              )}
+              <span className="text-xs text-dark-400 capitalize">{connectionStatus}</span>
             </div>
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
-              <table className="min-w-full divide-y divide-dark-700">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.price" />
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.amount" />
-                    </th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                      <FormattedMessage id="common.time" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-700">
-                  {recentTrades.map((trade) => (
-                    <tr key={trade.id}>
-                      <td className={`px-4 py-2 text-xs ${trade.type === 'buy' ? 'text-success-500' : 'text-danger-500'}`}>
-                        <FormattedNumber
-                          value={trade.price}
-                          minimumFractionDigits={2}
-                          maximumFractionDigits={2}
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-xs text-right">
-                        <FormattedNumber
-                          value={trade.amount}
-                          minimumFractionDigits={4}
-                          maximumFractionDigits={4}
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-xs text-right text-dark-400">{trade.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            
+            <div className="text-xs text-dark-400">
+              Subscriptions: {subscriptions.length}
             </div>
+            
+            <button className="p-1 hover:bg-dark-700 rounded">
+              <Settings className="h-4 w-4 text-dark-400" />
+            </button>
           </div>
         </div>
         
-        {/* Center - Chart */}
-        <div className="col-span-12 lg:col-span-6 card flex flex-col h-full overflow-hidden">
-          <div className="border-b border-dark-700 p-3 flex justify-between items-center">
-            <div className="flex space-x-4">
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Calendar className="h-4 w-4 mr-1" />
-                1D
-              </button>
-              <button className="flex items-center text-sm text-primary-500 border-b-2 border-primary-500 pb-1">
-                <Clock className="h-4 w-4 mr-1" />
-                4H
-              </button>
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Clock className="h-4 w-4 mr-1" />
-                1H
-              </button>
-              <button className="flex items-center text-sm text-dark-400 hover:text-dark-300">
-                <Clock className="h-4 w-4 mr-1" />
-                15m
-              </button>
+        {/* Stats bar */}
+        {tickerData && (
+          <div className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700">
+            <div className="flex flex-col">
+              <span className="text-dark-400">24h High</span>
+              <span className="font-medium">{parseFloat(tickerData.highPrice).toFixed(4)}</span>
             </div>
-            <div className="flex space-x-2">
-              <button className="text-dark-400 hover:text-dark-300 p-1">
-                <BarChart className="h-4 w-4" />
-              </button>
-              <button className="text-dark-400 hover:text-dark-300 p-1">
-                <Share2 className="h-4 w-4" />
-              </button>
+            <div className="flex flex-col">
+              <span className="text-dark-400">24h Low</span>
+              <span className="font-medium">{parseFloat(tickerData.lowPrice).toFixed(4)}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-dark-400">24h Volume ({selectedSymbol.replace('USDT', '')})</span>
+              <span className="font-medium">{parseFloat(tickerData.volume).toLocaleString()}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-dark-400">24h Volume (USDT)</span>
+              <span className="font-medium">{parseFloat(tickerData.quoteVolume).toLocaleString()}</span>
             </div>
           </div>
-          <div className="flex-1">
-            <TradingViewChart data={generateCandlestickData(7)} />
-          </div>
-        </div>
-        
-        {/* Right sidebar - Trading form and open orders */}
-        <div className="col-span-12 lg:col-span-3 flex flex-col h-full gap-4">
-          {/* Trading form */}
-          <div className="card overflow-hidden">
-            <div className="border-b border-dark-700">
-              <div className="flex">
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'limit'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('limit')}
-                >
-                  <FormattedMessage id="terminal.limit" />
+        )}
+      </div>
+
+      {/* Main content - Horizontal layout with chart on left */}
+      <div className="flex gap-1 h-[calc(100%-120px)]">
+        {/* Left - Chart (takes most space) */}
+        <div className="flex-1 bg-dark-800 border-r border-dark-700">
+          <div className="h-full flex flex-col">
+            {/* Chart controls */}
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <button className="text-xs px-2 py-1 bg-dark-700 rounded hover:bg-dark-600">1m</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">5m</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">15m</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">1h</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">4h</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">1d</button>
+                </div>
+                
+                <div className="h-4 w-px bg-dark-600" />
+                
+                <div className="flex items-center space-x-2">
+                  <button className="text-xs px-2 py-1 bg-dark-700 rounded hover:bg-dark-600">Candlesticks</button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">Line</button>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button className="p-1 hover:bg-dark-700 rounded">
+                  <TrendingUp className="h-4 w-4 text-dark-400" />
                 </button>
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'market'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('market')}
-                >
-                  <FormattedMessage id="terminal.market" />
-                </button>
-                <button
-                  className={`w-1/3 py-3 text-center text-sm font-medium ${
-                    activeTab === 'stop'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
-                  }`}
-                  onClick={() => setActiveTab('stop')}
-                >
-                  <FormattedMessage id="terminal.stop" />
+                <button className="p-1 hover:bg-dark-700 rounded">
+                  <Maximize2 className="h-4 w-4 text-dark-400" />
                 </button>
               </div>
             </div>
             
-            <div className="p-4">
-              <div className="flex space-x-2 mb-4">
+            {/* Chart area */}
+            <div className="flex-1 relative">
+              <TradingViewChart data={klineSeries} />
+
+              
+              {/* Chart overlay info */}
+              <div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs">
+                {klineData ? (
+                  <div className="space-y-1">
+                    <div>O: <span className="font-mono">{parseFloat(klineData.open).toFixed(4)}</span></div>
+                    <div>H: <span className="font-mono text-success-500">{parseFloat(klineData.high).toFixed(4)}</span></div>
+                    <div>L: <span className="font-mono text-danger-500">{parseFloat(klineData.low).toFixed(4)}</span></div>
+                    <div>C: <span className="font-mono">{parseFloat(klineData.close).toFixed(4)}</span></div>
+                    <div>V: <span className="font-mono">{parseFloat(klineData.volume).toLocaleString()}</span></div>
+                  </div>
+                ) : (
+                  <div className="text-dark-400">Waiting for data...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Center - Order book */}
+        <div className="w-64 bg-dark-800 border-r border-dark-700">
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <h3 className="text-sm font-medium">Order Book</h3>
+              <div className="flex items-center space-x-2">
+                <button className="text-xs text-dark-400 hover:text-dark-200">0.01</button>
+                <Settings className="h-3 w-3 text-dark-400" />
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-hidden">
+              {orderBook ? (
+                <div className="h-full flex flex-col">
+                  {/* Asks */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-0.5 p-2">
+                      {orderBook.asks.slice(0, 15).reverse().map((ask, index) => (
+                        <div key={index} className="flex justify-between text-xs relative">
+                          <span className="text-danger-500 font-mono">{parseFloat(ask.price).toFixed(4)}</span>
+                          <span className="text-dark-300 font-mono">{parseFloat(ask.quantity).toFixed(3)}</span>
+                          <div 
+                            className="absolute right-0 top-0 h-full bg-danger-500/10"
+                            style={{ width: `${Math.min(parseFloat(ask.quantity) / 10 * 100, 100)}%` }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Current price */}
+                  <div className="px-2 py-1 border-y border-dark-700">
+                    <div className="text-center">
+                      <div className={`text-sm font-bold ${
+                        tickerData && parseFloat(tickerData.priceChange) >= 0 ? 'text-success-500' : 'text-danger-500'
+                      }`}>
+                        {tickerData ? parseFloat(tickerData.lastPrice).toFixed(4) : '0.0000'}
+                      </div>
+                      <div className="text-xs text-dark-400">≈ ${tickerData ? parseFloat(tickerData.lastPrice).toFixed(2) : '0.00'}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Bids */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-0.5 p-2">
+                      {orderBook.bids.slice(0, 15).map((bid, index) => (
+                        <div key={index} className="flex justify-between text-xs relative">
+                          <span className="text-success-500 font-mono">{parseFloat(bid.price).toFixed(4)}</span>
+                          <span className="text-dark-300 font-mono">{parseFloat(bid.quantity).toFixed(3)}</span>
+                          <div 
+                            className="absolute right-0 top-0 h-full bg-success-500/10"
+                            style={{ width: `${Math.min(parseFloat(bid.quantity) / 10 * 100, 100)}%` }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-dark-400">
+                  <div className="text-center">
+                    <div className="text-sm">No order book data</div>
+                    <div className="text-xs mt-1">Waiting for WebSocket connection...</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right - Trading and Recent trades */}
+        <div className="w-80 bg-dark-800 border-l border-dark-700">
+          <div className="h-full flex flex-col">
+            {/* Trading form */}
+            <div className="border-b border-dark-700">
+              <div className="flex border-b border-dark-700">
                 <button
-                  className={`w-1/2 py-2 rounded-md text-sm font-medium ${
-                    tradeSide === 'buy'
-                      ? 'bg-success-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                  className={`flex-1 py-2 text-xs font-medium ${
+                    activeOrderTab === 'limit'
+                      ? 'border-b-2 border-primary-500 text-primary-500'
+                      : 'text-dark-400 hover:text-dark-300'
                   }`}
-                  onClick={() => setTradeSide('buy')}
+                  onClick={() => setActiveOrderTab('limit')}
                 >
-                  <FormattedMessage id="common.buy" />
+                  Limit
                 </button>
                 <button
-                  className={`w-1/2 py-2 rounded-md text-sm font-medium ${
-                    tradeSide === 'sell'
-                      ? 'bg-danger-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                  className={`flex-1 py-2 text-xs font-medium ${
+                    activeOrderTab === 'market'
+                      ? 'border-b-2 border-primary-500 text-primary-500'
+                      : 'text-dark-400 hover:text-dark-300'
                   }`}
-                  onClick={() => setTradeSide('sell')}
+                  onClick={() => setActiveOrderTab('market')}
                 >
-                  <FormattedMessage id="common.sell" />
+                  Market
+                </button>
+                <button
+                  className={`flex-1 py-2 text-xs font-medium ${
+                    activeOrderTab === 'stop'
+                      ? 'border-b-2 border-primary-500 text-primary-500'
+                      : 'text-dark-400 hover:text-dark-300'
+                  }`}
+                  onClick={() => setActiveOrderTab('stop')}
+                >
+                  Stop-Limit
                 </button>
               </div>
               
-              <div className="space-y-4">
-                {activeTab !== 'market' && (
+              <div className="p-3">
+                <div className="flex space-x-1 mb-3">
+                  <button
+                    className={`flex-1 py-2 text-xs font-medium rounded ${
+                      tradeSide === 'buy'
+                        ? 'bg-success-500 text-white'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                    }`}
+                    onClick={() => setTradeSide('buy')}
+                  >
+                    Buy
+                  </button>
+                  <button
+                    className={`flex-1 py-2 text-xs font-medium rounded ${
+                      tradeSide === 'sell'
+                        ? 'bg-danger-500 text-white'
+                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                    }`}
+                    onClick={() => setTradeSide('sell')}
+                  >
+                    Sell
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Available balance */}
+                  <div className="flex justify-between text-xs">
+                    <span className="text-dark-400">Available</span>
+                    <span>0.00000000 {tradeSide === 'buy' ? 'USDT' : selectedSymbol.replace('USDT', '')}</span>
+                  </div>
+                  
+                  {activeOrderTab !== 'market' && (
+                    <div>
+                      <label className="block text-xs text-dark-400 mb-1">Price</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
+                          placeholder="0.00"
+                          value={price}
+                          onChange={handlePriceChange}
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                          <span className="text-dark-400 text-xs">USDT</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div>
-                    <label htmlFor="price\" className="form-label">
-                      <FormattedMessage id="common.price" />
-                    </label>
+                    <label className="block text-xs text-dark-400 mb-1">Amount</label>
                     <div className="relative">
                       <input
                         type="text"
-                        id="price"
-                        className="form-input pr-16"
-                        placeholder="0.00"
-                        value={price}
-                        onChange={handlePriceChange}
+                        className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
+                        placeholder="0.00000000"
+                        value={amount}
+                        onChange={handleAmountChange}
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <span className="text-dark-400 text-sm">USDT</span>
+                        <span className="text-dark-400 text-xs">{selectedSymbol.replace('USDT', '')}</span>
                       </div>
                     </div>
                   </div>
-                )}
-                
-                <div>
-                  <label htmlFor="amount" className="form-label">
-                    <FormattedMessage id="common.amount" />
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="amount"
-                      className="form-input pr-16"
-                      placeholder="0.00000000"
-                      value={amount}
-                      onChange={handleAmountChange}
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <span className="text-dark-400 text-sm">BTC</span>
+                  
+                  <div className="grid grid-cols-4 gap-1">
+                    {[25, 50, 75, 100].map((percent) => (
+                      <button
+                        key={percent}
+                        className="py-1 text-xs bg-dark-700 rounded text-dark-300 hover:bg-dark-600"
+                      >
+                        {percent}%
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs text-dark-400 mb-1">Total</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
+                        placeholder="0.00"
+                        value={total}
+                        onChange={handleTotalChange}
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <span className="text-dark-400 text-xs">USDT</span>
+                      </div>
                     </div>
                   </div>
+                  
+                  <button
+                    className={`w-full py-2 rounded text-xs font-medium ${
+                      tradeSide === 'buy'
+                        ? 'bg-success-500 hover:bg-success-600 text-white'
+                        : 'bg-danger-500 hover:bg-danger-600 text-white'
+                    }`}
+                  >
+                    {tradeSide === 'buy' ? 'Buy' : 'Sell'} {selectedSymbol.replace('USDT', '')}
+                  </button>
                 </div>
-                
-                <div>
-                  <label htmlFor="total" className="form-label">
-                    <FormattedMessage id="common.total" />
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="total"
-                      className="form-input pr-16"
-                      placeholder="0.00"
-                      value={total}
-                      onChange={handleTotalChange}
-                    />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <span className="text-dark-400 text-sm">USDT</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-4 gap-2">
-                  {[25, 50, 75, 100].map((percent) => (
-                    <button
-                      key={percent}
-                      className="py-1 text-xs bg-dark-700 rounded text-dark-300 hover:bg-dark-600"
-                    >
-                      {percent}%
-                    </button>
-                  ))}
-                </div>
-                
-                <button
-                  className={`w-full py-3 rounded-md font-medium ${
-                    tradeSide === 'buy'
-                      ? 'bg-success-500 hover:bg-success-600 text-white'
-                      : 'bg-danger-500 hover:bg-danger-600 text-white'
-                  }`}
-                >
-                  {tradeSide === 'buy' ? (
-                    <FormattedMessage id="terminal.buyAmount" values={{ symbol: 'BTC' }} />
-                  ) : (
-                    <FormattedMessage id="terminal.sellAmount" values={{ symbol: 'BTC' }} />
-                  )}
-                </button>
+              </div>
+            </div>
+            
+            {/* Recent trades */}
+            <div className="flex-1 overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b border-dark-700">
+                <h3 className="text-sm font-medium">Recent Trades</h3>
+                <button className="text-xs text-dark-400 hover:text-dark-200">More</button>
               </div>
               
-              <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-dark-400">
-                    <FormattedMessage id="terminal.available" />:
-                  </span>
-                  <span>
-                    <FormattedNumber
-                      value={12500}
-                      minimumFractionDigits={2}
-                      maximumFractionDigits={2}
-                    /> USDT
-                  </span>
+              <div className="overflow-y-auto h-full">
+                <div className="px-3 py-2 border-b border-dark-700">
+                  <div className="grid grid-cols-3 gap-2 text-xs text-dark-400">
+                    <span>Price (USDT)</span>
+                    <span className="text-right">Amount ({selectedSymbol.replace('USDT', '')})</span>
+                    <span className="text-right">Time</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-dark-400">
-                    <FormattedMessage id="terminal.available" />:
-                  </span>
-                  <span>0.4892 BTC</span>
+                
+                <div className="space-y-0">
+                  {recentTrades.length > 0 ? (
+  recentTrades
+    .filter((trade) => trade && typeof trade === 'object' && 'isBuyerMaker' in trade)
+    .map((trade) => (
+      <div key={trade.id} className="px-3 py-1 hover:bg-dark-700/50">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <span
+            className={`font-mono ${
+              trade.isBuyerMaker ? 'text-danger-500' : 'text-success-500'
+            }`}
+          >
+            {parseFloat(trade.price).toFixed(4)}
+          </span>
+          <span className="text-right font-mono text-dark-300">
+            {parseFloat(trade.qty).toFixed(3)}
+          </span>
+          <span className="text-right text-dark-400">
+            {new Date(trade.time).toLocaleTimeString('en-US', {
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}
+          </span>
+        </div>
+      </div>
+    ))
+) : (
+  <div className="p-4 text-center text-dark-400">
+    <div className="text-sm">No recent trades</div>
+    <div className="text-xs mt-1">Waiting for WebSocket data...</div>
+  </div>
+)}
+
                 </div>
               </div>
             </div>
           </div>
-          
-          {/* Open orders */}
-          <div className="card flex-1 overflow-hidden">
-            <div className="card-header py-3">
-              <h2 className="text-sm font-medium">
-                <FormattedMessage id="terminal.openOrders" />
-              </h2>
-              {openOrders.length > 0 && (
-                <button className="text-xs text-danger-500 hover:text-danger-400">
-                  <FormattedMessage id="terminal.cancelAll" />
-                </button>
-              )}
+        </div>
+      </div>
+
+      {/* Bottom panel - Open orders and WebSocket info */}
+      <div className="h-40 border-t border-dark-700 bg-dark-800">
+        <div className="flex h-full">
+          {/* Open Orders */}
+          <div className="flex-1 border-r border-dark-700">
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <div className="flex items-center space-x-4">
+                <h3 className="text-sm font-medium">Open Orders</h3>
+                <span className="text-xs text-dark-400">(0)</span>
+              </div>
+              <button className="text-xs text-danger-500 hover:text-danger-400">Cancel All</button>
             </div>
             
-            <div className="overflow-y-auto h-[calc(100%-3rem)]">
-              {openOrders.length > 0 ? (
-                <table className="min-w-full divide-y divide-dark-700">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.pair" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.price" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.amount" />
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-dark-400">
-                        <FormattedMessage id="common.action" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-dark-700">
-                    {openOrders.map((order) => (
-                      <tr key={order.id}>
-                        <td className="px-4 py-2 text-xs">
-                          <div>
-                            <div className={order.side === 'buy' ? 'text-success-500' : 'text-danger-500'}>
-                              <FormattedMessage id={`common.${order.side}`} />
-                            </div>
-                            <div className="text-dark-400">{order.pair}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <FormattedNumber
-                            value={order.price}
-                            minimumFractionDigits={2}
-                            maximumFractionDigits={2}
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <div>
-                            <div>
-                              <FormattedNumber
-                                value={order.amount}
-                                minimumFractionDigits={order.amount < 1 ? 4 : 2}
-                                maximumFractionDigits={order.amount < 1 ? 4 : 2}
-                              />
-                            </div>
-                            <div className="text-dark-400">
-                              <FormattedNumber
-                                value={order.total}
-                                style="currency"
-                                currency="USD"
-                                minimumFractionDigits={2}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-xs text-right">
-                          <button className="text-danger-500 hover:text-danger-400">
-                            <FormattedMessage id="terminal.cancel" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-                  <DollarSign className="h-8 w-8 text-dark-600 mb-2" />
-                  <p className="text-sm text-dark-400">
-                    <FormattedMessage id="terminal.noOrders" />
-                  </p>
-                  <p className="text-xs text-dark-500 mt-1">
-                    <FormattedMessage id="terminal.ordersWillAppear" />
-                  </p>
-                </div>
-              )}
+            <div className="p-4 text-center text-dark-400">
+              <div className="text-sm">No open orders</div>
+              <div className="text-xs mt-1">Your open orders will appear here</div>
+            </div>
+          </div>
+          
+          {/* Order History */}
+          <div className="flex-1 border-r border-dark-700">
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <h3 className="text-sm font-medium">Order History</h3>
+              <button className="text-xs text-dark-400 hover:text-dark-200">View All</button>
+            </div>
+            
+            <div className="p-4 text-center text-dark-400">
+              <div className="text-sm">No order history</div>
+              <div className="text-xs mt-1">Your completed orders will appear here</div>
+            </div>
+          </div>
+          
+          {/* WebSocket Subscriptions */}
+          <div className="w-80">
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <h3 className="text-sm font-medium">Active Streams</h3>
+              <span className="text-xs text-dark-400">({subscriptions.length})</span>
+            </div>
+            
+            <div className="overflow-y-auto h-[calc(100%-41px)]">
+              <div className="p-2 space-y-1 max-h-32 overflow-y-auto">
+                {subscriptions.map((stream, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 bg-dark-700/50 rounded text-xs">
+                    <span className="font-mono text-dark-300 truncate">{stream}</span>
+                    <button
+                      onClick={() => handleUnsubscribe(stream)}
+                      className="text-danger-500 hover:text-danger-400 ml-2"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
