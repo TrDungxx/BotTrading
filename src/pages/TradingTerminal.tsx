@@ -4,6 +4,9 @@ import { FormattedMessage, FormattedNumber } from 'react-intl';
 import TradingViewChart from '../TradingViewChart';
 import { CandlestickData } from 'lightweight-charts';
 import { fetchHistoricalKlines } from '../utils/fetchKline';
+import { ExtendedCandle } from '../utils/types';
+import SymbolDropdown from '../components/common/SymbolDropdown';
+import symbolList from '../utils/symbolList';
 // WebSocket connection status
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -60,13 +63,12 @@ interface OrderBookData {
 }
 
 interface TradeData {
-  id: number;
   symbol: string;
+  tradeId: number;
   price: string;
   qty: string;
   time: number;
   isBuyerMaker: boolean;
-  tradeId: number;
 }
 
 interface BookTickerData {
@@ -87,6 +89,7 @@ interface MiniTickerData {
   volume: string;
   quoteVolume: string;
   eventTime: number;
+  percentChange: string;
 }
 
 // Account interfaces (for authenticated streams)
@@ -138,6 +141,9 @@ interface Subscription {
 }
 interface SymbolItem {
   symbol: string;
+  price: number;
+  percentChange: number;
+  volume: number;
 }
 // Custom WebSocket service for your server
 class CustomWebSocketService {
@@ -743,7 +749,12 @@ private isConnected = false;
 
 export default function TradingTerminal() {
 
-  const [candles, setCandles] = useState<CandlestickData[]>([]);
+  const [candles, setCandles] = useState<ExtendedCandle[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
+  
+
+
   // State management
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
   const [selectedMarket, setSelectedMarket] = useState<MarketType>('spot');
@@ -828,12 +839,23 @@ useEffect(() => {
     
     // 4. Trade Stream
     const tradeId = wsService.subscribeTrade(selectedSymbol, selectedMarket, (data) => {
-      console.log('💱 Trade data:', data);
-      setRecentTrades(prev => {
-        const newTrades = [data, ...prev.slice(0, 49)];
-        return newTrades.sort((a, b) => b.time - a.time);
-      });
-    });
+  console.log('💱 Trade data:', data);
+
+  const trade: TradeData = {
+    symbol: data.symbol,
+    tradeId: data.tradeId,
+    price: data.price?.toString() ?? '0',
+    qty: data.quantity?.toString() ?? '0',
+    time: data.tradeTime ?? Date.now(),
+    isBuyerMaker: data.isBuyerMaker
+  };
+
+  setRecentTrades((prev) => {
+    const newTrades = [trade, ...prev.slice(0, 49)];
+    return newTrades.sort((a, b) => b.time - a.time);
+  });
+});
+
     if (tradeId) subscriptionIds.push(tradeId);
     
     // 5. Book Ticker (Best Bid/Ask)
@@ -844,10 +866,30 @@ useEffect(() => {
     if (bookTickerId) subscriptionIds.push(bookTickerId);
     
     // 6. Mini Ticker
-    const miniTickerId = wsService.subscribeMiniTicker(selectedSymbol, selectedMarket, (data) => {
-      console.log('📊 Mini ticker data:', data);
-      setMiniTicker(data);
-    });
+    const miniTickerId = (wsService.subscribeMiniTicker as unknown as (
+  symbol: string,
+  market: string,
+  callback: (data: MiniTickerData) => void
+) => string)(
+  selectedSymbol,
+  selectedMarket,
+  (data: MiniTickerData) => {
+    setAllSymbols((prev) => {
+  if (!symbolList.includes(data.symbol)) return prev; // 👉 chỉ giữ symbol trong danh sách cho phép
+
+  const updated = prev.filter((s) => s.symbol !== data.symbol);
+  return [
+    ...updated,
+    {
+      symbol: data.symbol,
+      price: parseFloat(data.close),
+      percentChange: parseFloat(data.percentChange),
+      volume: parseFloat(data.volume),
+    },
+  ];
+});
+  }
+);
     if (miniTickerId) subscriptionIds.push(miniTickerId);
     
     // Update subscriptions list
@@ -938,11 +980,52 @@ useEffect(() => {
   }
 );
 
+
+
   return () => {
     wsService.unsubscribe(klineId);
   };
 }, [selectedSymbol, selectedInterval, selectedMarket]);
 
+useEffect(() => {
+  const ids: string[] = [];
+
+  symbolList.forEach((sym) => {
+    const id = wsService.subscribeMiniTicker(sym, 'spot', (data: MiniTickerData) => {
+      if (!symbolList.includes(data.symbol)) return;
+
+      setAllSymbols((prev) => {
+        const updated = prev.filter((s) => s.symbol !== data.symbol);
+        return [
+          ...updated,
+          {
+            symbol: data.symbol,
+            price: parseFloat(data.close),
+            percentChange: parseFloat(data.percentChange),
+            volume: parseFloat(data.volume),
+          },
+        ];
+      });
+    });
+    ids.push(id);
+  });
+
+  return () => {
+    ids.forEach((id) => wsService.unsubscribe(id));
+  };
+}, []);
+
+const sortedSymbols: SymbolItem[] = symbolList.map((symbol) => {
+  const matched = allSymbols.find((s) => s.symbol === symbol);
+  return matched ?? {
+    symbol,
+    price: 0,
+    percentChange: 0,
+    volume: 0,
+  };
+});
+
+console.log('✅ allSymbols:', allSymbols.length, allSymbols);
   return (
     <div className="h-[calc(100vh-6rem)] bg-dark-900">
       {/* Top Bar - Symbol selector and stats */}
@@ -951,13 +1034,36 @@ useEffect(() => {
           {/* Left: Symbol and basic info */}
           <div className="flex items-center space-x-6">
             <div className="flex items-center">
-              <button className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded">
-                <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
-                  <span className="text-xs font-bold text-dark-900">B</span>
-                </div>
-                <span className="font-bold text-lg">{selectedSymbol}</span>
-                <ChevronDown className="h-4 w-4 text-dark-400" />
-              </button>
+              <div className="relative z-50">
+  {/* Trigger Button */}
+  <button
+    className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded"
+    onClick={() => setIsDropdownOpen((prev) => !prev)}
+  >
+    <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
+      <span className="text-xs font-bold text-dark-900">
+        {selectedSymbol[0]}
+      </span>
+    </div>
+    <span className="font-bold text-lg">{selectedSymbol}</span>
+    <ChevronDown className="h-4 w-4 text-dark-400" />
+  </button>
+
+  {/* Dropdown Menu */}
+  {isDropdownOpen && (
+    <div className="absolute top-full left-0 mt-2 w-[350px] max-h-[500px] bg-dark-800 rounded shadow-lg overflow-y-auto z-[999] border border-dark-700">
+      <SymbolDropdown
+  symbols={sortedSymbols}
+  onSelect={(s) => {
+    setSelectedSymbol(s);
+    setIsDropdownOpen(false);
+  }}
+  selectedSymbol={selectedSymbol}
+/>
+    </div>
+  )}
+</div>
+
               <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
             </div>
             

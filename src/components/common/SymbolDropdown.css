@@ -1,0 +1,8 @@
+.symbol-dropdown {
+  border-radius: 0.25rem;
+  background-color: #1e1e2f;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.symbol-dropdown > div:hover {
+  background-color: #2c2c3e;
+}
