@@ -14,6 +14,8 @@
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "apexcharts": "^4.0.0",
     "axios": "^1.9.0",
+    "chart.js": "^4.5.0",
+    "chartjs-adapter-date-fns": "^3.0.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.6.0",
     "dayjs": "^1.11.13",
