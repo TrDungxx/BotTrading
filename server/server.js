@@ -6,7 +6,7 @@ import orderRoutes from './routes/orderRoutes.js';
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:5174', // ✅ frontend đang chạy ở port 5174 (Vite)
+  origin: 'http://localhost:5173', // ✅ frontend đang chạy ở port 5174 (Vite)
   credentials: true               // ✅ Cho phép gửi cookie/session
 }));
 

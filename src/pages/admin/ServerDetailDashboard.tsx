@@ -1,4 +1,4 @@
-// ✅ ServerDetailDashboard.tsx — giao diện Grafana-style cho server detail
+
 
 import React from 'react';
 import ReactApexChart from 'react-apexcharts';
