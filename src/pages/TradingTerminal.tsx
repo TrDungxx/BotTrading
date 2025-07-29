@@ -173,29 +173,29 @@ class CustomWebSocketService {
       this.ws = new WebSocket('ws://45.77.33.141/w-binance-socket/signalr/connect');
 
       this.ws.onopen = () => {
-  console.log('✅ WebSocket connected');
-  this.onStatusChange('connected');
-  this.isConnected = true;
+        console.log('✅ WebSocket connected');
+        this.onStatusChange('connected');
+        this.isConnected = true;
 
-  // 🟢 Gửi lại toàn bộ message đã queue trước đó
-  this.messageQueue.forEach((msg) => {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(msg));
-      console.log('📤 Flushed queued message:', msg);
-    }
-  });
+        // 🟢 Gửi lại toàn bộ message đã queue trước đó
+        this.messageQueue.forEach((msg) => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(msg));
+            console.log('📤 Flushed queued message:', msg);
+          }
+        });
 
-  this.messageQueue = [];
+        this.messageQueue = [];
 
-  // Tiếp tục các đăng ký mặc định nếu có
-  const subs = [
-    { action: 'subscribePublicTicker', symbol: 'BTCUSDT' },
-    { action: 'subscribePublicKline', symbol: 'BTCUSDT', interval: '1m' },
-    { action: 'subscribePublicTrade', symbol: 'BTCUSDT' }
-  ];
+        // Tiếp tục các đăng ký mặc định nếu có
+        const subs = [
+          { action: 'subscribePublicTicker', symbol: 'BTCUSDT' },
+          { action: 'subscribePublicKline', symbol: 'BTCUSDT', interval: '1m' },
+          { action: 'subscribePublicTrade', symbol: 'BTCUSDT' }
+        ];
 
-  subs.forEach((msg) => this.sendMessage(msg));
-};
+        subs.forEach((msg) => this.sendMessage(msg));
+      };
 
 
       this.ws.onmessage = (event) => {
@@ -372,7 +372,7 @@ class CustomWebSocketService {
 
   private handleMiniTickerData(data: any) {
     const symbol = data?.data?.symbol;
-const callback = this.callbacks.get(`miniTicker_${symbol}`);
+    const callback = this.callbacks.get(`miniTicker_${symbol}`);
     if (callback && data.data) {
       callback(data.data);
     }
@@ -420,14 +420,14 @@ const callback = this.callbacks.get(`miniTicker_${symbol}`);
   }
 
   private sendMessage(message: any) {
-  if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-    this.ws.send(JSON.stringify(message));
-    console.log('📤 Sent message:', message);
-  } else {
-    console.warn('⚠️ WebSocket not ready, message queued:', message);
-    this.messageQueue.push(message);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+      console.log('📤 Sent message:', message);
+    } else {
+      console.warn('⚠️ WebSocket not ready, message queued:', message);
+      this.messageQueue.push(message);
+    }
   }
-}
 
 
   public setStatusCallback(callback: (status: ConnectionStatus) => void) {
@@ -766,6 +766,12 @@ export default function TradingTerminal() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
   const miniTickerCallbacks = useRef<Map<string, (data: MiniTickerData) => void>>(new Map());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
+  const stored = localStorage.getItem('favoriteSymbols');
+  return stored ? JSON.parse(stored) : [];
+});
+  const [activeSymbolTab, setActiveSymbolTab] = useState<'all' | 'favorites'>('all');
 
 
 
@@ -798,6 +804,9 @@ export default function TradingTerminal() {
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [total, setTotal] = useState('');
+
+
+ 
 
   useEffect(() => {
     let isMounted = true;
@@ -1006,45 +1015,45 @@ export default function TradingTerminal() {
 
 
   useEffect(() => {
-  const ids: string[] = [];
-  const callbackMap = new Map<string, (data: MiniTickerData) => void>();
+    const ids: string[] = [];
+    const callbackMap = new Map<string, (data: MiniTickerData) => void>();
 
-  // 👉 lấy market 1 lần duy nhất khi mount (không dùng dependency)
-  const market: MarketType = 'futures'; // hoặc selectedMarket nếu chắc chắn đã có
+    // 👉 lấy market 1 lần duy nhất khi mount (không dùng dependency)
+    const market: MarketType = 'futures'; // hoặc selectedMarket nếu chắc chắn đã có
 
-  symbolList.forEach((sym) => {
-    const callback = (data: MiniTickerData) => {
-      const symbol = data.symbol?.toUpperCase?.();
-      if (symbol !== sym) return;
+    symbolList.forEach((sym) => {
+      const callback = (data: MiniTickerData) => {
+        const symbol = data.symbol?.toUpperCase?.();
+        if (symbol !== sym) return;
 
-      const close = parseFloat(data.close);
-      const open = parseFloat(data.open);
-      const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
+        const close = parseFloat(data.close);
+        const open = parseFloat(data.open);
+        const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
 
-      setAllSymbols((prev) => {
-        const updated = prev.filter((s) => s.symbol !== symbol);
-        return [
-          ...updated,
-          {
-            symbol,
-            price: close,
-            percentChange,
-            volume: parseFloat(data.volume),
-          },
-        ];
-      });
+        setAllSymbols((prev) => {
+          const updated = prev.filter((s) => s.symbol !== symbol);
+          return [
+            ...updated,
+            {
+              symbol,
+              price: close,
+              percentChange,
+              volume: parseFloat(data.volume),
+            },
+          ];
+        });
+      };
+
+      callbackMap.set(sym, callback);
+      const id = wsService.subscribeMiniTicker(sym, market, callback); // ✅ dùng 'futures' cố định
+      ids.push(id);
+    });
+
+    return () => {
+      ids.forEach((id) => wsService.unsubscribe(id));
+      callbackMap.clear();
     };
-
-    callbackMap.set(sym, callback);
-    const id = wsService.subscribeMiniTicker(sym, market, callback); // ✅ dùng 'futures' cố định
-    ids.push(id);
-  });
-
-  return () => {
-    ids.forEach((id) => wsService.unsubscribe(id));
-    callbackMap.clear();
-  };
-}, []); // ✅ KHÔNG dùng [selectedMarket]
+  }, []); // ✅ KHÔNG dùng [selectedMarket]
 
 
 
@@ -1088,12 +1097,26 @@ export default function TradingTerminal() {
                   <div className="absolute top-full left-0 mt-2 w-[350px] max-h-[500px] bg-dark-800 rounded shadow-lg overflow-y-auto z-[999] border border-dark-700">
                     <SymbolDropdown
                       symbols={sortedSymbols}
+                      selectedSymbol={selectedSymbol}
+                      favorites={favoriteSymbols}
+                      searchTerm={searchTerm}
+                      activeTab={activeSymbolTab}
                       onSelect={(s) => {
                         setSelectedSymbol(s);
                         setIsDropdownOpen(false);
                       }}
-                      selectedSymbol={selectedSymbol}
+                      onToggleFavorite={(symbol) => {
+                        setFavoriteSymbols((prev) =>
+                          prev.includes(symbol)
+                            ? prev.filter((s) => s !== symbol)
+                            : [...prev, symbol]
+                        );
+                      }}
+                      onSearchChange={setSearchTerm}
+                      onTabChange={setActiveSymbolTab}
                     />
+
+
                   </div>
                 )}
               </div>
@@ -1333,8 +1356,8 @@ export default function TradingTerminal() {
               <div className="flex border-b border-dark-700">
                 <button
                   className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'limit'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
+                    ? 'border-b-2 border-primary-500 text-primary-500'
+                    : 'text-dark-400 hover:text-dark-300'
                     }`}
                   onClick={() => setActiveOrderTab('limit')}
                 >
@@ -1342,8 +1365,8 @@ export default function TradingTerminal() {
                 </button>
                 <button
                   className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'market'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
+                    ? 'border-b-2 border-primary-500 text-primary-500'
+                    : 'text-dark-400 hover:text-dark-300'
                     }`}
                   onClick={() => setActiveOrderTab('market')}
                 >
@@ -1351,8 +1374,8 @@ export default function TradingTerminal() {
                 </button>
                 <button
                   className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'stop'
-                      ? 'border-b-2 border-primary-500 text-primary-500'
-                      : 'text-dark-400 hover:text-dark-300'
+                    ? 'border-b-2 border-primary-500 text-primary-500'
+                    : 'text-dark-400 hover:text-dark-300'
                     }`}
                   onClick={() => setActiveOrderTab('stop')}
                 >
@@ -1364,8 +1387,8 @@ export default function TradingTerminal() {
                 <div className="flex space-x-1 mb-3">
                   <button
                     className={`flex-1 py-2 text-xs font-medium rounded ${tradeSide === 'buy'
-                        ? 'bg-success-500 text-white'
-                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                      ? 'bg-success-500 text-white'
+                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                       }`}
                     onClick={() => setTradeSide('buy')}
                   >
@@ -1373,8 +1396,8 @@ export default function TradingTerminal() {
                   </button>
                   <button
                     className={`flex-1 py-2 text-xs font-medium rounded ${tradeSide === 'sell'
-                        ? 'bg-danger-500 text-white'
-                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                      ? 'bg-danger-500 text-white'
+                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                       }`}
                     onClick={() => setTradeSide('sell')}
                   >
@@ -1452,8 +1475,8 @@ export default function TradingTerminal() {
 
                   <button
                     className={`w-full py-2 rounded text-xs font-medium ${tradeSide === 'buy'
-                        ? 'bg-success-500 hover:bg-success-600 text-white'
-                        : 'bg-danger-500 hover:bg-danger-600 text-white'
+                      ? 'bg-success-500 hover:bg-success-600 text-white'
+                      : 'bg-danger-500 hover:bg-danger-600 text-white'
                       }`}
                   >
                     {tradeSide === 'buy' ? 'Buy' : 'Sell'} {selectedSymbol.replace('USDT', '')}
