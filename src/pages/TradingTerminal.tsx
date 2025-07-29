@@ -181,7 +181,7 @@ class CustomWebSocketService {
         this.messageQueue.forEach((msg) => {
           if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(msg));
-            console.log('📤 Flushed queued message:', msg);
+            
           }
         });
 
@@ -201,7 +201,7 @@ class CustomWebSocketService {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('📥 Incoming:', data);
+         
           this.handleMessage(data); // ✅ xử lý tại đây luôn
         } catch (error) {
           console.error('❌ Error parsing message:', error);
@@ -227,7 +227,7 @@ class CustomWebSocketService {
   }
 
   private handleMessage(data: any) {
-    console.log('📨 Received message:', data);
+   
 
     if (data.action) {
       switch (data.action) {
@@ -289,7 +289,7 @@ class CustomWebSocketService {
           break;
         case 'connection_status':
           // Bạn có thể log nhẹ nếu muốn theo dõi trạng thái từng stream
-          console.log(`ℹ️ WS connected to ${data.stream} (${data.status})`);
+         
           break;
         case 'welcome':
           // Đây là message chào, không cần xử lý gì cả
@@ -304,7 +304,7 @@ class CustomWebSocketService {
 
 
   private handleKlineData(data: any) {
-    console.log('📊 [WS] Kline raw message:', data);
+    
 
     const callback = this.callbacks.get('kline');
     if (!callback) return;
@@ -422,7 +422,7 @@ class CustomWebSocketService {
   private sendMessage(message: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
-      console.log('📤 Sent message:', message);
+     
     } else {
       console.warn('⚠️ WebSocket not ready, message queued:', message);
       this.messageQueue.push(message);
@@ -768,9 +768,9 @@ export default function TradingTerminal() {
   const miniTickerCallbacks = useRef<Map<string, (data: MiniTickerData) => void>>(new Map());
   const [searchTerm, setSearchTerm] = useState('');
   const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
-  const stored = localStorage.getItem('favoriteSymbols');
-  return stored ? JSON.parse(stored) : [];
-});
+    const stored = localStorage.getItem('favoriteSymbols');
+    return stored ? JSON.parse(stored) : [];
+  });
   const [activeSymbolTab, setActiveSymbolTab] = useState<'all' | 'favorites'>('all');
 
 
@@ -806,7 +806,7 @@ export default function TradingTerminal() {
   const [total, setTotal] = useState('');
 
 
- 
+
 
   useEffect(() => {
     let isMounted = true;
@@ -820,7 +820,7 @@ export default function TradingTerminal() {
         );
         if (isMounted) {
           setCandles(historicalData);
-          console.log('📈 Historical candles loaded:', historicalData.length);
+          
         }
       } catch (error) {
         console.error('❌ Failed to fetch historical klines:', error);
@@ -843,7 +843,7 @@ export default function TradingTerminal() {
     // 1. Kline/Candlestick Stream
     const klineId = wsService.subscribeKline(selectedSymbol, selectedInterval, selectedMarket, (data) => {
       if (data.symbol !== selectedSymbol) return;
-      console.log('📊 Kline data:', data);
+     
       setKlineData(data);
     });
     if (klineId) subscriptionIds.push(klineId);
@@ -851,14 +851,14 @@ export default function TradingTerminal() {
     // 2. 24hr Ticker Statistics
     const tickerId = wsService.subscribeTicker(selectedSymbol, selectedMarket, (data) => {
       if (data.symbol !== selectedSymbol) return;
-      console.log('📈 Ticker data:', data);
+      
       setTickerData(data);
     });
     if (tickerId) subscriptionIds.push(tickerId);
 
     // 3. Order Book Depth
     const depthId = wsService.subscribeDepth(selectedSymbol, '20', '1000ms', selectedMarket, (data) => {
-      console.log('📖 Depth data:', data);
+      if (data.symbol !== selectedSymbol) return;
       setOrderBook(data);
     });
     if (depthId) subscriptionIds.push(depthId);
@@ -886,7 +886,7 @@ export default function TradingTerminal() {
 
     // 5. Book Ticker (Best Bid/Ask)
     const bookTickerId = wsService.subscribeBookTicker(selectedSymbol, selectedMarket, (data) => {
-      console.log('📋 Book ticker data:', data);
+     if (data.symbol !== selectedSymbol) return;
       setBookTicker(data);
     });
     if (bookTickerId) subscriptionIds.push(bookTickerId);
@@ -986,7 +986,7 @@ export default function TradingTerminal() {
       (data) => {
         if (data.symbol !== selectedSymbol) return; // ✅ đảm bảo đúng symbol
 
-        console.log('✅ Realtime Kline:', data);
+        
 
         const newCandle: CandlestickData = {
           time: Math.floor(data.openTime / 1000), // UNIX seconds
@@ -1068,7 +1068,7 @@ export default function TradingTerminal() {
     };
   });
 
-  console.log('✅ allSymbols:', allSymbols.length, allSymbols);
+ 
   return (
     <div className="h-[calc(100vh-6rem)] bg-dark-900">
       {/* Top Bar - Symbol selector and stats */}
@@ -1261,7 +1261,7 @@ export default function TradingTerminal() {
 
               {/* Chart overlay info */}
               <div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
-                {klineData ? (
+                {klineData && (
                   <div className="space-y-1">
                     <div>O: <span className="font-mono">{parseFloat(klineData.open || '0').toFixed(2)}</span></div>
                     <div>H: <span className="font-mono text-success-500">{parseFloat(klineData.high || '0').toFixed(2)}</span></div>
@@ -1269,10 +1269,9 @@ export default function TradingTerminal() {
                     <div>C: <span className="font-mono">{parseFloat(klineData.close || '0').toFixed(2)}</span></div>
                     <div>V: <span className="font-mono">{parseFloat(klineData.volume || '0').toLocaleString()}</span></div>
                   </div>
-                ) : (
-                  <div className="text-dark-400">Waiting for kline data...</div>
                 )}
               </div>
+
 
 
             </div>

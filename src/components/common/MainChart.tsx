@@ -19,22 +19,32 @@ const MainChart = forwardRef<IChartApi | null, Props>(({ data, onChartReady }, r
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const maSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
 
   useImperativeHandle(ref, () => chartRef.current!);
 
-  // Init chart
   useEffect(() => {
     if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      layout: { background: { type: ColorType.Solid, color: '#1e293b' }, textColor: '#cbd5e1' },
-      grid: { vertLines: { color: '#334155' }, horzLines: { color: '#334155' } },
+      layout: {
+        background: { type: ColorType.Solid, color: '#0b0e11' },
+        textColor: '#d1d4dc',
+      },
+      grid: {
+        vertLines: { color: '#2b3139' },
+        horzLines: { color: '#2b3139' },
+      },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: {
-        scaleMargins: { top: 0.05, bottom: 0.15 },
+        scaleMargins: {
+          top: 0.05,
+          bottom: 0.05,
+        },
+        borderVisible: false,
       },
       timeScale: {
-        borderColor: '#334155',
+        borderColor: '#2b3139',
         timeVisible: true,
         secondsVisible: false,
       },
@@ -44,21 +54,30 @@ const MainChart = forwardRef<IChartApi | null, Props>(({ data, onChartReady }, r
     onChartReady?.(chart);
 
     candleSeriesRef.current = chart.addCandlestickSeries({
-      upColor: '#00C9A7',
-      downColor: '#E63757',
-      wickUpColor: '#00C9A7',
-      wickDownColor: '#E63757',
+      upColor: '#26A69A',
+      downColor: '#EF5350',
+      borderUpColor: '#26A69A',
+      borderDownColor: '#EF5350',
+      wickUpColor: '#26A69A',
+      wickDownColor: '#EF5350',
       borderVisible: false,
     });
 
-    const maSeries = chart.addLineSeries({
-  color: '#FFD700',
-  lineWidth: 1,
-  lastValueVisible: false,
-  priceLineVisible: false,
-});
+    maSeriesRef.current = chart.addLineSeries({
+      color: '#FFD700',
+      lineWidth: 1,
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
 
-maSeriesRef.current = maSeries;
+    volumeSeriesRef.current = chart.addHistogramSeries({
+      priceFormat: { type: 'volume' },
+      overlay: false, // ✅ scale riêng cho volume
+      scaleMargins: {
+        top: 0,
+        bottom: 0.2, // ✅ đủ chỗ cho volume mà không phá scale
+      },
+    });
 
     const resize = () => {
       chart.applyOptions({
@@ -76,15 +95,25 @@ maSeriesRef.current = maSeries;
     };
   }, []);
 
-  // Update data
   useEffect(() => {
-    const candleSeries = candleSeriesRef.current;
-    const maSeries = maSeriesRef.current;
+    if (!candleSeriesRef.current || !maSeriesRef.current || !volumeSeriesRef.current) return;
 
-    if (!candleSeries || !maSeries) return;
+    // Set Candlestick data
+    candleSeriesRef.current.setData(
+      data.filter(
+        (c) =>
+          typeof c.open === 'number' &&
+          typeof c.high === 'number' &&
+          typeof c.low === 'number' &&
+          typeof c.close === 'number' &&
+          !isNaN(c.open) &&
+          !isNaN(c.high) &&
+          !isNaN(c.low) &&
+          !isNaN(c.close)
+      )
+    );
 
-    candleSeries.setData(data);
-
+    // Set MA line
     const maData = data.length >= 20
       ? data.slice(19).map((_, i) => {
           const slice = data.slice(i, i + 20);
@@ -93,10 +122,20 @@ maSeriesRef.current = maSeries;
         })
       : [];
 
-    maSeries.setData(maData);
+    maSeriesRef.current.setData(maData);
+
+    // Set Volume data
+    const volumeData = data
+      .filter((c) => typeof c.volume === 'number')
+      .map((c) => ({
+        time: c.time as UTCTimestamp,
+        value: c.volume,
+        color: c.close >= c.open ? '#26A69A' : '#EF5350',
+      }));
+
+    volumeSeriesRef.current.setData(volumeData);
   }, [data]);
 
-  // Fit chart on first load only
   useEffect(() => {
     chartRef.current?.timeScale().fitContent();
   }, []);

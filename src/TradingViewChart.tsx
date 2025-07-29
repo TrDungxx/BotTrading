@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import MainChart from './components/common/MainChart';
-import VolumeChart from './components/common/VolumeChart';
 import { ExtendedCandle } from './utils/types';
 import { IChartApi } from 'lightweight-charts';
 
@@ -12,14 +11,25 @@ export default function TradingViewChart({ data }: Props) {
   const mainChartRef = useRef<IChartApi | null>(null);
   const [mainInstance, setMainInstance] = useState<IChartApi | null>(null);
 
+ 
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[600px] text-dark-400">
+        Đang tải dữ liệu nến...
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full w-full grid grid-rows-[75%_25%] gap-px">
-      <MainChart
-        ref={mainChartRef}
-        data={data}
-        onChartReady={(chart) => setMainInstance(chart)}
-      />
-      {mainInstance && <VolumeChart data={data} syncChart={mainInstance} />}
+    <div className="h-full w-full">
+      <div className="relative w-full h-[600px] rounded overflow-hidden border border-dark-800 bg-dark-900">
+        <MainChart
+          ref={mainChartRef}
+          data={data}
+          onChartReady={(chart) => setMainInstance(chart)}
+        />
+      </div>
     </div>
   );
 }
