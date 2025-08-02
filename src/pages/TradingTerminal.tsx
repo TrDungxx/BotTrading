@@ -1,12 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2, Star, Settings, Maximize2, TrendingUp, Volume2, Activity, Wifi, WifiOff, X } from 'lucide-react';
 import { FormattedMessage, FormattedNumber } from 'react-intl';
-import TradingViewChart from '../TradingViewChart';
+import TradingViewChart from '../components/common/TradingViewChart';
 import { CandlestickData } from 'lightweight-charts';
 import { fetchHistoricalKlines } from '../utils/fetchKline';
 import { ExtendedCandle } from '../utils/types';
-import SymbolDropdown from '../components/common/SymbolDropdown';
+import { Order } from '../utils/types';
+import SymbolDropdown from '../components/symboldropdown/SymbolDropdown';
 import symbolList from '../utils/symbolList';
+import TradingForm from '../components/common/TradingForm';
+import { useMiniTickerStore } from '../utils/miniTickerStore';
+import { binanceWS } from '../components/binancewebsocket/BinanceWebSocketService';
+import { toast } from 'react-toastify';
+import { AlertTriangle } from 'lucide-react';
+import OrderOpenHistory from '../components/orderlayout/OrderOpenHistory';
+import OpenOrders from '../components/orderlayout/OpenOrders';
+import { BinanceAccount } from '../utils/types';
+import BinanceAccountSelector from '../components/common/BinanceAccountSelector';
+import { useAuth } from '../context/AuthContext';
+import { User } from '../utils/types';
 // WebSocket connection status
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -310,7 +322,7 @@ class CustomWebSocketService {
     if (!callback) return;
 
     const kline = data.data;
-    console.log('⏱ Kline waiting... open:', kline?.open);
+    
     if (
       kline &&
       kline.open !== undefined &&
@@ -424,7 +436,7 @@ class CustomWebSocketService {
       this.ws.send(JSON.stringify(message));
      
     } else {
-      console.warn('⚠️ WebSocket not ready, message queued:', message);
+      
       this.messageQueue.push(message);
     }
   }
@@ -745,7 +757,7 @@ class CustomWebSocketService {
     }
 
     this.sendMessage(message);
-    console.log(`🔕 Unsubscribed: ${connectionId || 'all streams'}`);
+    
   }
 
   public disconnect() {
@@ -761,7 +773,10 @@ class CustomWebSocketService {
 }
 
 export default function TradingTerminal() {
+  const [openOrders, setOpenOrders] = useState<Order[]>([]);
 
+const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(null);
   const [candles, setCandles] = useState<ExtendedCandle[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
@@ -772,8 +787,9 @@ export default function TradingTerminal() {
     return stored ? JSON.parse(stored) : [];
   });
   const [activeSymbolTab, setActiveSymbolTab] = useState<'all' | 'favorites'>('all');
-
-
+const [availableBalance, setAvailableBalance] = useState<number>(0);
+const token = localStorage.getItem('token') || '';
+const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
 
   // State management
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
@@ -782,7 +798,8 @@ export default function TradingTerminal() {
   const [selectedInterval, setSelectedInterval] = useState('1m');
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
   const [wsService] = useState(() => new CustomWebSocketService());
-
+   const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
+ const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
   // Market data states
   const [klineData, setKlineData] = useState<KlineData | null>(null);
   const [tickerData, setTickerData] = useState<TickerData | null>(null);
@@ -801,9 +818,110 @@ export default function TradingTerminal() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
   // Trading form states
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState<number>(0);
   const [amount, setAmount] = useState('');
   const [total, setTotal] = useState('');
+  // market
+  const { user } = useAuth() as { user: User };
+const binanceAccountId = user?.internalAccountId;
+  useEffect(() => {
+  const cachedOrders = JSON.parse(localStorage.getItem('openOrders') || '[]');
+  if (cachedOrders.length > 0) {
+    setOpenOrders(cachedOrders);
+  }
+}, []);
+
+useEffect(() => {
+  console.log('🌀 Market changed:', selectedMarket);
+  console.log('🔍 Account ID:', binanceAccountId);
+
+  if (!selectedMarket || !binanceAccountId) {
+    console.log('⛔️ Không có market hoặc accountId, bỏ qua');
+    return;
+  }
+
+  if (selectedMarket === 'futures') {
+    console.log('📩 Gửi lệnh getMyAccountFutureInfo');
+    binanceWS.send({ action: 'getMyAccountFutureInfo', binanceAccountId });
+  } else if (selectedMarket === 'spot') {
+    console.log('📩 Gửi lệnh getMyAccountSpotInfo');
+    binanceWS.send({ action: 'getMyAccountSpotInfo', binanceAccountId });
+  }
+}, [selectedMarket, binanceAccountId]);
+
+
+
+useEffect(() => {
+  if (!token) return;
+
+  binanceWS.connect(token, (msg) => {
+    console.log('📥 WS Message:', msg);
+
+    switch (msg.type) {
+      case 'authenticated':
+        console.log('✅ Authenticated, selecting account...');
+
+        const firstAccount = msg.binanceAccounts?.[0];
+        if (firstAccount?.id) {
+          binanceWS.selectAccount(firstAccount.id);       // ✅ gửi lệnh chọn account
+          setSelectedAccount(firstAccount);               // ✅ lưu vào state
+
+          console.log('🧪 selectedAccount gán từ authenticated:', firstAccount);
+
+          setTimeout(() => {
+            binanceWS.getBalances('futures');
+          }, 1000);
+        }
+        break;
+        case 'myBinanceAccounts':
+    console.log('📦 Nhận được myBinanceAccounts:', msg.data);
+    const acc = msg.data?.accounts?.[0];
+    if (acc?.id) {
+      binanceWS.selectAccount(acc.id);
+      setSelectedAccount(acc);
+      console.log('🧪 selectedAccount gán từ myBinanceAccounts:', acc);
+
+      setTimeout(() => {
+        binanceWS.getBalances('futures');
+      }, 1000);
+    }
+    break;
+
+      case 'cancelAllOrdersSuccess':
+        toast.success('Huỷ tất cả lệnh thành công!');
+        break;
+
+      case 'cancelAllOrdersFailed':
+        toast.error('Huỷ tất cả lệnh thất bại!');
+        break;
+
+      case 'futuresDataLoaded':
+      case 'balances':
+        const usdt = msg.data?.balances?.find((b: any) => b.asset === 'USDT');
+        if (usdt) {
+          setAvailableBalance(parseFloat(usdt.availableBalance || '0'));
+        }
+        break;
+
+      default:
+        break;
+    }
+  });
+}, [token]);
+
+
+
+
+const handleCancelAllOrders = () => {
+  binanceWS.send({
+    action: 'cancelAllOrders',
+    symbol: selectedSymbol,
+    market: selectedMarket,
+  });
+  setShowCancelAllConfirm(false); // Đóng popup sau khi gửi
+};
+
+
 
 
 
@@ -892,31 +1010,10 @@ export default function TradingTerminal() {
     if (bookTickerId) subscriptionIds.push(bookTickerId);
 
     // 6. Mini Ticker
-    const miniTickerId = (wsService.subscribeMiniTicker as unknown as (
-      symbol: string,
-      market: string,
-      callback: (data: MiniTickerData) => void
-    ) => string)(
-      selectedSymbol,
-      selectedMarket,
-      (data: MiniTickerData) => {
-        setAllSymbols((prev) => {
-          if (!symbolList.includes(data.symbol)) return prev; // 👉 chỉ giữ symbol trong danh sách cho phép
-
-          const updated = prev.filter((s) => s.symbol !== data.symbol);
-          return [
-            ...updated,
-            {
-              symbol: data.symbol,
-              price: parseFloat(data.close),
-              percentChange: parseFloat(data.percentChange),
-              volume: parseFloat(data.volume),
-            },
-          ];
-        });
-      }
-    );
-    if (miniTickerId) subscriptionIds.push(miniTickerId);
+    wsService.subscribeMiniTicker(selectedSymbol, selectedMarket, (data) => {
+  if (data.symbol !== selectedSymbol) return;
+  setPrice(parseFloat(data.close));
+});
 
     // Update subscriptions list
     setSubscriptions(wsService.getSubscriptions());
@@ -933,6 +1030,14 @@ export default function TradingTerminal() {
     wsService.unsubscribe(subscriptionId);
     setSubscriptions(wsService.getSubscriptions());
   };
+
+  const handleClickOrderBookPrice = (price: number) => {
+  
+  setPrice(price); // 👈 RẤT QUAN TRỌNG: dùng setPrice của TradingTerminal
+};
+
+
+
 
   const handleSymbolChange = (newSymbol: string) => {
     setSelectedSymbol(newSymbol);
@@ -988,13 +1093,14 @@ export default function TradingTerminal() {
 
         
 
-        const newCandle: CandlestickData = {
-          time: Math.floor(data.openTime / 1000), // UNIX seconds
-          open: parseFloat(data.open),
-          high: parseFloat(data.high),
-          low: parseFloat(data.low),
-          close: parseFloat(data.close),
-        };
+        const newCandle: ExtendedCandle = {
+  time: Math.floor(data.openTime / 1000),
+  open: parseFloat(data.open),
+  high: parseFloat(data.high),
+  low: parseFloat(data.low),
+  close: parseFloat(data.close),
+  volume: parseFloat(data.volume), // ✅ giữ được volume
+};
 
         setCandles((prev) => {
           const exists = prev.find((c) => c.time === newCandle.time);
@@ -1013,47 +1119,60 @@ export default function TradingTerminal() {
     };
   }, [selectedSymbol, selectedInterval, selectedMarket]);
 
+useEffect(() => {
+  const ids: string[] = [];
 
-  useEffect(() => {
-    const ids: string[] = [];
-    const callbackMap = new Map<string, (data: MiniTickerData) => void>();
+  symbolList.forEach((sym) => {
+    const callback = (data: MiniTickerData) => {
+      const symbol = data.symbol?.toUpperCase?.();
+      const close = parseFloat(data.close);
+      const open = parseFloat(data.open);
+      const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
 
-    // 👉 lấy market 1 lần duy nhất khi mount (không dùng dependency)
-    const market: MarketType = 'futures'; // hoặc selectedMarket nếu chắc chắn đã có
+      // ⛔ Nếu là symbol đang chọn, bỏ qua luôn
+      if (symbol === selectedSymbol) return;
 
-    symbolList.forEach((sym) => {
-      const callback = (data: MiniTickerData) => {
-        const symbol = data.symbol?.toUpperCase?.();
-        if (symbol !== sym) return;
-
-        const close = parseFloat(data.close);
-        const open = parseFloat(data.open);
-        const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
-
-        setAllSymbols((prev) => {
-          const updated = prev.filter((s) => s.symbol !== symbol);
-          return [
-            ...updated,
-            {
-              symbol,
-              price: close,
-              percentChange,
-              volume: parseFloat(data.volume),
-            },
-          ];
-        });
-      };
-
-      callbackMap.set(sym, callback);
-      const id = wsService.subscribeMiniTicker(sym, market, callback); // ✅ dùng 'futures' cố định
-      ids.push(id);
-    });
-
-    return () => {
-      ids.forEach((id) => wsService.unsubscribe(id));
-      callbackMap.clear();
+      setAllSymbols((prev) => {
+        const updated = prev.filter((s) => s.symbol !== symbol);
+        return [
+          ...updated,
+          {
+            symbol,
+            price: close,
+            percentChange,
+            volume: parseFloat(data.volume),
+          },
+        ];
+      });
     };
-  }, []); // ✅ KHÔNG dùng [selectedMarket]
+
+    const id = wsService.subscribeMiniTicker(sym, selectedMarket, callback);
+    ids.push(id);
+  });
+
+  return () => {
+    ids.forEach((id) => wsService.unsubscribe(id));
+  };
+}, [selectedMarket, selectedSymbol]); // ⬅️ thêm selectedSymbol để cập nhật đúng theo mỗi lần chọn
+
+  
+
+ {/* useEffect(() => {
+  const miniTickerCallback = (data: MiniTickerData) => {
+    if (data.symbol !== selectedSymbol) return;
+    const close = parseFloat(data.close || '0');
+    
+    // ✅ Lấy giá 1 lần duy nhất khi symbol thay đổi
+    setPrice(close);
+    wsService.unsubscribe(id); // ✅ Unsubscribe luôn sau lần đầu
+  };
+
+  const id = wsService.subscribeMiniTicker(selectedSymbol, selectedMarket, miniTickerCallback);
+
+  return () => {
+    wsService.unsubscribe(id);
+  };
+}, [selectedSymbol, selectedMarket]);*/}
 
 
 
@@ -1067,6 +1186,41 @@ export default function TradingTerminal() {
       volume: 0,
     };
   });
+useEffect(() => {
+  if (!selectedAccount?.id) {
+    console.warn('❌ selectedAccount chưa có id');
+    return;
+  }
+
+  console.log('✅ useEffect gọi subscribeAccountUpdates');
+
+  binanceWS.subscribeAccountUpdates((orders) => {
+    console.log('📥 [Terminal] Received open orders in callback:', orders); // ✅ GIAI ĐOẠN 2
+
+    // ✅ Lọc chỉ những lệnh đang mở
+    const activeOrders = orders.filter(
+      (o) => o.status === 'NEW' || o.status === 'PARTIALLY_FILLED'
+    );
+
+    // ✅ Lưu vào localStorage để giữ khi F5
+    localStorage.setItem('openOrders', JSON.stringify(activeOrders));
+console.log('✅ Filtered activeOrders:', activeOrders);
+    // ✅ Cập nhật UI
+    setOpenOrders(activeOrders);
+  });
+
+  return () => {
+    binanceWS.unsubscribeAccountUpdates();
+  };
+}, [selectedAccount?.id]);
+
+useEffect(() => {
+  binanceWS.setOrderUpdateHandler(setOpenOrders);
+
+  return () => {
+    binanceWS.setOrderUpdateHandler(null); // clear khi unmount
+  };
+}, []);
 
  
   return (
@@ -1175,6 +1329,16 @@ export default function TradingTerminal() {
               )}
               <span className="text-xs text-dark-400 capitalize">{connectionStatus}</span>
             </div>
+
+            {/* Hiển thị tài khoản Binance được chọn */}
+  <div className="flex items-center space-x-2">
+    <span className="text-xs text-dark-400">Tài khoản:</span>
+    <BinanceAccountSelector
+  onSelect={(id) => {
+    setSelectedAccount({ id }); // ✅ tạo object có field id
+  }}
+/>
+  </div>
 
             <div className="text-xs text-dark-400">
               Subscriptions: {subscriptions.length}
@@ -1295,16 +1459,20 @@ export default function TradingTerminal() {
                   {/* Asks */}
                   <div className="flex-1 overflow-y-auto">
                     <div className="space-y-0.5 p-2">
-                      {orderBook.asks.slice(0, 15).reverse().map((ask, index) => (
-                        <div key={index} className="flex justify-between text-xs relative">
-                          <span className="text-danger-500 font-mono">{parseFloat(ask.price).toFixed(4)}</span>
-                          <span className="text-dark-300 font-mono">{parseFloat(ask.quantity).toFixed(3)}</span>
-                          <div
-                            className="absolute right-0 top-0 h-full bg-danger-500/10"
-                            style={{ width: `${Math.min(parseFloat(ask.quantity) / 10 * 100, 100)}%` }}
-                          />
-                        </div>
-                      ))}
+                     {orderBook.asks.slice(0, 15).reverse().map((ask, index) => (
+  <div
+    key={index}
+    className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+    onClick={() => handleClickOrderBookPrice(parseFloat(ask.price))}
+  >
+    <span className="text-danger-500 font-mono">{parseFloat(ask.price).toFixed(4)}</span>
+    <span className="text-dark-300 font-mono">{parseFloat(ask.quantity).toFixed(3)}</span>
+    <div
+      className="absolute right-0 top-0 h-full bg-danger-500/10"
+      style={{ width: `${Math.min(parseFloat(ask.quantity) / 10 * 100, 100)}%` }}
+    />
+  </div>
+))}
                     </div>
                   </div>
 
@@ -1323,15 +1491,19 @@ export default function TradingTerminal() {
                   <div className="flex-1 overflow-y-auto">
                     <div className="space-y-0.5 p-2">
                       {orderBook.bids.slice(0, 15).map((bid, index) => (
-                        <div key={index} className="flex justify-between text-xs relative">
-                          <span className="text-success-500 font-mono">{parseFloat(bid.price).toFixed(4)}</span>
-                          <span className="text-dark-300 font-mono">{parseFloat(bid.quantity).toFixed(3)}</span>
-                          <div
-                            className="absolute right-0 top-0 h-full bg-success-500/10"
-                            style={{ width: `${Math.min(parseFloat(bid.quantity) / 10 * 100, 100)}%` }}
-                          />
-                        </div>
-                      ))}
+  <div
+    key={index}
+    className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+    onClick={() => handleClickOrderBookPrice(parseFloat(bid.price))}
+  >
+    <span className="text-success-500 font-mono">{parseFloat(bid.price).toFixed(4)}</span>
+    <span className="text-dark-300 font-mono">{parseFloat(bid.quantity).toFixed(3)}</span>
+    <div
+      className="absolute right-0 top-0 h-full bg-success-500/10"
+      style={{ width: `${Math.min(parseFloat(bid.quantity) / 10 * 100, 100)}%` }}
+    />
+  </div>
+))}
                     </div>
                   </div>
                 </div>
@@ -1350,139 +1522,13 @@ export default function TradingTerminal() {
         {/* Right - Trading and Recent trades */}
         <div className="w-80 bg-dark-800 border-l border-dark-700">
           <div className="h-full flex flex-col">
-            {/* Trading form */}
-            <div className="border-b border-dark-700">
-              <div className="flex border-b border-dark-700">
-                <button
-                  className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'limit'
-                    ? 'border-b-2 border-primary-500 text-primary-500'
-                    : 'text-dark-400 hover:text-dark-300'
-                    }`}
-                  onClick={() => setActiveOrderTab('limit')}
-                >
-                  Limit
-                </button>
-                <button
-                  className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'market'
-                    ? 'border-b-2 border-primary-500 text-primary-500'
-                    : 'text-dark-400 hover:text-dark-300'
-                    }`}
-                  onClick={() => setActiveOrderTab('market')}
-                >
-                  Market
-                </button>
-                <button
-                  className={`flex-1 py-2 text-xs font-medium ${activeOrderTab === 'stop'
-                    ? 'border-b-2 border-primary-500 text-primary-500'
-                    : 'text-dark-400 hover:text-dark-300'
-                    }`}
-                  onClick={() => setActiveOrderTab('stop')}
-                >
-                  Stop-Limit
-                </button>
-              </div>
-
-              <div className="p-3">
-                <div className="flex space-x-1 mb-3">
-                  <button
-                    className={`flex-1 py-2 text-xs font-medium rounded ${tradeSide === 'buy'
-                      ? 'bg-success-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-                      }`}
-                    onClick={() => setTradeSide('buy')}
-                  >
-                    Buy
-                  </button>
-                  <button
-                    className={`flex-1 py-2 text-xs font-medium rounded ${tradeSide === 'sell'
-                      ? 'bg-danger-500 text-white'
-                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-                      }`}
-                    onClick={() => setTradeSide('sell')}
-                  >
-                    Sell
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {/* Available balance */}
-                  <div className="flex justify-between text-xs">
-                    <span className="text-dark-400">Available</span>
-                    <span>0.00000000 {tradeSide === 'buy' ? 'USDT' : selectedSymbol.replace('USDT', '')}</span>
-                  </div>
-
-                  {activeOrderTab !== 'market' && (
-                    <div>
-                      <label className="block text-xs text-dark-400 mb-1">Price</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
-                          placeholder="0.00"
-                          value={price}
-                          onChange={handlePriceChange}
-                        />
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-dark-400 text-xs">USDT</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1">Amount</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
-                        placeholder="0.00000000"
-                        value={amount}
-                        onChange={handleAmountChange}
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <span className="text-dark-400 text-xs">{selectedSymbol.replace('USDT', '')}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-1">
-                    {[25, 50, 75, 100].map((percent) => (
-                      <button
-                        key={percent}
-                        className="py-1 text-xs bg-dark-700 rounded text-dark-300 hover:bg-dark-600"
-                      >
-                        {percent}%
-                      </button>
-                    ))}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-dark-400 mb-1">Total</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        className="w-full bg-dark-700 border border-dark-600 rounded px-3 py-2 text-xs focus:border-primary-500 focus:outline-none"
-                        placeholder="0.00"
-                        value={total}
-                        onChange={handleTotalChange}
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <span className="text-dark-400 text-xs">USDT</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    className={`w-full py-2 rounded text-xs font-medium ${tradeSide === 'buy'
-                      ? 'bg-success-500 hover:bg-success-600 text-white'
-                      : 'bg-danger-500 hover:bg-danger-600 text-white'
-                      }`}
-                  >
-                    {tradeSide === 'buy' ? 'Buy' : 'Sell'} {selectedSymbol.replace('USDT', '')}
-                  </button>
-                </div>
-              </div>
-            </div>
+           <TradingForm
+  selectedSymbol={selectedSymbol}
+  price={price}
+  internalBalance={availableBalance}
+  selectedMarket={selectedMarket as 'spot' | 'futures'}
+  
+/>
 
             {/* Recent trades */}
             <div className="flex-1 overflow-hidden">
@@ -1552,33 +1598,17 @@ export default function TradingTerminal() {
       <div className="h-40 border-t border-dark-700 bg-dark-800">
         <div className="flex h-full">
           {/* Open Orders */}
-          <div className="flex-1 border-r border-dark-700">
-            <div className="flex items-center justify-between p-3 border-b border-dark-700">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-sm font-medium">Open Orders</h3>
-                <span className="text-xs text-dark-400">(0)</span>
-              </div>
-              <button className="text-xs text-danger-500 hover:text-danger-400">Cancel All</button>
-            </div>
-
-            <div className="p-4 text-center text-dark-400">
-              <div className="text-sm">No open orders</div>
-              <div className="text-xs mt-1">Your open orders will appear here</div>
-            </div>
-          </div>
+          <OpenOrders
+  selectedSymbol={selectedSymbol}
+  openOrders={openOrders}
+  showCancelAllConfirm={showCancelAllConfirm}
+  setShowCancelAllConfirm={setShowCancelAllConfirm}
+  handleCancelAllOrders={handleCancelAllOrders}
+  openOrdersCount={openOrders.length}
+/>
 
           {/* Order History */}
-          <div className="flex-1 border-r border-dark-700">
-            <div className="flex items-center justify-between p-3 border-b border-dark-700">
-              <h3 className="text-sm font-medium">Order History</h3>
-              <button className="text-xs text-dark-400 hover:text-dark-200">View All</button>
-            </div>
-
-            <div className="p-4 text-center text-dark-400">
-              <div className="text-sm">No order history</div>
-              <div className="text-xs mt-1">Your completed orders will appear here</div>
-            </div>
-          </div>
+          <OrderOpenHistory />
 
           {/* WebSocket Subscriptions */}
           <div className="w-80">
