@@ -1,29 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ArrowDown, ArrowUp, Calendar, ChevronDown, Clock, DollarSign, BarChart, RefreshCw, Share2, Star, Settings, Maximize2, TrendingUp, Volume2, Activity, Wifi, WifiOff, X } from 'lucide-react';
-import { FormattedMessage, FormattedNumber } from 'react-intl';
-import TradingViewChart from '../components/common/TradingViewChart';
-import { CandlestickData } from 'lightweight-charts';
-import { fetchHistoricalKlines } from '../utils/fetchKline';
-import { ExtendedCandle } from '../utils/types';
-import { Order } from '../utils/types';
-import SymbolDropdown from '../components/symboldropdown/SymbolDropdown';
-import symbolList from '../utils/symbolList';
-import TradingForm from '../components/common/TradingForm';
-import { useMiniTickerStore } from '../utils/miniTickerStore';
-import { binanceWS } from '../components/binancewebsocket/BinanceWebSocketService';
-import { toast } from 'react-toastify';
-import { AlertTriangle } from 'lucide-react';
-import OrderOpenHistory from '../components/orderlayout/OrderOpenHistory';
-import OpenOrders from '../components/orderlayout/OpenOrders';
-import { BinanceAccount } from '../utils/types';
-import BinanceAccountSelector from '../components/common/BinanceAccountSelector';
-import { useAuth } from '../context/AuthContext';
-import { User } from '../utils/types';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  BarChart,
+  RefreshCw,
+  Share2,
+  Star,
+  Settings,
+  Maximize2,
+  TrendingUp,
+  Volume2,
+  Activity,
+  Wifi,
+  WifiOff,
+  X,
+} from "lucide-react";
+import { FormattedMessage, FormattedNumber } from "react-intl";
+import TradingViewChart from "../components/common/TradingViewChart";
+import { CandlestickData } from "lightweight-charts";
+import { fetchHistoricalKlines } from "../utils/fetchKline";
+import { ExtendedCandle } from "../utils/types";
+import { Order } from "../utils/types";
+import SymbolDropdown from "../components/symboldropdown/SymbolDropdown";
+import symbolList from "../utils/symbolList";
+import TradingForm from "../components/common/TradingForm";
+import { useMiniTickerStore } from "../utils/miniTickerStore";
+import { binanceWS } from "../components/binancewebsocket/BinanceWebSocketService";
+import { toast } from "react-toastify";
+import { AlertTriangle } from "lucide-react";
+import OrderOpenHistory from "../components/orderlayout/OrderOpenHistory";
+import OpenOrders from "../components/orderlayout/OpenOrders";
+import { BinanceAccount } from "../utils/types";
+import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
+import { useAuth } from "../context/AuthContext";
+import { User } from "../utils/types";
 // WebSocket connection status
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 // Market types
-type MarketType = 'spot' | 'futures' | 'delivery';
+type MarketType = "spot" | "futures" | "delivery";
 
 // Market data interfaces
 interface KlineData {
@@ -169,7 +188,7 @@ class CustomWebSocketService {
   private authToken: string | null = null;
   private binanceAccountId: number | null = null;
   private isConnected = false;
-  public onStatusChange: (status: ConnectionStatus) => void = () => { };
+  public onStatusChange: (status: ConnectionStatus) => void = () => {};
 
   constructor() {
     this.connect();
@@ -177,23 +196,23 @@ class CustomWebSocketService {
 
   private messageQueue: any[] = [];
 
-
   private connect() {
     try {
-      this.onStatusChange('connecting');
+      this.onStatusChange("connecting");
 
-      this.ws = new WebSocket('ws://45.77.33.141/w-binance-socket/signalr/connect');
+      this.ws = new WebSocket(
+        "ws://45.77.33.141/w-binance-socket/signalr/connect"
+      );
 
       this.ws.onopen = () => {
-        console.log('✅ WebSocket connected');
-        this.onStatusChange('connected');
+        console.log("✅ WebSocket connected");
+        this.onStatusChange("connected");
         this.isConnected = true;
 
         // 🟢 Gửi lại toàn bộ message đã queue trước đó
         this.messageQueue.forEach((msg) => {
           if (this.ws?.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(msg));
-            
           }
         });
 
@@ -201,109 +220,106 @@ class CustomWebSocketService {
 
         // Tiếp tục các đăng ký mặc định nếu có
         const subs = [
-          { action: 'subscribePublicTicker', symbol: 'BTCUSDT' },
-          { action: 'subscribePublicKline', symbol: 'BTCUSDT', interval: '1m' },
-          { action: 'subscribePublicTrade', symbol: 'BTCUSDT' }
+          { action: "subscribePublicTicker", symbol: "BTCUSDT" },
+          { action: "subscribePublicKline", symbol: "BTCUSDT", interval: "1m" },
+          { action: "subscribePublicTrade", symbol: "BTCUSDT" },
         ];
 
         subs.forEach((msg) => this.sendMessage(msg));
       };
 
-
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-         
+
           this.handleMessage(data); // ✅ xử lý tại đây luôn
         } catch (error) {
-          console.error('❌ Error parsing message:', error);
+          console.error("❌ Error parsing message:", error);
         }
       };
 
       this.ws.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-        this.onStatusChange('error');
+        console.error("❌ WebSocket error:", error);
+        this.onStatusChange("error");
         this.isConnected = false;
       };
 
       this.ws.onclose = () => {
-        console.warn('🔌 WebSocket closed. Reconnecting...');
-        this.onStatusChange('disconnected');
+        console.warn("🔌 WebSocket closed. Reconnecting...");
+        this.onStatusChange("disconnected");
         this.isConnected = false;
         this.attemptReconnect();
       };
     } catch (error) {
-      console.error('❌ Failed to connect WebSocket:', error);
-      this.onStatusChange('error');
+      console.error("❌ Failed to connect WebSocket:", error);
+      this.onStatusChange("error");
     }
   }
 
   private handleMessage(data: any) {
-   
-
     if (data.action) {
       switch (data.action) {
-        case 'klineUpdate':
+        case "klineUpdate":
           this.handleKlineData(data);
           break;
-        case 'tickerUpdate':
+        case "tickerUpdate":
           this.handleTickerData(data);
           break;
-        case 'depthUpdate':
+        case "depthUpdate":
           this.handleDepthData(data);
           break;
-        case 'tradeUpdate':
+        case "tradeUpdate":
           this.handleTradeData(data);
           break;
-        case 'bookTickerUpdate':
+        case "bookTickerUpdate":
           this.handleBookTickerData(data);
           break;
-        case 'miniTickerUpdate':
+        case "miniTickerUpdate":
           this.handleMiniTickerData(data);
           break;
-        case 'accountUpdate':
+        case "accountUpdate":
           this.handleAccountData(data);
           break;
-        case 'orderUpdate':
+        case "orderUpdate":
           this.handleOrderData(data);
           break;
-        case 'subscriptionList':
+        case "subscriptionList":
           this.handleSubscriptionList(data);
           break;
         default:
-          console.warn('⚠️ Unknown WebSocket action:', data.action);
+          console.warn("⚠️ Unknown WebSocket action:", data.action);
       }
     } else if (data.type) {
       switch (data.type) {
-        case 'kline':
+        case "kline":
           this.handleKlineData(data);
           break;
-        case 'ticker':
+        case "ticker":
           this.handleTickerData(data);
           break;
-        case 'depth':
+        case "depth":
           this.handleDepthData(data);
           break;
-        case 'trade':
+        case "trade":
           this.handleTradeData(data);
           break;
-        case 'bookTicker':
+        case "bookTicker":
           this.handleBookTickerData(data);
           break;
-        case 'miniTicker':
+        case "miniTicker":
           this.handleMiniTickerData(data);
           break;
-        case 'account':
+        case "account":
           this.handleAccountData(data);
           break;
-        case 'order':
+        case "order":
           this.handleOrderData(data);
           break;
-        case 'connection_status':
+        case "connection_status":
           // Bạn có thể log nhẹ nếu muốn theo dõi trạng thái từng stream
-         
+
           break;
-        case 'welcome':
+        case "welcome":
           // Đây là message chào, không cần xử lý gì cả
           break;
         default:
@@ -313,16 +329,12 @@ class CustomWebSocketService {
     }
   }
 
-
-
   private handleKlineData(data: any) {
-    
-
-    const callback = this.callbacks.get('kline');
+    const callback = this.callbacks.get("kline");
     if (!callback) return;
 
     const kline = data.data;
-    
+
     if (
       kline &&
       kline.open !== undefined &&
@@ -333,8 +345,8 @@ class CustomWebSocketService {
     ) {
       // ✅ Nếu là dạng đầy đủ
       callback({
-        symbol: kline.symbol || '',
-        interval: kline.interval || '',
+        symbol: kline.symbol || "",
+        interval: kline.interval || "",
         openTime: kline.openTime,
         closeTime: kline.closeTime,
         open: kline.open,
@@ -343,40 +355,37 @@ class CustomWebSocketService {
         close: kline.close,
         volume: kline.volume,
         trades: kline.trades || 0,
-        baseAssetVolume: kline.baseAssetVolume || '',
-        quoteAssetVolume: kline.quoteAssetVolume || ''
+        baseAssetVolume: kline.baseAssetVolume || "",
+        quoteAssetVolume: kline.quoteAssetVolume || "",
       });
     } else {
-      console.warn('⚠️ Invalid kline data received:', kline);
+      console.warn("⚠️ Invalid kline data received:", kline);
     }
   }
 
-
-
-
   private handleTickerData(data: any) {
-    const callback = this.callbacks.get('ticker');
+    const callback = this.callbacks.get("ticker");
     if (callback && data.data) {
       callback(data.data);
     }
   }
 
   private handleDepthData(data: any) {
-    const callback = this.callbacks.get('depth');
+    const callback = this.callbacks.get("depth");
     if (callback && data.data) {
       callback(data.data);
     }
   }
 
   private handleTradeData(data: any) {
-    const callback = this.callbacks.get('trade');
+    const callback = this.callbacks.get("trade");
     if (callback && data.data) {
       callback(data.data);
     }
   }
 
   private handleBookTickerData(data: any) {
-    const callback = this.callbacks.get('bookTicker');
+    const callback = this.callbacks.get("bookTicker");
     if (callback && data.data) {
       callback(data.data);
     }
@@ -391,21 +400,21 @@ class CustomWebSocketService {
   }
 
   private handleAccountData(data: any) {
-    const callback = this.callbacks.get('account');
+    const callback = this.callbacks.get("account");
     if (callback && data.data) {
       callback(data.data);
     }
   }
 
   private handleOrderData(data: any) {
-    const callback = this.callbacks.get('orders');
+    const callback = this.callbacks.get("orders");
     if (callback && data.data) {
       callback(data.data);
     }
   }
 
   private handleSubscriptionList(data: any) {
-    console.log('📋 Active subscriptions:', data.subscriptions);
+    console.log("📋 Active subscriptions:", data.subscriptions);
   }
 
   private attemptReconnect() {
@@ -413,14 +422,16 @@ class CustomWebSocketService {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * this.reconnectAttempts;
 
-      console.log(`🔄 Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+      console.log(
+        `🔄 Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`
+      );
 
       setTimeout(() => {
         this.connect();
       }, delay);
     } else {
-      console.error('❌ Max reconnection attempts reached');
-      this.onStatusChange('error');
+      console.error("❌ Max reconnection attempts reached");
+      this.onStatusChange("error");
     }
   }
 
@@ -434,13 +445,10 @@ class CustomWebSocketService {
   private sendMessage(message: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
-     
     } else {
-      
       this.messageQueue.push(message);
     }
   }
-
 
   public setStatusCallback(callback: (status: ConnectionStatus) => void) {
     this.onStatusChange = callback;
@@ -453,135 +461,161 @@ class CustomWebSocketService {
   }
 
   // PUBLIC STREAMS
-  public subscribeKline(symbol: string, interval: string, market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeKline(
+    symbol: string,
+    interval: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `kline_${symbol}_${interval}_${market}`;
     const message = {
-      action: 'subscribeKline',  // ⚠️ Không phải subscribePublicKline
-      market,                    // ⚠️ Phải có market
+      action: "subscribeKline", // ⚠️ Không phải subscribePublicKline
+      market, // ⚠️ Phải có market
       symbol,
-      interval
+      interval,
     };
 
     if (callback) {
-      this.callbacks.set('kline', callback);
+      this.callbacks.set("kline", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribeKline',
+      action: "subscribeKline",
       symbol,
       market,
       interval,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-
-  public subscribeTicker(symbol: string, market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `ticker_${symbol}_${market}`;
     const message = {
-      action: 'subscribeTicker',
+      action: "subscribeTicker",
       market,
-      symbol
+      symbol,
     };
 
     if (callback) {
-      this.callbacks.set('ticker', callback);
+      this.callbacks.set("ticker", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribeTicker',
+      action: "subscribeTicker",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribeDepth(symbol: string, levels: string = '20', speed: string = '1000ms', market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeDepth(
+    symbol: string,
+    levels: string = "20",
+    speed: string = "1000ms",
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `depth_${symbol}_${levels}_${speed}_${market}`;
     const message = {
-      action: 'subscribePublicDepth',
+      action: "subscribePublicDepth",
       symbol,
       levels,
-      speed
+      speed,
     };
 
     if (callback) {
-      this.callbacks.set('depth', callback);
+      this.callbacks.set("depth", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePublicDepth',
+      action: "subscribePublicDepth",
       symbol,
       market,
       levels,
       speed,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribeTrade(symbol: string, market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeTrade(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `trade_${symbol}_${market}`;
     const message = {
-      action: 'subscribePublicTrade',
-      symbol
+      action: "subscribePublicTrade",
+      symbol,
     };
 
     if (callback) {
-      this.callbacks.set('trade', callback);
+      this.callbacks.set("trade", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePublicTrade',
+      action: "subscribePublicTrade",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribeBookTicker(symbol: string, market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeBookTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `bookTicker_${symbol}_${market}`;
     const message = {
-      action: 'subscribePublicBookTicker',
-      symbol
+      action: "subscribePublicBookTicker",
+      symbol,
     };
 
     if (callback) {
-      this.callbacks.set('bookTicker', callback);
+      this.callbacks.set("bookTicker", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePublicBookTicker',
+      action: "subscribePublicBookTicker",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribeMiniTicker(symbol: string, market: MarketType = 'spot', callback?: (data: any) => void) {
+  public subscribeMiniTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `miniTicker_${symbol}_${market}`;
     const message = {
-      action: 'subscribePublicMiniTicker',
-      symbol
+      action: "subscribePublicMiniTicker",
+      symbol,
     };
 
     if (callback) {
@@ -590,10 +624,10 @@ class CustomWebSocketService {
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePublicMiniTicker',
+      action: "subscribePublicMiniTicker",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
@@ -601,48 +635,56 @@ class CustomWebSocketService {
   }
 
   // FUTURES-specific streams
-  public subscribeMarkPrice(symbol: string, market: MarketType = 'futures', callback?: (data: any) => void) {
+  public subscribeMarkPrice(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `markPrice_${symbol}_${market}`;
     const message = {
-      action: 'subscribeMarkPrice',
+      action: "subscribeMarkPrice",
       market,
-      symbol
+      symbol,
     };
 
     if (callback) {
-      this.callbacks.set('markPrice', callback);
+      this.callbacks.set("markPrice", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribeMarkPrice',
+      action: "subscribeMarkPrice",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribeFundingRate(symbol: string, market: MarketType = 'futures', callback?: (data: any) => void) {
+  public subscribeFundingRate(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
     const subscriptionId = `fundingRate_${symbol}_${market}`;
     const message = {
-      action: 'subscribeFundingRate',
+      action: "subscribeFundingRate",
       market,
-      symbol
+      symbol,
     };
 
     if (callback) {
-      this.callbacks.set('fundingRate', callback);
+      this.callbacks.set("fundingRate", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribeFundingRate',
+      action: "subscribeFundingRate",
       symbol,
       market,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
@@ -652,25 +694,25 @@ class CustomWebSocketService {
   // PRIVATE STREAMS (require authentication)
   public subscribeAccount(callback?: (data: any) => void) {
     if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
-      console.error('❌ Authentication required for private streams');
+      console.error("❌ Authentication required for private streams");
       return null;
     }
 
     const subscriptionId = `account_${this.binanceAccountId}`;
     const message = {
-      action: 'subscribePrivateAccount',
+      action: "subscribePrivateAccount",
       token: this.authToken,
-      binanceAccountId: this.binanceAccountId
+      binanceAccountId: this.binanceAccountId,
     };
 
     if (callback) {
-      this.callbacks.set('account', callback);
+      this.callbacks.set("account", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePrivateAccount',
-      timestamp: Date.now()
+      action: "subscribePrivateAccount",
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
@@ -679,25 +721,25 @@ class CustomWebSocketService {
 
   public subscribeOrders(callback?: (data: any) => void) {
     if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
-      console.error('❌ Authentication required for private streams');
+      console.error("❌ Authentication required for private streams");
       return null;
     }
 
     const subscriptionId = `orders_${this.binanceAccountId}`;
     const message = {
-      action: 'subscribePrivateOrders',
+      action: "subscribePrivateOrders",
       token: this.authToken,
-      binanceAccountId: this.binanceAccountId
+      binanceAccountId: this.binanceAccountId,
     };
 
     if (callback) {
-      this.callbacks.set('orders', callback);
+      this.callbacks.set("orders", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePrivateOrders',
-      timestamp: Date.now()
+      action: "subscribePrivateOrders",
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
@@ -706,25 +748,25 @@ class CustomWebSocketService {
 
   public subscribeTrades(callback?: (data: any) => void) {
     if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
-      console.error('❌ Authentication required for private streams');
+      console.error("❌ Authentication required for private streams");
       return null;
     }
 
     const subscriptionId = `trades_${this.binanceAccountId}`;
     const message = {
-      action: 'subscribePrivateTrades',
+      action: "subscribePrivateTrades",
       token: this.authToken,
-      binanceAccountId: this.binanceAccountId
+      binanceAccountId: this.binanceAccountId,
     };
 
     if (callback) {
-      this.callbacks.set('trades', callback);
+      this.callbacks.set("trades", callback);
     }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribePrivateTrades',
-      timestamp: Date.now()
+      action: "subscribePrivateTrades",
+      timestamp: Date.now(),
     });
 
     this.sendMessage(message);
@@ -734,7 +776,7 @@ class CustomWebSocketService {
   // CONTROL COMMANDS
   public getSubscriptions() {
     const message = {
-      action: 'getSubscriptions'
+      action: "getSubscriptions",
     };
     this.sendMessage(message);
     return Array.from(this.subscriptions.values());
@@ -742,8 +784,8 @@ class CustomWebSocketService {
 
   public unsubscribe(connectionId?: string) {
     const message = {
-      action: 'unsubscribe',
-      ...(connectionId && { connectionId })
+      action: "unsubscribe",
+      ...(connectionId && { connectionId }),
     };
 
     if (connectionId) {
@@ -757,7 +799,6 @@ class CustomWebSocketService {
     }
 
     this.sendMessage(message);
-    
   }
 
   public disconnect() {
@@ -767,39 +808,46 @@ class CustomWebSocketService {
     }
     this.subscriptions.clear();
     this.callbacks.clear();
-    this.onStatusChange('disconnected');
-    console.log('🔌 WebSocket disconnected');
+    this.onStatusChange("disconnected");
+    console.log("🔌 WebSocket disconnected");
   }
 }
 
 export default function TradingTerminal() {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
 
-const [orderHistory, setOrderHistory] = useState<Order[]>([]);
-const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(null);
+  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
+    null
+  );
   const [candles, setCandles] = useState<ExtendedCandle[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
-  const miniTickerCallbacks = useRef<Map<string, (data: MiniTickerData) => void>>(new Map());
-  const [searchTerm, setSearchTerm] = useState('');
+  const miniTickerCallbacks = useRef<
+    Map<string, (data: MiniTickerData) => void>
+  >(new Map());
+  const [searchTerm, setSearchTerm] = useState("");
   const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
-    const stored = localStorage.getItem('favoriteSymbols');
+    const stored = localStorage.getItem("favoriteSymbols");
     return stored ? JSON.parse(stored) : [];
   });
-  const [activeSymbolTab, setActiveSymbolTab] = useState<'all' | 'favorites'>('all');
-const [availableBalance, setAvailableBalance] = useState<number>(0);
-const token = localStorage.getItem('token') || '';
-const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
+  const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">(
+    "all"
+  );
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const token = localStorage.getItem("token") || "";
+  const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
 
   // State management
-  const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT');
-  const [selectedMarket, setSelectedMarket] = useState<MarketType>('futures');
+  const [selectedSymbol, setSelectedSymbol] = useState("BTCUSDT");
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
 
-  const [selectedInterval, setSelectedInterval] = useState('1m');
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [selectedInterval, setSelectedInterval] = useState("1m");
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
   const [wsService] = useState(() => new CustomWebSocketService());
-   const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
- const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
+  const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
+  const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
   // Market data states
   const [klineData, setKlineData] = useState<KlineData | null>(null);
   const [tickerData, setTickerData] = useState<TickerData | null>(null);
@@ -813,118 +861,113 @@ const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
   const [orderUpdates, setOrderUpdates] = useState<OrderUpdate[]>([]);
 
   // UI states
-  const [activeOrderTab, setActiveOrderTab] = useState<'limit' | 'market' | 'stop'>('limit');
-  const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
+  const [activeOrderTab, setActiveOrderTab] = useState<
+    "limit" | "market" | "stop"
+  >("limit");
+  const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
   // Trading form states
   const [price, setPrice] = useState<number>(0);
-  const [amount, setAmount] = useState('');
-  const [total, setTotal] = useState('');
+  const [amount, setAmount] = useState("");
+  const [total, setTotal] = useState("");
   // market
   const { user } = useAuth() as { user: User };
-const binanceAccountId = user?.internalAccountId;
+  const binanceAccountId = user?.internalAccountId;
   useEffect(() => {
-  const cachedOrders = JSON.parse(localStorage.getItem('openOrders') || '[]');
-  if (cachedOrders.length > 0) {
-    setOpenOrders(cachedOrders);
-  }
-}, []);
-
-useEffect(() => {
-  console.log('🌀 Market changed:', selectedMarket);
-  console.log('🔍 Account ID:', binanceAccountId);
-
-  if (!selectedMarket || !binanceAccountId) {
-    console.log('⛔️ Không có market hoặc accountId, bỏ qua');
-    return;
-  }
-
-  if (selectedMarket === 'futures') {
-    console.log('📩 Gửi lệnh getMyAccountFutureInfo');
-    binanceWS.send({ action: 'getMyAccountFutureInfo', binanceAccountId });
-  } else if (selectedMarket === 'spot') {
-    console.log('📩 Gửi lệnh getMyAccountSpotInfo');
-    binanceWS.send({ action: 'getMyAccountSpotInfo', binanceAccountId });
-  }
-}, [selectedMarket, binanceAccountId]);
-
-
-
-useEffect(() => {
-  if (!token) return;
-
-  binanceWS.connect(token, (msg) => {
-    console.log('📥 WS Message:', msg);
-
-    switch (msg.type) {
-      case 'authenticated':
-        console.log('✅ Authenticated, selecting account...');
-
-        const firstAccount = msg.binanceAccounts?.[0];
-        if (firstAccount?.id) {
-          binanceWS.selectAccount(firstAccount.id);       // ✅ gửi lệnh chọn account
-          setSelectedAccount(firstAccount);               // ✅ lưu vào state
-
-          console.log('🧪 selectedAccount gán từ authenticated:', firstAccount);
-
-          setTimeout(() => {
-            binanceWS.getBalances('futures');
-          }, 1000);
-        }
-        break;
-        case 'myBinanceAccounts':
-    console.log('📦 Nhận được myBinanceAccounts:', msg.data);
-    const acc = msg.data?.accounts?.[0];
-    if (acc?.id) {
-      binanceWS.selectAccount(acc.id);
-      setSelectedAccount(acc);
-      console.log('🧪 selectedAccount gán từ myBinanceAccounts:', acc);
-
-      setTimeout(() => {
-        binanceWS.getBalances('futures');
-      }, 1000);
+    const cachedOrders = JSON.parse(localStorage.getItem("openOrders") || "[]");
+    if (cachedOrders.length > 0) {
+      setOpenOrders(cachedOrders);
     }
-    break;
+  }, []);
 
-      case 'cancelAllOrdersSuccess':
-        toast.success('Huỷ tất cả lệnh thành công!');
-        break;
+  useEffect(() => {
+    console.log("🌀 Market changed:", selectedMarket);
+    console.log("🔍 Account ID:", binanceAccountId);
 
-      case 'cancelAllOrdersFailed':
-        toast.error('Huỷ tất cả lệnh thất bại!');
-        break;
-
-      case 'futuresDataLoaded':
-      case 'balances':
-        const usdt = msg.data?.balances?.find((b: any) => b.asset === 'USDT');
-        if (usdt) {
-          setAvailableBalance(parseFloat(usdt.availableBalance || '0'));
-        }
-        break;
-
-      default:
-        break;
+    if (!selectedMarket || !binanceAccountId) {
+      console.log("⛔️ Không có market hoặc accountId, bỏ qua");
+      return;
     }
-  });
-}, [token]);
 
+    if (selectedMarket === "futures") {
+      console.log("📩 Gửi lệnh getMyAccountFutureInfo");
+      binanceWS.send({ action: "getMyAccountFutureInfo", binanceAccountId });
+    } else if (selectedMarket === "spot") {
+      console.log("📩 Gửi lệnh getMyAccountSpotInfo");
+      binanceWS.send({ action: "getMyAccountSpotInfo", binanceAccountId });
+    }
+  }, [selectedMarket, binanceAccountId]);
 
+  useEffect(() => {
+    if (!token) return;
 
+    binanceWS.connect(token, (msg) => {
+      console.log("📥 WS Message:", msg);
 
-const handleCancelAllOrders = () => {
-  binanceWS.send({
-    action: 'cancelAllOrders',
-    symbol: selectedSymbol,
-    market: selectedMarket,
-  });
-  setShowCancelAllConfirm(false); // Đóng popup sau khi gửi
-};
+      switch (msg.type) {
+        case "authenticated":
+          console.log("✅ Authenticated, selecting account...");
 
+          const firstAccount = msg.binanceAccounts?.[0];
+          if (firstAccount?.id) {
+            binanceWS.selectAccount(firstAccount.id); // ✅ gửi lệnh chọn account
+            setSelectedAccount(firstAccount); // ✅ lưu vào state
 
+            console.log(
+              "🧪 selectedAccount gán từ authenticated:",
+              firstAccount
+            );
 
+            setTimeout(() => {
+              binanceWS.getBalances("futures");
+            }, 1000);
+          }
+          break;
+        case "myBinanceAccounts":
+          console.log("📦 Nhận được myBinanceAccounts:", msg.data);
+          const acc = msg.data?.accounts?.[0];
+          if (acc?.id) {
+            binanceWS.selectAccount(acc.id);
+            setSelectedAccount(acc);
+            console.log("🧪 selectedAccount gán từ myBinanceAccounts:", acc);
 
+            setTimeout(() => {
+              binanceWS.getBalances("futures");
+            }, 1000);
+          }
+          break;
 
+        case "cancelAllOrdersSuccess":
+          toast.success("Huỷ tất cả lệnh thành công!");
+          break;
+
+        case "cancelAllOrdersFailed":
+          toast.error("Huỷ tất cả lệnh thất bại!");
+          break;
+
+        case "futuresDataLoaded":
+        case "balances":
+          const usdt = msg.data?.balances?.find((b: any) => b.asset === "USDT");
+          if (usdt) {
+            setAvailableBalance(parseFloat(usdt.availableBalance || "0"));
+          }
+          break;
+
+        default:
+          break;
+      }
+    });
+  }, [token]);
+
+  const handleCancelAllOrders = () => {
+    binanceWS.send({
+      action: "cancelAllOrders",
+      symbol: selectedSymbol,
+      market: selectedMarket,
+    });
+    setShowCancelAllConfirm(false); // Đóng popup sau khi gửi
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -938,10 +981,9 @@ const handleCancelAllOrders = () => {
         );
         if (isMounted) {
           setCandles(historicalData);
-          
         }
       } catch (error) {
-        console.error('❌ Failed to fetch historical klines:', error);
+        console.error("❌ Failed to fetch historical klines:", error);
       }
     };
 
@@ -959,68 +1001,91 @@ const handleCancelAllOrders = () => {
     const subscriptionIds: string[] = [];
 
     // 1. Kline/Candlestick Stream
-    const klineId = wsService.subscribeKline(selectedSymbol, selectedInterval, selectedMarket, (data) => {
-      if (data.symbol !== selectedSymbol) return;
-     
-      setKlineData(data);
-    });
+    const klineId = wsService.subscribeKline(
+      selectedSymbol,
+      selectedInterval,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        setKlineData(data);
+      }
+    );
     if (klineId) subscriptionIds.push(klineId);
 
     // 2. 24hr Ticker Statistics
-    const tickerId = wsService.subscribeTicker(selectedSymbol, selectedMarket, (data) => {
-      if (data.symbol !== selectedSymbol) return;
-      
-      setTickerData(data);
-    });
+    const tickerId = wsService.subscribeTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        setTickerData(data);
+      }
+    );
     if (tickerId) subscriptionIds.push(tickerId);
 
     // 3. Order Book Depth
-    const depthId = wsService.subscribeDepth(selectedSymbol, '20', '1000ms', selectedMarket, (data) => {
-      if (data.symbol !== selectedSymbol) return;
-      setOrderBook(data);
-    });
+    const depthId = wsService.subscribeDepth(
+      selectedSymbol,
+      "20",
+      "1000ms",
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setOrderBook(data);
+      }
+    );
     if (depthId) subscriptionIds.push(depthId);
 
     // 4. Trade Stream
-    const tradeId = wsService.subscribeTrade(selectedSymbol, selectedMarket, (data) => {
-      if (data.symbol !== selectedSymbol) return;
+    const tradeId = wsService.subscribeTrade(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
 
-      const trade: TradeData = {
-        symbol: data.symbol,
-        tradeId: data.tradeId,
-        price: data.price?.toString() ?? '0',
-        qty: data.quantity?.toString() ?? '0',
-        time: data.tradeTime ?? Date.now(),
-        isBuyerMaker: data.isBuyerMaker
-      };
+        const trade: TradeData = {
+          symbol: data.symbol,
+          tradeId: data.tradeId,
+          price: data.price?.toString() ?? "0",
+          qty: data.quantity?.toString() ?? "0",
+          time: data.tradeTime ?? Date.now(),
+          isBuyerMaker: data.isBuyerMaker,
+        };
 
-      setRecentTrades((prev) => {
-        const newTrades = [trade, ...prev.slice(0, 49)];
-        return newTrades.sort((a, b) => b.time - a.time);
-      });
-    });
+        setRecentTrades((prev) => {
+          const newTrades = [trade, ...prev.slice(0, 49)];
+          return newTrades.sort((a, b) => b.time - a.time);
+        });
+      }
+    );
 
     if (tradeId) subscriptionIds.push(tradeId);
 
     // 5. Book Ticker (Best Bid/Ask)
-    const bookTickerId = wsService.subscribeBookTicker(selectedSymbol, selectedMarket, (data) => {
-     if (data.symbol !== selectedSymbol) return;
-      setBookTicker(data);
-    });
+    const bookTickerId = wsService.subscribeBookTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setBookTicker(data);
+      }
+    );
     if (bookTickerId) subscriptionIds.push(bookTickerId);
 
     // 6. Mini Ticker
     wsService.subscribeMiniTicker(selectedSymbol, selectedMarket, (data) => {
-  if (data.symbol !== selectedSymbol) return;
-  setPrice(parseFloat(data.close));
-});
+      if (data.symbol !== selectedSymbol) return;
+      setPrice(parseFloat(data.close));
+    });
 
     // Update subscriptions list
     setSubscriptions(wsService.getSubscriptions());
 
     return () => {
       // Cleanup subscriptions when component unmounts or symbol changes
-      subscriptionIds.forEach(id => {
+      subscriptionIds.forEach((id) => {
         wsService.unsubscribe(id);
       });
     };
@@ -1032,12 +1097,8 @@ const handleCancelAllOrders = () => {
   };
 
   const handleClickOrderBookPrice = (price: number) => {
-  
-  setPrice(price); // 👈 RẤT QUAN TRỌNG: dùng setPrice của TradingTerminal
-};
-
-
-
+    setPrice(price); // 👈 RẤT QUAN TRỌNG: dùng setPrice của TradingTerminal
+  };
 
   const handleSymbolChange = (newSymbol: string) => {
     setSelectedSymbol(newSymbol);
@@ -1056,7 +1117,7 @@ const handleCancelAllOrders = () => {
       const calculatedTotal = parseFloat(price) * parseFloat(amount);
       return calculatedTotal.toFixed(8);
     }
-    return '';
+    return "";
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1076,10 +1137,12 @@ const handleCancelAllOrders = () => {
     setTotal(newTotal);
 
     if (newTotal && price && parseFloat(price) !== 0) {
-      const calculatedAmount = (parseFloat(newTotal) / parseFloat(price)).toFixed(8);
+      const calculatedAmount = (
+        parseFloat(newTotal) / parseFloat(price)
+      ).toFixed(8);
       setAmount(calculatedAmount);
     } else {
-      setAmount('');
+      setAmount("");
     }
   };
 
@@ -1091,16 +1154,14 @@ const handleCancelAllOrders = () => {
       (data) => {
         if (data.symbol !== selectedSymbol) return; // ✅ đảm bảo đúng symbol
 
-        
-
         const newCandle: ExtendedCandle = {
-  time: Math.floor(data.openTime / 1000),
-  open: parseFloat(data.open),
-  high: parseFloat(data.high),
-  low: parseFloat(data.low),
-  close: parseFloat(data.close),
-  volume: parseFloat(data.volume), // ✅ giữ được volume
-};
+          time: Math.floor(data.openTime / 1000),
+          open: parseFloat(data.open),
+          high: parseFloat(data.high),
+          low: parseFloat(data.low),
+          close: parseFloat(data.close),
+          volume: parseFloat(data.volume), // ✅ giữ được volume
+        };
 
         setCandles((prev) => {
           const exists = prev.find((c) => c.time === newCandle.time);
@@ -1119,45 +1180,44 @@ const handleCancelAllOrders = () => {
     };
   }, [selectedSymbol, selectedInterval, selectedMarket]);
 
-useEffect(() => {
-  const ids: string[] = [];
+  useEffect(() => {
+    const ids: string[] = [];
 
-  symbolList.forEach((sym) => {
-    const callback = (data: MiniTickerData) => {
-      const symbol = data.symbol?.toUpperCase?.();
-      const close = parseFloat(data.close);
-      const open = parseFloat(data.open);
-      const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
+    symbolList.forEach((sym) => {
+      const callback = (data: MiniTickerData) => {
+        const symbol = data.symbol?.toUpperCase?.();
+        const close = parseFloat(data.close);
+        const open = parseFloat(data.open);
+        const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
 
-      // ⛔ Nếu là symbol đang chọn, bỏ qua luôn
-      if (symbol === selectedSymbol) return;
+        // ⛔ Nếu là symbol đang chọn, bỏ qua luôn
+        if (symbol === selectedSymbol) return;
 
-      setAllSymbols((prev) => {
-        const updated = prev.filter((s) => s.symbol !== symbol);
-        return [
-          ...updated,
-          {
-            symbol,
-            price: close,
-            percentChange,
-            volume: parseFloat(data.volume),
-          },
-        ];
-      });
+        setAllSymbols((prev) => {
+          const updated = prev.filter((s) => s.symbol !== symbol);
+          return [
+            ...updated,
+            {
+              symbol,
+              price: close,
+              percentChange,
+              volume: parseFloat(data.volume),
+            },
+          ];
+        });
+      };
+
+      const id = wsService.subscribeMiniTicker(sym, selectedMarket, callback);
+      ids.push(id);
+    });
+
+    return () => {
+      ids.forEach((id) => wsService.unsubscribe(id));
     };
+  }, [selectedMarket, selectedSymbol]); // ⬅️ thêm selectedSymbol để cập nhật đúng theo mỗi lần chọn
 
-    const id = wsService.subscribeMiniTicker(sym, selectedMarket, callback);
-    ids.push(id);
-  });
-
-  return () => {
-    ids.forEach((id) => wsService.unsubscribe(id));
-  };
-}, [selectedMarket, selectedSymbol]); // ⬅️ thêm selectedSymbol để cập nhật đúng theo mỗi lần chọn
-
-  
-
- {/* useEffect(() => {
+  {
+    /* useEffect(() => {
   const miniTickerCallback = (data: MiniTickerData) => {
     if (data.symbol !== selectedSymbol) return;
     const close = parseFloat(data.close || '0');
@@ -1172,57 +1232,56 @@ useEffect(() => {
   return () => {
     wsService.unsubscribe(id);
   };
-}, [selectedSymbol, selectedMarket]);*/}
-
-
-
+}, [selectedSymbol, selectedMarket]);*/
+  }
 
   const sortedSymbols: SymbolItem[] = symbolList.map((symbol) => {
     const matched = allSymbols.find((s) => s.symbol === symbol);
-    return matched ?? {
-      symbol,
-      price: 0,
-      percentChange: 0,
-      volume: 0,
-    };
-  });
-useEffect(() => {
-  if (!selectedAccount?.id) {
-    console.warn('❌ selectedAccount chưa có id');
-    return;
-  }
-
-  console.log('✅ useEffect gọi subscribeAccountUpdates');
-
-  binanceWS.subscribeAccountUpdates((orders) => {
-    console.log('📥 [Terminal] Received open orders in callback:', orders); // ✅ GIAI ĐOẠN 2
-
-    // ✅ Lọc chỉ những lệnh đang mở
-    const activeOrders = orders.filter(
-      (o) => o.status === 'NEW' || o.status === 'PARTIALLY_FILLED'
+    return (
+      matched ?? {
+        symbol,
+        price: 0,
+        percentChange: 0,
+        volume: 0,
+      }
     );
-
-    // ✅ Lưu vào localStorage để giữ khi F5
-    localStorage.setItem('openOrders', JSON.stringify(activeOrders));
-console.log('✅ Filtered activeOrders:', activeOrders);
-    // ✅ Cập nhật UI
-    setOpenOrders(activeOrders);
   });
+  useEffect(() => {
+    if (!selectedAccount?.id) {
+      console.warn("❌ selectedAccount chưa có id");
+      return;
+    }
 
-  return () => {
-    binanceWS.unsubscribeAccountUpdates();
-  };
-}, [selectedAccount?.id]);
+    console.log("✅ useEffect gọi subscribeAccountUpdates");
 
-useEffect(() => {
-  binanceWS.setOrderUpdateHandler(setOpenOrders);
+    binanceWS.subscribeAccountUpdates((orders) => {
+      console.log("📥 [Terminal] Received open orders in callback:", orders); // ✅ GIAI ĐOẠN 2
 
-  return () => {
-    binanceWS.setOrderUpdateHandler(null); // clear khi unmount
-  };
-}, []);
+      // ✅ Lọc chỉ những lệnh đang mở
+      const activeOrders = orders.filter(
+        (o) => o.status === "NEW" || o.status === "PARTIALLY_FILLED"
+      );
 
- 
+      // ✅ Lưu vào localStorage để giữ khi F5
+      localStorage.setItem("openOrders", JSON.stringify(activeOrders));
+      console.log("✅ Filtered activeOrders:", activeOrders);
+      // ✅ Cập nhật UI
+      setOpenOrders(activeOrders);
+    });
+
+    return () => {
+      binanceWS.unsubscribeAccountUpdates();
+    };
+  }, [selectedAccount?.id]);
+
+  useEffect(() => {
+    binanceWS.setOrderUpdateHandler(setOpenOrders);
+
+    return () => {
+      binanceWS.setOrderUpdateHandler(null); // clear khi unmount
+    };
+  }, []);
+
   return (
     <div className="h-[calc(100vh-6rem)] bg-dark-900">
       {/* Top Bar - Symbol selector and stats */}
@@ -1269,8 +1328,6 @@ useEffect(() => {
                       onSearchChange={setSearchTerm}
                       onTabChange={setActiveSymbolTab}
                     />
-
-
                   </div>
                 )}
               </div>
@@ -1283,7 +1340,9 @@ useEffect(() => {
               <span className="text-xs text-dark-400">Market:</span>
               <select
                 value={selectedMarket}
-                onChange={(e) => handleMarketChange(e.target.value as MarketType)}
+                onChange={(e) =>
+                  handleMarketChange(e.target.value as MarketType)
+                }
                 className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
               >
                 <option value="futures">FUTURES</option>
@@ -1300,17 +1359,31 @@ useEffect(() => {
                   <span className="text-lg font-bold">
                     {parseFloat(tickerData.lastPrice).toFixed(4)}
                   </span>
-                  <span className="text-xs text-dark-400">≈ ${parseFloat(tickerData.lastPrice).toFixed(2)}</span>
+                  <span className="text-xs text-dark-400">
+                    ≈ ${parseFloat(tickerData.lastPrice).toFixed(2)}
+                  </span>
                 </div>
 
                 <div className="flex flex-col">
-                  <span className={`text-sm font-medium ${parseFloat(tickerData.priceChange) >= 0 ? 'text-success-500' : 'text-danger-500'
-                    }`}>
-                    {parseFloat(tickerData.priceChange) >= 0 ? '+' : ''}{parseFloat(tickerData.priceChange).toFixed(4)}
+                  <span
+                    className={`text-sm font-medium ${
+                      parseFloat(tickerData.priceChange) >= 0
+                        ? "text-success-500"
+                        : "text-danger-500"
+                    }`}
+                  >
+                    {parseFloat(tickerData.priceChange) >= 0 ? "+" : ""}
+                    {parseFloat(tickerData.priceChange).toFixed(4)}
                   </span>
-                  <span className={`text-xs ${parseFloat(tickerData.priceChangePercent) >= 0 ? 'text-success-500' : 'text-danger-500'
-                    }`}>
-                    {parseFloat(tickerData.priceChangePercent) >= 0 ? '+' : ''}{tickerData.priceChangePercent}%
+                  <span
+                    className={`text-xs ${
+                      parseFloat(tickerData.priceChangePercent) >= 0
+                        ? "text-success-500"
+                        : "text-danger-500"
+                    }`}
+                  >
+                    {parseFloat(tickerData.priceChangePercent) >= 0 ? "+" : ""}
+                    {tickerData.priceChangePercent}%
                   </span>
                 </div>
               </>
@@ -1320,25 +1393,27 @@ useEffect(() => {
           {/* Right: Connection status and controls */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              {connectionStatus === 'connected' ? (
+              {connectionStatus === "connected" ? (
                 <Wifi className="h-4 w-4 text-success-500" />
-              ) : connectionStatus === 'connecting' ? (
+              ) : connectionStatus === "connecting" ? (
                 <div className="h-4 w-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
               ) : (
                 <WifiOff className="h-4 w-4 text-danger-500" />
               )}
-              <span className="text-xs text-dark-400 capitalize">{connectionStatus}</span>
+              <span className="text-xs text-dark-400 capitalize">
+                {connectionStatus}
+              </span>
             </div>
 
             {/* Hiển thị tài khoản Binance được chọn */}
-  <div className="flex items-center space-x-2">
-    <span className="text-xs text-dark-400">Tài khoản:</span>
-    <BinanceAccountSelector
-  onSelect={(id) => {
-    setSelectedAccount({ id }); // ✅ tạo object có field id
-  }}
-/>
-  </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-dark-400">Tài khoản:</span>
+              <BinanceAccountSelector
+                onSelect={(id) => {
+                  setSelectedAccount({ id }); // ✅ tạo object có field id
+                }}
+              />
+            </div>
 
             <div className="text-xs text-dark-400">
               Subscriptions: {subscriptions.length}
@@ -1362,19 +1437,29 @@ useEffect(() => {
           <div className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700">
             <div className="flex flex-col">
               <span className="text-dark-400">24h High</span>
-              <span className="font-medium">{parseFloat(tickerData.highPrice).toFixed(4)}</span>
+              <span className="font-medium">
+                {parseFloat(tickerData.highPrice).toFixed(4)}
+              </span>
             </div>
             <div className="flex flex-col">
               <span className="text-dark-400">24h Low</span>
-              <span className="font-medium">{parseFloat(tickerData.lowPrice).toFixed(4)}</span>
+              <span className="font-medium">
+                {parseFloat(tickerData.lowPrice).toFixed(4)}
+              </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-dark-400">24h Volume ({selectedSymbol.replace('USDT', '')})</span>
-              <span className="font-medium">{parseFloat(tickerData.volume).toLocaleString()}</span>
+              <span className="text-dark-400">
+                24h Volume ({selectedSymbol.replace("USDT", "")})
+              </span>
+              <span className="font-medium">
+                {parseFloat(tickerData.volume).toLocaleString()}
+              </span>
             </div>
             <div className="flex flex-col">
               <span className="text-dark-400">24h Volume (USDT)</span>
-              <span className="font-medium">{parseFloat(tickerData.quoteVolume).toLocaleString()}</span>
+              <span className="font-medium">
+                {parseFloat(tickerData.quoteVolume).toLocaleString()}
+              </span>
             </div>
           </div>
         )}
@@ -1389,23 +1474,30 @@ useEffect(() => {
             <div className="flex items-center justify-between p-3 border-b border-dark-700">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  {['1m', '3m', '5m', '15m', '30m', '1h', '4h', '1d'].map((interval) => (
-                    <button
-                      key={interval}
-                      onClick={() => handleIntervalChange(interval)}
-                      className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${selectedInterval === interval ? 'bg-dark-700' : ''
+                  {["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"].map(
+                    (interval) => (
+                      <button
+                        key={interval}
+                        onClick={() => handleIntervalChange(interval)}
+                        className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
+                          selectedInterval === interval ? "bg-dark-700" : ""
                         }`}
-                    >
-                      {interval}
-                    </button>
-                  ))}
+                      >
+                        {interval}
+                      </button>
+                    )
+                  )}
                 </div>
 
                 <div className="h-4 w-px bg-dark-600" />
 
                 <div className="flex items-center space-x-2">
-                  <button className="text-xs px-2 py-1 bg-dark-700 rounded hover:bg-dark-600">Candlesticks</button>
-                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">Line</button>
+                  <button className="text-xs px-2 py-1 bg-dark-700 rounded hover:bg-dark-600">
+                    Candlesticks
+                  </button>
+                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">
+                    Line
+                  </button>
                 </div>
               </div>
 
@@ -1427,17 +1519,39 @@ useEffect(() => {
               <div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
                 {klineData && (
                   <div className="space-y-1">
-                    <div>O: <span className="font-mono">{parseFloat(klineData.open || '0').toFixed(2)}</span></div>
-                    <div>H: <span className="font-mono text-success-500">{parseFloat(klineData.high || '0').toFixed(2)}</span></div>
-                    <div>L: <span className="font-mono text-danger-500">{parseFloat(klineData.low || '0').toFixed(2)}</span></div>
-                    <div>C: <span className="font-mono">{parseFloat(klineData.close || '0').toFixed(2)}</span></div>
-                    <div>V: <span className="font-mono">{parseFloat(klineData.volume || '0').toLocaleString()}</span></div>
+                    <div>
+                      O:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.open || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      H:{" "}
+                      <span className="font-mono text-success-500">
+                        {parseFloat(klineData.high || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      L:{" "}
+                      <span className="font-mono text-danger-500">
+                        {parseFloat(klineData.low || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      C:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.close || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      V:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.volume || "0").toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
-
-
-
             </div>
           </div>
         </div>
@@ -1448,7 +1562,9 @@ useEffect(() => {
             <div className="flex items-center justify-between p-3 border-b border-dark-700">
               <h3 className="text-sm font-medium">Order Book</h3>
               <div className="flex items-center space-x-2">
-                <button className="text-xs text-dark-400 hover:text-dark-200">0.01</button>
+                <button className="text-xs text-dark-400 hover:text-dark-200">
+                  0.01
+                </button>
                 <Settings className="h-3 w-3 text-dark-400" />
               </div>
             </div>
@@ -1459,31 +1575,57 @@ useEffect(() => {
                   {/* Asks */}
                   <div className="flex-1 overflow-y-auto">
                     <div className="space-y-0.5 p-2">
-                     {orderBook.asks.slice(0, 15).reverse().map((ask, index) => (
-  <div
-    key={index}
-    className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
-    onClick={() => handleClickOrderBookPrice(parseFloat(ask.price))}
-  >
-    <span className="text-danger-500 font-mono">{parseFloat(ask.price).toFixed(4)}</span>
-    <span className="text-dark-300 font-mono">{parseFloat(ask.quantity).toFixed(3)}</span>
-    <div
-      className="absolute right-0 top-0 h-full bg-danger-500/10"
-      style={{ width: `${Math.min(parseFloat(ask.quantity) / 10 * 100, 100)}%` }}
-    />
-  </div>
-))}
+                      {orderBook.asks
+                        .slice(0, 15)
+                        .reverse()
+                        .map((ask, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                            onClick={() =>
+                              handleClickOrderBookPrice(parseFloat(ask.price))
+                            }
+                          >
+                            <span className="text-danger-500 font-mono">
+                              {parseFloat(ask.price).toFixed(4)}
+                            </span>
+                            <span className="text-dark-300 font-mono">
+                              {parseFloat(ask.quantity).toFixed(3)}
+                            </span>
+                            <div
+                              className="absolute right-0 top-0 h-full bg-danger-500/10"
+                              style={{
+                                width: `${Math.min(
+                                  (parseFloat(ask.quantity) / 10) * 100,
+                                  100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        ))}
                     </div>
                   </div>
 
                   {/* Current price */}
                   <div className="px-2 py-1 border-y border-dark-700">
                     <div className="text-center">
-                      <div className={`text-sm font-bold ${tickerData && parseFloat(tickerData.priceChange) >= 0 ? 'text-success-500' : 'text-danger-500'
-                        }`}>
-                        {tickerData ? parseFloat(tickerData.lastPrice).toFixed(4) : '0.0000'}
+                      <div
+                        className={`text-sm font-bold ${
+                          tickerData && parseFloat(tickerData.priceChange) >= 0
+                            ? "text-success-500"
+                            : "text-danger-500"
+                        }`}
+                      >
+                        {tickerData
+                          ? parseFloat(tickerData.lastPrice).toFixed(4)
+                          : "0.0000"}
                       </div>
-                      <div className="text-xs text-dark-400">≈ ${tickerData ? parseFloat(tickerData.lastPrice).toFixed(2) : '0.00'}</div>
+                      <div className="text-xs text-dark-400">
+                        ≈ $
+                        {tickerData
+                          ? parseFloat(tickerData.lastPrice).toFixed(2)
+                          : "0.00"}
+                      </div>
                     </div>
                   </div>
 
@@ -1491,19 +1633,30 @@ useEffect(() => {
                   <div className="flex-1 overflow-y-auto">
                     <div className="space-y-0.5 p-2">
                       {orderBook.bids.slice(0, 15).map((bid, index) => (
-  <div
-    key={index}
-    className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
-    onClick={() => handleClickOrderBookPrice(parseFloat(bid.price))}
-  >
-    <span className="text-success-500 font-mono">{parseFloat(bid.price).toFixed(4)}</span>
-    <span className="text-dark-300 font-mono">{parseFloat(bid.quantity).toFixed(3)}</span>
-    <div
-      className="absolute right-0 top-0 h-full bg-success-500/10"
-      style={{ width: `${Math.min(parseFloat(bid.quantity) / 10 * 100, 100)}%` }}
-    />
-  </div>
-))}
+                        <div
+                          key={index}
+                          className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                          onClick={() =>
+                            handleClickOrderBookPrice(parseFloat(bid.price))
+                          }
+                        >
+                          <span className="text-success-500 font-mono">
+                            {parseFloat(bid.price).toFixed(4)}
+                          </span>
+                          <span className="text-dark-300 font-mono">
+                            {parseFloat(bid.quantity).toFixed(3)}
+                          </span>
+                          <div
+                            className="absolute right-0 top-0 h-full bg-success-500/10"
+                            style={{
+                              width: `${Math.min(
+                                (parseFloat(bid.quantity) / 10) * 100,
+                                100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1511,7 +1664,9 @@ useEffect(() => {
                 <div className="flex items-center justify-center h-full text-dark-400">
                   <div className="text-center">
                     <div className="text-sm">No order book data</div>
-                    <div className="text-xs mt-1">Waiting for WebSocket connection...</div>
+                    <div className="text-xs mt-1">
+                      Waiting for WebSocket connection...
+                    </div>
                   </div>
                 </div>
               )}
@@ -1522,15 +1677,14 @@ useEffect(() => {
         {/* Right - Trading and Recent trades */}
         <div className="w-80 bg-dark-800 border-l border-dark-700">
           <div className="h-full flex flex-col">
-           <TradingForm
-  selectedSymbol={selectedSymbol}
-  price={price}
-  internalBalance={availableBalance}
-  selectedMarket={selectedMarket as 'spot' | 'futures'}
-  
-/>
+            <TradingForm
+              selectedSymbol={selectedSymbol}
+              price={price}
+              internalBalance={availableBalance}
+              selectedMarket={selectedMarket as "spot" | "futures"}
+            />
 
-            {/* Recent trades */}
+            {/* Recent trades 
             <div className="flex-1 overflow-hidden">
               <div className="flex items-center justify-between p-3 border-b border-dark-700">
                 <h3 className="text-sm font-medium">Recent Trades</h3>
@@ -1551,7 +1705,7 @@ useEffect(() => {
                     recentTrades.map((trade, index) => (
                       <div key={trade.id || index} className="px-3 py-1 hover:bg-dark-700/50">
                         <div className="grid grid-cols-3 gap-2 text-xs">
-                          {/* Giá */}
+                          
                           <span className={`font-mono ${trade.isBuyerMaker ? 'text-danger-500' : 'text-success-500'
                             }`}>
                             {trade.price && !isNaN(Number(trade.price))
@@ -1559,14 +1713,14 @@ useEffect(() => {
                               : '0.0000'}
                           </span>
 
-                          {/* Số lượng */}
+                          
                           <span className="text-right font-mono text-dark-300">
                             {trade.qty && !isNaN(Number(trade.qty))
                               ? parseFloat(trade.qty).toFixed(3)
                               : '0.000'}
                           </span>
 
-                          {/* Thời gian */}
+                          
                           <span className="text-right text-dark-400">
                             {trade.time && !isNaN(Number(trade.time))
                               ? new Date(Number(trade.time)).toLocaleTimeString('en-US', {
@@ -1589,7 +1743,7 @@ useEffect(() => {
 
                 </div>
               </div>
-            </div>
+            </div>*/}
           </div>
         </div>
       </div>
@@ -1599,18 +1753,18 @@ useEffect(() => {
         <div className="flex h-full">
           {/* Open Orders */}
           <OpenOrders
-  selectedSymbol={selectedSymbol}
-  openOrders={openOrders}
-  showCancelAllConfirm={showCancelAllConfirm}
-  setShowCancelAllConfirm={setShowCancelAllConfirm}
-  handleCancelAllOrders={handleCancelAllOrders}
-  openOrdersCount={openOrders.length}
-/>
+            selectedSymbol={selectedSymbol}
+            openOrders={openOrders}
+            showCancelAllConfirm={showCancelAllConfirm}
+            setShowCancelAllConfirm={setShowCancelAllConfirm}
+            handleCancelAllOrders={handleCancelAllOrders}
+            openOrdersCount={openOrders.length}
+          />
 
-          {/* Order History */}
-          <OrderOpenHistory />
+          {/* Order History 
+          <OrderOpenHistory />*/}
 
-          {/* WebSocket Subscriptions */}
+          {/* WebSocket Subscriptions 
           <div className="w-80">
             <div className="flex items-center justify-between p-3 border-b border-dark-700">
               <h3 className="text-sm font-medium">Active Streams</h3>
@@ -1638,7 +1792,7 @@ useEffect(() => {
                 ))}
               </div>
             </div>
-          </div>
+          </div>*/}
         </div>
       </div>
     </div>

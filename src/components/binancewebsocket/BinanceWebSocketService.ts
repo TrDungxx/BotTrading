@@ -30,63 +30,74 @@ setOrderUpdateHandler(handler: ((orders: any[]) => void) | null) {
     };
 
     this.socket.onmessage = (event) => {
-  console.log('📥 RAW WS MSG:', event.data);
+      console.log('📥 RAW WS MSG:', event.data);
+      try {
+        const data = JSON.parse(event.data);
+        console.log('📥 WS Parsed:', data);
 
-  try {
-    const data = JSON.parse(event.data);
-    console.log('📥 WS Parsed:', data);
+        if (data.e === 'ORDER_TRADE_UPDATE' && data.o && this.orderUpdateHandler) {
+  const o = data.o;
 
-    // ✅ Dữ liệu từ Binance chuẩn
-    if (data.e === 'ORDER_TRADE_UPDATE' && data.o && this.orderUpdateHandler) {
-      const o = data.o;
+  const order = {
+    orderId: o.i,
+    symbol: o.s,
+    side: o.S,
+    type: o.o,
+    price: o.p,
+    origQty: o.q,
+    status: o.X,
+  };
 
-      const order = {
-        orderId: o.i,        // orderId
-        symbol: o.s,         // symbol
-        side: o.S,           // BUY / SELL
-        type: o.o,           // MARKET / LIMIT ...
-        price: o.p,          // giá đặt
-        origQty: o.q,        // số lượng đặt
-        status: o.X,         // NEW, FILLED, CANCELED...
-      };
+  let currentOrders: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
 
-      // 🔍 Lấy danh sách openOrders từ localStorage
-      let currentOrders: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
-
-      // 🧹 Nếu lệnh đã FILLED, CANCELED, REJECTED → xoá
-      if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
-        currentOrders = currentOrders.filter((o) => o.orderId !== order.orderId);
-      } else {
-        // ➕ Nếu là NEW hoặc PARTIALLY_FILLED → thêm hoặc cập nhật
-        const idx = currentOrders.findIndex((o) => o.orderId === order.orderId);
-        if (idx !== -1) {
-          currentOrders[idx] = order;
-        } else {
-          currentOrders.push(order);
-        }
-      }
-
-      // 💾 Lưu lại và cập nhật UI
-      console.log('📦 Final openOrders:', currentOrders);
-      localStorage.setItem('openOrders', JSON.stringify(currentOrders));
-      this.orderUpdateHandler(currentOrders);
+  // 🧠 Tự huỷ lệnh TP/SL đối ứng nếu một trong hai đã khớp
+  if (['TAKE_PROFIT_MARKET', 'STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
+    const oppositeType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
+    const opposite = currentOrders.find(
+      (o) => o.symbol === order.symbol && o.type === oppositeType && o.status === 'NEW'
+    );
+    if (opposite) {
+      console.log('🤖 Huỷ lệnh đối ứng TP/SL:', oppositeType, 'orderId:', opposite.orderId);
+      this.send({
+        action: 'cancelOrder',
+        symbol: order.symbol,
+        orderId: opposite.orderId,
+        market: 'futures',
+      });
     }
-
-    // ✅ Trường hợp định dạng riêng của server bạn
-    if (data.type === 'update' && data.channel === 'account') {
-      if (data.orders && this.orderUpdateHandler) {
-        console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
-        localStorage.setItem('openOrders', JSON.stringify(data.orders));
-        this.orderUpdateHandler(data.orders);
-      }
-    }
-
-    // ✅ Gửi toàn bộ message cho handler khác (balances, v.v.)
-    this.messageHandlers.forEach((h) => h(data));
-  } catch (error) {
-    console.error('❌ WS parse error:', error);
   }
-};
+
+  // 🧹 Cập nhật local openOrders
+  if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
+    currentOrders = currentOrders.filter((o) => o.orderId !== order.orderId);
+  } else {
+    const idx = currentOrders.findIndex((o) => o.orderId === order.orderId);
+    if (idx !== -1) {
+      currentOrders[idx] = order;
+    } else {
+      currentOrders.push(order);
+    }
+  }
+
+  console.log('📦 Final openOrders:', currentOrders);
+  localStorage.setItem('openOrders', JSON.stringify(currentOrders));
+  this.orderUpdateHandler(currentOrders);
+}
+        
+
+        if (data.type === 'update' && data.channel === 'account') {
+          if (data.orders && this.orderUpdateHandler) {
+            console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
+            localStorage.setItem('openOrders', JSON.stringify(data.orders));
+            this.orderUpdateHandler(data.orders);
+          }
+        }
+
+        this.messageHandlers.forEach((h) => h(data));
+      } catch (error) {
+        console.error('❌ WS parse error:', error);
+      }
+    };
 
 
 
