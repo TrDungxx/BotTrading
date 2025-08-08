@@ -19,6 +19,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
+import TradingBinance from "../components/common/TradingBinance";
 import { FormattedMessage, FormattedNumber } from "react-intl";
 import TradingViewChart from "../components/common/TradingViewChart";
 import { CandlestickData } from "lightweight-charts";
@@ -33,16 +34,17 @@ import { binanceWS } from "../components/binancewebsocket/BinanceWebSocketServic
 import { toast } from "react-toastify";
 import { AlertTriangle } from "lucide-react";
 import OrderOpenHistory from "../components/orderlayout/OrderOpenHistory";
-import OpenOrders from "../components/orderlayout/OpenOrders";
+import SettingControl from "../components/common/controlsetting/SetiingControl";
 import { BinanceAccount } from "../utils/types";
 import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
 import { useAuth } from "../context/AuthContext";
 import { User } from "../utils/types";
+import PositionFunction from "../components/common/PositionFunction";
 // WebSocket connection status
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 // Market types
-type MarketType = "spot" | "futures" | "delivery";
+type MarketType = "spot" | "futures" ;
 
 // Market data interfaces
 interface KlineData {
@@ -175,6 +177,19 @@ interface SymbolItem {
   price: number;
   percentChange: number;
   volume: number;
+}
+
+interface Position {
+  symbol: string;
+  positionSide: string;
+  positionAmt: string; // Giá trị là chuỗi số, ví dụ: '0'
+}
+interface Order {
+  orderId: number;
+  symbol: string;
+  status: string;
+  positionSide: 'LONG' | 'SHORT' | 'BOTH';
+  // bổ sung các field như quantity, price, type... nếu cần
 }
 // Custom WebSocket service for your server
 class CustomWebSocketService {
@@ -815,7 +830,13 @@ class CustomWebSocketService {
 
 export default function TradingTerminal() {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
-
+const [positions, setPositions] = useState<PositionData[]>([]);
+const [currentOrders, setCurrentOrders] = useState<Order[]>(() => {
+  const stored = localStorage.getItem('openOrders');
+  return stored ? JSON.parse(stored) : [];
+});
+const [showSettings, setShowSettings] = useState(false);
+const settingRef = useRef<HTMLDivElement>(null);
   const [orderHistory, setOrderHistory] = useState<Order[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
     null
@@ -839,8 +860,10 @@ export default function TradingTerminal() {
   const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
 
   // State management
-  const [selectedSymbol, setSelectedSymbol] = useState("BTCUSDT");
-  const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+  return localStorage.getItem('selectedSymbol') || 'BTCUSDT';
+});
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>('futures');
 
   const [selectedInterval, setSelectedInterval] = useState("1m");
   const [connectionStatus, setConnectionStatus] =
@@ -872,14 +895,132 @@ export default function TradingTerminal() {
   const [amount, setAmount] = useState("");
   const [total, setTotal] = useState("");
   // market
+  
   const { user } = useAuth() as { user: User };
   const binanceAccountId = user?.internalAccountId;
-  useEffect(() => {
-    const cachedOrders = JSON.parse(localStorage.getItem("openOrders") || "[]");
-    if (cachedOrders.length > 0) {
-      setOpenOrders(cachedOrders);
+
+
+
+  // lưu local symboldropdown
+useEffect(() => {
+  if (selectedSymbol) {
+    localStorage.setItem('selectedSymbol', selectedSymbol);
+  }
+}, [selectedSymbol]);
+
+
+
+const updateCurrentOrders = (orders: Order[]) => {
+  setOpenOrders(orders);
+  localStorage.setItem('openOrders', JSON.stringify(orders));
+};
+ const handleOrderUpdate = (order: Order, updatedPositions: Position[] = []) => {
+  const isFilled = order.status === 'FILLED';
+
+  // Tìm position hiện tại sau lệnh FILLED
+  const matchingPos = updatedPositions.find(
+    (p) => p.symbol === order.symbol && p.positionSide === order.positionSide
+  );
+
+  const isPositionClosed = matchingPos?.positionAmt === '0';
+
+  if (isFilled && isPositionClosed) {
+    // Đây là lệnh ĐÓNG vị thế → xoá khỏi localStorage
+    const updated = openOrders.filter(
+      (o) =>
+        o.symbol !== order.symbol || o.positionSide !== order.positionSide
+    );
+    updateCurrentOrders(updated);
+  } else {
+    // Lệnh MỞ hoặc cập nhật lệnh
+    const idx = openOrders.findIndex((o) => o.orderId === order.orderId);
+    const updated = [...openOrders];
+    if (idx !== -1) {
+      updated[idx] = order;
+    } else {
+      updated.push(order);
     }
+    updateCurrentOrders(updated);
+  }
+};
+
+binanceWS.setPositionUpdateHandler((positions) => {
+  localStorage.setItem('positions', JSON.stringify(positions));
+});
+// Ẩn khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingRef.current && !settingRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+useEffect(() => {
+  binanceWS.setOrderUpdateHandler((order: any) => {
+    const status = order.status;
+
+    // Cập nhật openOrders state
+    if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(status)) {
+      setOpenOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
+    } else {
+      setOpenOrders((prev) => {
+        const idx = prev.findIndex((o) => o.orderId === order.orderId);
+        if (idx !== -1) {
+          const updated = [...prev];
+          updated[idx] = order;
+          return updated;
+        }
+        return [...prev, order];
+      });
+    }
+
+    // Nếu là FILLED thì cập nhật positions
+    if (status === 'FILLED') {
+      setPositions((prev) => prev.filter((p) => p.symbol !== order.symbol));
+    }
+  });
+}, []);
+
+
+  // ✅ Sau đó sử dụng bên trong WebSocket onMessage
+  useEffect(() => {
+    const handler = (msg: any) => {
+      if (msg.e === 'ORDER_TRADE_UPDATE') {
+        handleOrderUpdate(msg.o);
+      }
+    };
+
+    binanceWS.onMessage(handler);
+    return () => binanceWS.removeMessageHandler(handler);
+  }, []);
+
+
+useEffect(() => {
+  if (!selectedAccount?.id) {
+    console.log("❌ selectedAccount chưa có id, chưa gửi getPositions");
+    return;
+  }
+  console.log("📤 Gửi getPositions cho account:", selectedAccount.id);
+  binanceWS.send({ action: "getPositions", binanceAccountId: selectedAccount.id });
+
+  const handler = (msg: any) => {
+    console.log("📥 WS nhận msg:", msg);
+    if (msg.type === "positions") {
+      const activePositions = msg.data?.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+      console.log("✅ Nhận được positions:", activePositions);
+      setPositions(activePositions);
+    }
+  };
+
+  binanceWS.onMessage(handler);
+
+  return () => {
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccount?.id]);
 
   useEffect(() => {
     console.log("🌀 Market changed:", selectedMarket);
@@ -891,11 +1032,11 @@ export default function TradingTerminal() {
     }
 
     if (selectedMarket === "futures") {
-      console.log("📩 Gửi lệnh getMyAccountFutureInfo");
-      binanceWS.send({ action: "getMyAccountFutureInfo", binanceAccountId });
+      console.log("📩 Gửi lệnh getFuturesAccount");
+      binanceWS.send({ action: "getFuturesAccount", binanceAccountId });
     } else if (selectedMarket === "spot") {
-      console.log("📩 Gửi lệnh getMyAccountSpotInfo");
-      binanceWS.send({ action: "getMyAccountSpotInfo", binanceAccountId });
+      console.log("📩 Gửi lệnh getSpotAccount");
+      binanceWS.send({ action: "getSpotAccount", binanceAccountId });
     }
   }, [selectedMarket, binanceAccountId]);
 
@@ -1105,9 +1246,17 @@ export default function TradingTerminal() {
   };
 
   const handleMarketChange = (newMarket: MarketType) => {
-    setSelectedMarket(newMarket);
-  };
-
+  setSelectedMarket(newMarket);
+  localStorage.setItem('selectedMarket', newMarket);
+  // Optional: Gửi thêm lệnh getBalances hoặc logging
+  console.log("✅ Market selected:", newMarket);
+};
+useEffect(() => {
+  const savedMarket = localStorage.getItem('selectedMarket');
+  if (savedMarket === 'spot' || savedMarket === 'futures') {
+    setSelectedMarket(savedMarket as MarketType);
+  }
+}, []);
   const handleIntervalChange = (newInterval: string) => {
     setSelectedInterval(newInterval);
   };
@@ -1246,33 +1395,80 @@ export default function TradingTerminal() {
       }
     );
   });
-  useEffect(() => {
-    if (!selectedAccount?.id) {
-      console.warn("❌ selectedAccount chưa có id");
-      return;
+ useEffect(() => {
+  if (!selectedAccount?.id) return;
+
+  const payload = {
+    action: "subscribeAccountUpdates",
+    types: ["balance", "positions", "orders"],
+  };
+
+  console.log("📤 WS Sending: subscribeAccountUpdates →", payload);
+  binanceWS.send(payload);
+
+  const handler = (msg: any) => {
+    if (msg.type === "positions") {
+      const active = msg.data?.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+      console.log("✅ Nhận được positions:", active);
+      setOpenOrders(active);
     }
+  };
 
-    console.log("✅ useEffect gọi subscribeAccountUpdates");
+  binanceWS.onMessage(handler);
 
-    binanceWS.subscribeAccountUpdates((orders) => {
-      console.log("📥 [Terminal] Received open orders in callback:", orders); // ✅ GIAI ĐOẠN 2
+  return () => {
+    console.log("📤 WS Unsubscribing (cleanup)");
+    binanceWS.send({ action: "unsubscribeAccountUpdates" }); // optional
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccount?.id]);
 
-      // ✅ Lọc chỉ những lệnh đang mở
-      const activeOrders = orders.filter(
-        (o) => o.status === "NEW" || o.status === "PARTIALLY_FILLED"
+
+useEffect(() => {
+  const handler = (msg: any) => {
+    // ✅ Gửi log ra console kiểm tra
+    console.log("📥 WS MSG RECEIVED:", msg);
+
+    if (msg.type === "positions") {
+      const active = msg.data?.filter(
+        (p: any) => parseFloat(p.positionAmt) !== 0
       );
+      console.log("✅ Nhận được positions:", active);
+      setOpenOrders(active); // hoặc rename lại là setOpenPositions nếu bạn muốn rõ ràng hơn
+    }
+  };
 
-      // ✅ Lưu vào localStorage để giữ khi F5
-      localStorage.setItem("openOrders", JSON.stringify(activeOrders));
-      console.log("✅ Filtered activeOrders:", activeOrders);
-      // ✅ Cập nhật UI
-      setOpenOrders(activeOrders);
-    });
+  binanceWS.onMessage(handler);
 
-    return () => {
-      binanceWS.unsubscribeAccountUpdates();
-    };
-  }, [selectedAccount?.id]);
+  return () => {
+    binanceWS.removeMessageHandler(handler);
+  };
+}, []);
+
+useEffect(() => {
+  if (!selectedAccount?.id) return;
+
+  binanceWS.send({ action: "getPositions" }); // 🔥 Gọi thủ công 1 lần
+
+  const handler = (msg: any) => {
+    if (msg.type === "positions") {
+      const active = msg.data?.filter(
+        (p: any) => parseFloat(p.positionAmt) !== 0
+      );
+      console.log("✅ Nhận được positions:", active);
+      setOpenOrders(active);
+    }
+    if (msg.type === 'subscribeAccountUpdates') {
+    console.log("✅ Đã được xác nhận sub từ BE:", msg);
+  }
+  };
+
+  binanceWS.onMessage(handler);
+
+  return () => {
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccount?.id]);
 
   useEffect(() => {
     binanceWS.setOrderUpdateHandler(setOpenOrders);
@@ -1281,6 +1477,38 @@ export default function TradingTerminal() {
       binanceWS.setOrderUpdateHandler(null); // clear khi unmount
     };
   }, []);
+useEffect(() => {
+  const savedId = localStorage.getItem('selectedBinanceAccountId');
+  const parsedId = savedId ? parseInt(savedId) : null;
+
+  if (!parsedId) return;
+
+  const delaySend = () => {
+    console.log("🔁 Khôi phục account từ localStorage:", parsedId);
+    binanceWS.setCurrentAccountId(parsedId);
+    binanceWS.send({ action: "selectBinanceAccount", binanceAccountId: parsedId });
+    binanceWS.send({ action: "getMultiAssetsMode" });
+
+    setSelectedAccount({ id: parsedId }); // set tạm để tiếp tục flow các useEffect phụ thuộc
+  };
+
+  // ⏳ Delay 300ms để chắc chắn WebSocket đã sẵn sàng
+  const timer = setTimeout(() => {
+    if (binanceWS.isConnected()) {
+      delaySend();
+    } else {
+      // Nếu chưa sẵn sàng, đợi 1 chút nữa
+      const waitInterval = setInterval(() => {
+        if (binanceWS.isConnected()) {
+          clearInterval(waitInterval);
+          delaySend();
+        }
+      }, 200);
+    }
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, []);
 
   return (
     <div className="h-[calc(100vh-6rem)] bg-dark-900">
@@ -1337,20 +1565,18 @@ export default function TradingTerminal() {
 
             {/* Market selector */}
             <div className="flex items-center space-x-2">
-              <span className="text-xs text-dark-400">Market:</span>
-              <select
-                value={selectedMarket}
-                onChange={(e) =>
-                  handleMarketChange(e.target.value as MarketType)
-                }
-                className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
-              >
-                <option value="futures">FUTURES</option>
-                <option value="spot">SPOT</option>
-
-                <option value="delivery">DELIVERY</option>
-              </select>
-            </div>
+  <span className="text-xs text-dark-400">Market:</span>
+  <select
+    value={selectedMarket}
+    onChange={(e) =>
+      handleMarketChange(e.target.value as 'spot' | 'futures')
+    }
+    className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
+  >
+    <option value="futures">FUTURES</option>
+    <option value="spot">SPOT</option>
+  </select>
+</div>
 
             {/* Price display - will show when data is available */}
             {tickerData && (
@@ -1489,16 +1715,30 @@ export default function TradingTerminal() {
                   )}
                 </div>
 
-                <div className="h-4 w-px bg-dark-600" />
+                
 
-                <div className="flex items-center space-x-2">
-                  <button className="text-xs px-2 py-1 bg-dark-700 rounded hover:bg-dark-600">
-                    Candlesticks
-                  </button>
-                  <button className="text-xs px-2 py-1 hover:bg-dark-700 rounded">
-                    Line
-                  </button>
-                </div>
+                 <div className="relative" ref={settingRef}>
+      <div className="flex items-center gap-2">
+        <button className="btn">Candlesticks</button>
+        <button className="btn">Line</button>
+
+        <button
+          className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+          title="Cài đặt biểu đồ"
+          onClick={() => setShowSettings((prev) => !prev)}
+        >
+          <Settings size={18} />
+        </button>
+      </div>
+
+      {/* Popup hiển thị ngay dưới nút ⚙ */}
+      {showSettings && (
+        <div className="absolute right-0 mt-2 z-50">
+          <SettingControl />
+        </div>
+      )}
+    </div>
+                
               </div>
 
               <div className="flex items-center space-x-2">
@@ -1512,8 +1752,18 @@ export default function TradingTerminal() {
             </div>
 
             {/* Chart area */}
-            <div className="flex-1 relative">
-              <TradingViewChart data={candles} />
+            <div className="flex-1 relative h-[calc(100vh-10rem)]">
+              
+  {/* Wrapper chart giữ đúng 100% height */}
+  <div className="flex-1 min-h-0">
+  <TradingBinance
+    selectedSymbol={selectedSymbol}
+    selectedInterval={selectedInterval}
+    market={selectedMarket}
+  />
+  
+</div>
+
 
               {/* Chart overlay info */}
               <div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
@@ -1681,7 +1931,7 @@ export default function TradingTerminal() {
               selectedSymbol={selectedSymbol}
               price={price}
               internalBalance={availableBalance}
-              selectedMarket={selectedMarket as "spot" | "futures"}
+              selectedMarket={selectedMarket}
             />
 
             {/* Recent trades 
@@ -1749,17 +1999,15 @@ export default function TradingTerminal() {
       </div>
 
       {/* Bottom panel - Open orders and WebSocket info */}
-      <div className="h-40 border-t border-dark-700 bg-dark-800">
+      <div className="h-[25rem] border-t border-dark-700 bg-dark-800">
         <div className="flex h-full">
-          {/* Open Orders */}
-          <OpenOrders
-            selectedSymbol={selectedSymbol}
-            openOrders={openOrders}
-            showCancelAllConfirm={showCancelAllConfirm}
-            setShowCancelAllConfirm={setShowCancelAllConfirm}
-            handleCancelAllOrders={handleCancelAllOrders}
-            openOrdersCount={openOrders.length}
-          />
+          {/* PositionFunction */}
+          <PositionFunction
+  market={selectedMarket}
+  selectedSymbol={selectedSymbol}
+  orderBook={orderBook}
+  positions={positions}
+/>
 
           {/* Order History 
           <OrderOpenHistory />*/}

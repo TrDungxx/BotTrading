@@ -4,7 +4,7 @@ import MarginModeModal from '../modeltrading/MarginModeModal';
 import LeverageModal from '../modeltrading/LeverageModal';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import { binanceAccountApi } from '../../utils/api';
-import PositionModeModal from '../formtrading/PositionModeModal';
+import MultiAssetsModeModal from '../formtrading/MultiAssetsModeModal';
 import TpSlModal from '../formtrading/TpSlModal';
 import { ExternalLink } from 'lucide-react';
 interface Props {
@@ -23,11 +23,12 @@ interface BinanceAccount {
 const TradingForm: React.FC<Props> = ({ selectedSymbol, price }) => {
   const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
-  const [isPositionModeOpen, setIsPositionModeOpen] = useState(false);
+  const [isMultiAssetsOpen, setIsMultiAssetsOpen] = useState(false);
   const [isTpSlModalOpen, setIsTpSlModalOpen] = useState(false);
   const [tpSlSide, setTpSlSide] = useState<'buy' | 'sell'>('buy');
   const [tpSl, setTpSl] = useState(false);
   const [tpSlOrders, setTpSlOrders] = useState<any[]>([]); // ✅ Thêm preview TP/SL
+const [isMultiAssetsMode, setIsMultiAssetsMode] = useState<boolean>(false);
 
   const [isPriceOverridden, setIsPriceOverridden] = useState(false);
   const [tradeSide, setTradeSide] = useState<'buy' | 'sell'>('buy');
@@ -41,7 +42,7 @@ const TradingForm: React.FC<Props> = ({ selectedSymbol, price }) => {
   const [isLeverageOpen, setIsLeverageOpen] = useState(false);
   const [marginMode, setMarginMode] = useState<'cross' | 'isolated'>('cross');
   const [leverage, setLeverage] = useState(2);
-  const [dualSidePosition, setDualSidePosition] = useState<boolean | null>(null);
+  const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<'spot' | 'futures'>('futures');
   const [internalBalance, setInternalBalance] = useState<number>(0);
 const [tpSlValues, setTpSlValues] = useState({
@@ -55,41 +56,44 @@ const [tpSlValues, setTpSlValues] = useState({
 
   // ============================ USE EFFECTS ===============================
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
+  const token = localStorage.getItem('authToken');
+  if (!token) return;
 
-    binanceWS.connect(token, (msg) => {
-      if (msg.type === 'authenticated') {
+  binanceWS.connect(token, (msg) => {
+    switch (msg.type) {
+      case 'authenticated':
         binanceWS.getMyBinanceAccounts();
-        binanceWS.send({ action: 'getPositionMode' });
-      }
+        break;
 
-      if (msg.type === 'getPositionMode') {
-        setDualSidePosition(msg.dualSidePosition);
-      }
+      case 'changeMultiAssetsMode':
+  setMultiAssetsMode(msg.multiAssetsMargin);
+        break;
 
-      if (msg.type === 'changePositionMode') {
-        setDualSidePosition(msg.dualSidePosition);
-      }
-
-      if (msg.type === 'myBinanceAccounts') {
+      case 'myBinanceAccounts': {
         const firstAccount = msg.data?.accounts?.[0];
         if (firstAccount?.id) {
           binanceWS.selectAccount(firstAccount.id);
           setSelectedAccountId(firstAccount.id);
         }
+        break;
       }
 
-      if (msg.type === 'futuresDataLoaded') {
+      case 'futuresDataLoaded': {
         const usdt = msg.data?.balances?.find((b: any) => b.asset === 'USDT');
         if (usdt) {
           setInternalBalance(parseFloat(usdt.availableBalance || '0'));
         }
+        break;
       }
-    });
-  }, []);
 
-  useEffect(() => {
+      default:
+        break;
+    }
+  });
+}, []);
+
+
+   useEffect(() => {
     binanceAccountApi.getMyAccounts()
       .then((res) => {
         const accounts = (res?.Data?.accounts ?? []) as BinanceAccount[];
@@ -99,13 +103,22 @@ const [tpSlValues, setTpSlValues] = useState({
   }, []);
 
   useEffect(() => {
-    if (selectedAccountId) {
-      binanceWS.send({
-        action: 'selectBinanceAccount',
-        binanceAccountId: selectedAccountId,
-        market: selectedMarket,
-      });
-    }
+    if (!selectedAccountId) return;
+    binanceWS.send({
+      action: 'selectBinanceAccount',
+      binanceAccountId: selectedAccountId,
+      market: selectedMarket,
+    });
+
+    binanceWS.send({ action: 'getMultiAssetsMode' });
+
+    const modeCheckHandler = (msg: any) => {
+      if (msg.type === 'getMultiAssetsMode') {
+        setMultiAssetsMode(msg.multiAssetsMargin);
+        binanceWS.removeMessageHandler(modeCheckHandler);
+      }
+    };
+    binanceWS.onMessage(modeCheckHandler);
   }, [selectedAccountId, selectedSymbol]);
 
   useEffect(() => {
@@ -149,27 +162,44 @@ const [tpSlValues, setTpSlValues] = useState({
     });
   }, []);
 // ============================ HANDLE MODE SWITCH ===============================
-  const handleChangeMode = () => {
-    binanceWS.send({ action: 'getPositions' });
+  const handleChangeMode = (newMode: boolean) => {
+  // Gửi lệnh lên WebSocket đổi chế độ
+  binanceWS.send({
+    action: 'changeMultiAssetsMode',
+    multiAssetsMargin: newMode,
+  });
+  binanceWS.send({
+    action: 'changePositionMode',
+    dualSidePosition: newMode, // true: HEDGE, false: ONE_WAY
+  });
+  setTimeout(() => {
+    binanceWS.send({ action: 'getPositionMode' });
+  }, 500); // delay nhẹ 500ms
 
-    setTimeout(() => {
-      const positions = JSON.parse(localStorage.getItem('positions') || '[]');
-      const hasOpenPosition = positions.some((p: any) => parseFloat(p.positionAmt) !== 0);
+  // ❌ KHÔNG setMultiAssetsMode ở đây
+  // ✅ Chờ WebSocket gửi lại phản hồi 'multiAssetsMargin'
+};
 
-      const openOrders = JSON.parse(localStorage.getItem('openOrders') || '[]');
-      const hasPendingOrders = openOrders.length > 0;
-
-      if (hasOpenPosition || hasPendingOrders) {
-        alert('❌ Không thể đổi chế độ khi đang có vị thế hoặc lệnh chờ.');
-        return;
-      }
-
-      binanceWS.send({
-        action: 'changePositionMode',
-        dualSidePosition: !dualSidePosition,
-      });
-    }, 100);
+useEffect(() => {
+  const handler = (msg: any) => {
+    if (typeof msg?.multiAssetsMargin === 'boolean') {
+      console.log('[WS] Nhận được multiAssetsMargin cập nhật: ', msg.multiAssetsMargin);
+      setMultiAssetsMode(msg.multiAssetsMargin);
+      if (selectedAccountId)
+        localStorage.setItem(
+          `multiAssetsMode_${selectedAccountId}`,
+          String(msg.multiAssetsMargin)
+        );
+    }
   };
+
+  binanceWS.onMessage(handler);
+  return () => {
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccountId]);
+
+
   // ============================ ORDER ===============================
   const placeOrder = () => {
     if (!amount) return alert('Vui lòng nhập số lượng');
@@ -182,13 +212,21 @@ const [tpSlValues, setTpSlValues] = useState({
       symbol: selectedSymbol,
       side: tradeSide.toUpperCase(),
       quantity: parseFloat(amount),
-      market,
+      market: selectedMarket,
     };
 
-    if (market === 'futures') {
-      basePayload.positionSide = positionSide;
-      basePayload.reduceOnly = !!reduceOnly;
-    }
+   if (selectedMarket === 'futures') {
+  basePayload.reduceOnly = !!reduceOnly;
+
+  // Gán positionSide theo chế độ hiện tại
+  if (multiAssetsMode) {
+    // ✅ HEDGE mode
+    basePayload.positionSide = tradeSide === 'buy' ? 'LONG' : 'SHORT';
+  } else {
+    // ✅ ONE-WAY mode
+    basePayload.positionSide = 'BOTH'; // hoặc có thể bỏ hẳn dòng này nếu bạn muốn Binance tự hiểu
+  }
+}
 
     if (orderType === 'limit') {
       if (!priceValue) return alert('Vui lòng nhập giá limit');
@@ -213,7 +251,7 @@ const [tpSlValues, setTpSlValues] = useState({
 
       const payload = {
         action: 'placeOrder',
-        market,
+        market: selectedMarket,
         symbol: selectedSymbol,
         side,
         type: o.type,
@@ -229,25 +267,30 @@ const [tpSlValues, setTpSlValues] = useState({
     setTpSlOrders([]); // reset sau khi gửi
   };
 
-  const handleClosePosition = () => {
-  if (!amount || parseFloat(amount) === 0) return alert('Nhập số lượng để đóng vị thế');
-  const side = tradeSide === 'buy' ? 'SELL' : 'BUY';
-  const positionSide = tradeSide === 'buy' ? 'LONG' : 'SHORT';
+  //const handleClosePosition = () => {
+  //if (!amount || parseFloat(amount) === 0) return alert('Nhập số lượng để đóng vị thế');
+  
+ // const side = tradeSide === 'buy' ? 'SELL' : 'BUY';
+ // const positionSide = tradeSide === 'buy' ? 'LONG' : 'SHORT';
 
-  const orderPayload = {
-    action: 'placeOrder',
-    symbol: selectedSymbol,
-    side,
-    type: 'MARKET',
-    quantity: parseFloat(amount),
-    market: 'futures',
-    positionSide,
-    reduceOnly: true,
-  };
+ // const orderPayload: any = {
+    //action: 'placeOrder',
+   // symbol: selectedSymbol,
+   // side,
+    //type: 'MARKET',
+   // quantity: parseFloat(amount),
+    //market: selectedMarket, // ✅ dùng giá trị người dùng chọn
+//  };
 
-  console.log('📤 Gửi lệnh đóng vị thế:', orderPayload);
-  binanceWS.send(orderPayload);
-};
+  // ✅ Chỉ gửi reduceOnly + positionSide nếu là FUTURES
+  //if (selectedMarket === 'futures') {
+    
+    //orderPayload.positionSide = positionSide;
+ // }
+
+  //console.log('📤 Gửi lệnh đóng vị thế:', orderPayload);
+//  binanceWS.send(orderPayload);
+//};
 
 
  
@@ -272,40 +315,31 @@ const [tpSlValues, setTpSlValues] = useState({
     {leverage}x
   </button>
 
-  {/* Nút chuyển đổi chế độ One-way / Hedge */}
-  <button
+  {/* Nút để mở modal */}
+<button
+  onClick={() => setIsMultiAssetsOpen(true)}
   className={`text-xs px-2 py-1 rounded ${
-    dualSidePosition ? 'bg-warning-700' : 'bg-dark-700'
+    multiAssetsMode ? 'bg-warning-700' : 'bg-dark-700'
   } hover:ring-1 ring-primary-500`}
-  onClick={() => setIsPositionModeOpen(true)}
-  title={dualSidePosition ? 'Chế độ Hedge (S)' : 'Chế độ One-way (M)'}
+  title={
+    multiAssetsMode
+      ? 'Chế độ Hedge (M): cho phép mở song song Long & Short'
+      : 'Chế độ One-way (S): chỉ cho phép 1 chiều lệnh'
+  }
 >
-  {dualSidePosition ? 'S' : 'M'}
+  {multiAssetsMode ? 'M' : 'S'}
 </button>
 
-  {/* Hiển thị trạng thái hiện tại: M hoặc S */}
-  {dualSidePosition !== null && (
-    <span
-      className={`text-xs px-2 py-1 rounded ${
-        dualSidePosition ? 'bg-warning-700' : 'bg-dark-700'
-      }`}
-      title={
-        dualSidePosition
-          ? 'Chế độ Hedge (S): cho phép mở song song Long & Short'
-          : 'Chế độ One-way (M): chỉ cho phép 1 chiều lệnh'
-      }
-    >
-      {dualSidePosition ? 'S' : 'M'}
-    </span>
-  )}
-  <PositionModeModal
-        isOpen={isPositionModeOpen}
-        onClose={() => setIsPositionModeOpen(false)}
-        dualSidePosition={!!dualSidePosition}
-        onChangeMode={handleChangeMode}
-      />
+{/* Modal để thao tác đổi chế độ */}
+<MultiAssetsModeModal
+  isOpen={isMultiAssetsOpen}
+  onClose={() => setIsMultiAssetsOpen(false)}
+  multiAssetsMargin={multiAssetsMode ?? false}
+  onChangeMode={(newMode) => {
+    handleChangeMode(newMode); // chỉ gửi WS command đổi chế độ
+  }}
+/>
 </div>
-
 
       {/* Tabs */}
       <div className="flex space-x-2 text-sm">
@@ -534,9 +568,9 @@ const [tpSlValues, setTpSlValues] = useState({
       >
         Đặt lệnh {tradeSide === 'buy' ? 'MUA / LONG' : 'BÁN / SHORT'}
       </button>
-      <button className="btn btn-outline w-full" onClick={() => handleClosePosition()}>
+     {/* <button className="btn btn-outline w-full" onClick={() => handleClosePosition()}>
         Đóng vị thế (Close Position)
-      </button>
+      </button>*/}
 
       {/* Các modal */}
       <MarginModeModal

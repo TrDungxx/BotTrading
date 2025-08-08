@@ -365,3 +365,195 @@ else {
 }
 
 export const binanceWS = new BinanceWebSocketService();
+
+
+import React, { useEffect, useState } from "react";
+import { binancePublicWS } from "../binancewebsocket/binancePublicWS";
+import { binanceWS } from "../binancewebsocket/BinanceWebSocketService";
+interface PositionData {
+  symbol: string;
+  positionAmt: string;
+  entryPrice: string;
+  markPrice?: string;
+}
+
+interface PositionProps {
+  positions?: PositionData[];
+  market?: "spot" | "futures";
+}
+
+const Position: React.FC<PositionProps> = ({ positions: externalPositions, market }) => {
+  const [positions, setPositions] = useState<PositionData[]>([]);
+
+  // Load từ props hoặc localStorage
+  useEffect(() => {
+    if (!externalPositions || externalPositions.length === 0) {
+      const raw = localStorage.getItem("positions");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          setPositions(parsed);
+        } catch {}
+      }
+    } else {
+      setPositions(externalPositions);
+    }
+  }, [externalPositions]);
+
+
+useEffect(() => {
+  binanceWS.setPositionUpdateHandler((rawPositions) => {
+    // ⚠️ Nếu không có vị thế nào hoặc toàn bộ đã đóng
+    if (!Array.isArray(rawPositions) || rawPositions.length === 0) {
+      setPositions([]);
+      localStorage.removeItem("positions");
+      return;
+    }
+
+    // ⚠️ Lọc bỏ vị thế đã đóng
+    const filtered = rawPositions.filter((p: any) => parseFloat(p.positionAmt) !== 0);
+
+    if (filtered.length === 0) {
+      setPositions([]);
+      localStorage.removeItem("positions");
+      return;
+    }
+
+    // ✅ Chuẩn hóa dữ liệu
+    const cleaned = filtered.map((p: any) => ({
+      symbol: p.symbol,
+      positionAmt: p.positionAmt ?? "0",
+      entryPrice: p.entryPrice ?? "0",
+      markPrice: undefined, // sẽ được cập nhật từ WS public
+    }));
+
+    setPositions(cleaned);
+    localStorage.setItem("positions", JSON.stringify(cleaned));
+  });
+
+  // ✅ Lấy danh sách vị thế ngay khi mount
+  binanceWS.send({ action: "getPositions" });
+
+  return () => {
+    binanceWS.setPositionUpdateHandler(() => {}); // cleanup
+  };
+}, []);
+// 🔁 Lắng nghe WS để bắt ACCOUNT_UPDATE.a.P
+useEffect(() => {
+  const handler = (msg: any) => {
+    // ✅ Nếu có vị thế trong update từ server
+    if (msg?.a?.P && Array.isArray(msg.a.P)) {
+      const rawPositions = msg.a.P;
+
+      const filtered = rawPositions.filter((p: any) => parseFloat(p.pa) !== 0);
+
+      if (filtered.length === 0) {
+        setPositions([]);
+        localStorage.removeItem("positions");
+        return;
+      }
+
+      const cleaned = filtered.map((p: any) => ({
+        symbol: p.s,
+        positionAmt: p.pa ?? "0",
+        entryPrice: p.ep ?? "0",
+        markPrice: undefined,
+      }));
+
+      setPositions(cleaned);
+      localStorage.setItem("positions", JSON.stringify(cleaned));
+    }
+  };
+
+  binanceWS.onMessage(handler);
+  return () => binanceWS.removeMessageHandler(handler);
+}, []);
+
+
+  // Subscribe markPrice theo từng symbol
+  useEffect(() => {
+  if (!positions || positions.length === 0) return;
+  if (market !== "futures") return;
+
+  const subscribed: string[] = [];
+
+  positions.forEach((pos) => {
+    const symbol = pos.symbol;
+    if (!symbol || subscribed.includes(symbol)) return;
+    subscribed.push(symbol);
+
+    binancePublicWS.subscribeMarkPrice(symbol, (markPrice) => {
+      setPositions((prev) =>
+        prev.map((p) =>
+          p.symbol === symbol ? { ...p, markPrice } : p
+        )
+      );
+    });
+  });
+
+  return () => {
+    subscribed.forEach((symbol) => {
+      binancePublicWS.unsubscribeMarkPrice(symbol);
+    });
+  };
+}, [positions, market]);
+
+
+  const calculatePnl = (pos: PositionData) => {
+    const entry = parseFloat(pos.entryPrice || "0");
+    const size = parseFloat(pos.positionAmt || "0");
+    const mark = parseFloat(pos.markPrice || "0");
+
+    if (size === 0 || entry === 0 || mark === 0) return 0;
+
+    return size > 0
+      ? (mark - entry) * size
+      : (entry - mark) * Math.abs(size);
+  };
+
+  return (
+    <div className="card">
+      <div className="card-header">Positions</div>
+      <div className="card-body overflow-x-auto">
+        <table className="min-w-full text-sm text-left">
+          <thead>
+            <tr className="text-dark-400 border-b border-dark-700">
+              <th className="px-4 py-2">Symbol</th>
+              <th className="px-4 py-2">Size</th>
+              <th className="px-4 py-2">Entry</th>
+              <th className="px-4 py-2">Mark Price</th>
+              <th className="px-4 py-2">PNL</th>
+            </tr>
+          </thead>
+          <tbody>
+            {positions.map((pos) => {
+              const size = parseFloat(pos.positionAmt || "0");
+              const pnl = calculatePnl(pos);
+
+              const pnlClass =
+                pnl > 0 ? "text-success-500" : pnl < 0 ? "text-danger-500" : "";
+              const sizeClass =
+                size > 0 ? "text-success-500" : size < 0 ? "text-danger-500" : "";
+
+              return (
+                <tr key={pos.symbol} className="border-b border-dark-700">
+                  <td className="px-4 py-3 font-medium">{pos.symbol}</td>
+                  <td className={`px-4 py-3 font-medium ${sizeClass}`}>
+                    {size > 0 ? "" : "-"} {Math.abs(size)}
+                  </td>
+                  <td className="px-4 py-3">{pos.entryPrice}</td>
+                  <td className="px-4 py-3">{pos.markPrice ?? "--"}</td>
+                  <td className={`px-4 py-3 font-medium ${pnlClass}`}>
+                    {pnl.toFixed(4)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default Position;

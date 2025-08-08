@@ -1,0 +1,1374 @@
+<div
+  class="react-grid-item react-draggable react-resizable"
+  style="
+    z-index: 1;
+    top: 100px;
+    left: 0%;
+    width: 62.5249%;
+    height: 530px;
+    position: absolute;
+  "
+>
+  <div
+    class="w-full h-full bg-BasicBg md:rounded-lg RemovableCard relative z-[auto]"
+    style="grid-area: chart"
+  >
+    <div
+      class="overflow-y-auto overflow-x-hidden absolute left-0 right-0 bottom-0"
+      style="top: 0px"
+    >
+      <div
+        class="w-full h-full bg-BasicBg md:rounded-lg"
+        style="grid-area: chart"
+      >
+        <div class="flex flex-col h-full">
+          <div
+            class="futures-bn-tabs flex flex-0 justify-between border-0 border-b-[1px] border-solid border-Line h-[40px] px-[16px]"
+          >
+            <div class="bn-tabs bn-tabs__default draggableHandle">
+              <div
+                role="tablist"
+                aria-orientation="horizontal"
+                class="bn-tab-list bn-tab-list__default"
+              >
+                <div
+                  role="tab"
+                  aria-selected="true"
+                  class="bn-tab bn-tab__default active bn-text-[14px]"
+                  id="bn-tab-0"
+                  aria-controls="bn-tab-pane-0"
+                  tabindex="0"
+                >
+                  <div class="text-[14px]">Đồ thị</div>
+                </div>
+                <div
+                  role="tab"
+                  aria-selected="false"
+                  class="bn-tab bn-tab__default bn-text-[14px]"
+                  id="bn-tab-1"
+                  aria-controls="bn-tab-pane-1"
+                  tabindex="-1"
+                >
+                  <div class="text-[14px]">Thông tin</div>
+                </div>
+                <div
+                  role="tab"
+                  aria-selected="false"
+                  class="bn-tab bn-tab__default bn-text-[14px]"
+                  id="bn-tab-2"
+                  aria-controls="bn-tab-pane-2"
+                  tabindex="-1"
+                >
+                  <div class="text-[14px]">Dữ liệu Giao dịch</div>
+                </div>
+              </div>
+              <div class="bn-tab-pane-list">
+                <div
+                  role="tabpanel"
+                  aria-hidden="false"
+                  id="bn-tab-pane-0"
+                  aria-labelledby="bn-tab-0"
+                  class="bn-tab-pane active"
+                ></div>
+                <div
+                  role="tabpanel"
+                  aria-hidden="true"
+                  id="bn-tab-pane-1"
+                  aria-labelledby="bn-tab-1"
+                  class="bn-tab-pane"
+                  style="display: none"
+                ></div>
+                <div
+                  role="tabpanel"
+                  aria-hidden="true"
+                  id="bn-tab-pane-2"
+                  aria-labelledby="bn-tab-2"
+                  class="bn-tab-pane"
+                  style="display: none"
+                ></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-[16px]">
+              <svg
+                class="bn-svg chart-fullscreen-icon min-w-[16px] min-h-[16px] cursor-pointer text-[--color-IconNormal] hover:text-SecondaryText"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M14.121 12l3.44-3.44L21 12V3h-9l3.44 3.44L12 9.878l2.121 2.12zM3 12l3.44 3.44L9.878 12 12 14.12l-3.44 3.44L12 21H3v-9z"
+                  fill="currentColor"
+                ></path>
+              </svg>
+              <div class="css-1vhz0qn">
+                <svg
+                  size="20"
+                  class="bn-svg text-IconNormal hover:text-SecondaryText"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style="cursor: pointer"
+                >
+                  <path
+                    d="M11.5 17a4.5 4.5 0 10-9 0 4.5 4.5 0 009 0zM17 12l-5-5 5-5 5 5-5 5z"
+                    fill="currentColor"
+                  ></path>
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M21 21v-8h-8v8h8z"
+                    fill="currentColor"
+                  ></path>
+                  <path fill="currentColor" d="M11 11H3V3h8z"></path>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="css-1dehh3h">
+            <div class="h-full w-full" tabindex="-1">
+              <div class="bn-flex h-full flex-col">
+                <div
+                  class="border-b-[1px] border-x-0 border-t-0 border-solid border-Line pl-[16px] pr-[16px] min-h-[40px]"
+                >
+                  <div
+                    class="grid grid-cols-[auto_min-content] items-center h-full"
+                  >
+                    <div
+                      class="flex items-center relative overflow-hidden mr-[24px]"
+                    >
+                      <div
+                        class="flex cursor-pointer items-center justify-start absolute w-[30px] h-[20px] left-[-1px] z-[1]"
+                        style="
+                          background: linear-gradient(
+                            to right,
+                            var(--color-BasicBg),
+                            var(--color-BasicBg),
+                            transparent
+                          );
+                          visibility: hidden;
+                        "
+                      >
+                        <svg
+                          class="bn-svg w-[16px] h-[16px] text-IconNormal"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            clip-rule="evenodd"
+                            d="M11.934 12l3.89 3.89-1.769 1.767L8.398 12l1.768-1.768 3.89-3.889 1.767 1.768-3.889 3.89z"
+                            fill="currentColor"
+                          ></path>
+                        </svg>
+                      </div>
+                      <div
+                        class="flex flex-row items-center h-full w-full overflow-scroll gap-[--space-m] [&amp;::-webkit-scrollbar]:hidden"
+                        style="scrollbar-width: none"
+                      >
+                        <div class="flex items-center gap-[--space-m]">
+                          <div class="!ml-[0px]">
+                            <div class="bn-flex h-[20px]">
+                              <div
+                                class="bn-flex justify-between overflow-hidden gap-[8px]"
+                              >
+                                <div
+                                  id="time"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  Thời gian
+                                </div>
+                                <div
+                                  id="1s"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  1s
+                                </div>
+                                <div
+                                  id="15m"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-PrimaryText px-[1px] whitespace-nowrap"
+                                >
+                                  15Phút
+                                </div>
+                                <div
+                                  id="1h"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  1h
+                                </div>
+                                <div
+                                  id="4h"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  4h
+                                </div>
+                                <div
+                                  id="1d"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  1ngày
+                                </div>
+                                <div
+                                  id="1w"
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText px-[1px] whitespace-nowrap"
+                                >
+                                  1Tuần
+                                </div>
+                              </div>
+                              <div
+                                class="!ml-[8px] css-ybbx55"
+                                style="min-width: auto; padding-left: 4px"
+                              >
+                                <div
+                                  class="bn-flex h-[20px] items-center justify-center cursor-pointer typography-caption0 text-TertiaryText min-w-[auto]"
+                                >
+                                  <div
+                                    class="bn-flex items-center flex-nowrap justify-center"
+                                  >
+                                    <svg
+                                      class="bn-svg interval-expand-btn text-IconNormal w-[16px] h-[16px] transition-transform hover:rotate-180"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M16.5 8.49v2.25L12 15.51l-4.5-4.77V8.49h9z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="bn-tooltips-wrap bn-tooltips-web">
+                            <div
+                              aria-describedby="bn-tooltips-m1yF8cd7"
+                              class="bn-tooltips-ele"
+                            >
+                              <div
+                                class="flex items-center cursor-pointer relative text-[--color-IconNormal] hover:text-[--color-SecondaryText]"
+                              >
+                                <svg
+                                  class="bn-svg h-[16px] w-[16px]"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M10 3H7v2H4v3h16V5h-3V3h-3v2h-4V3zm10 7H4v10h16V10zm-10 2v2h7v2h-7v2l-3-3 3-3z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="bn-tooltips-wrap bn-tooltips-web">
+                            <div
+                              aria-describedby="bn-tooltips-ilMSAr0W"
+                              class="bn-tooltips-ele"
+                            >
+                              <div
+                                class="flex items-center cursor-pointer relative text-[--color-IconNormal] hover:text-[--color-SecondaryText]"
+                              >
+                                <svg
+                                  class="bn-svg h-[16px] w-[16px]"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M4 20h3v-6.791l3.767-3.767.967.966 1.767 1.768 6.364-6.364-1.767-1.768-4.596 4.596-.967-.966-1.768-1.768L7 9.673V4H4v16zm16 0H7v-3h13v3zm-6.5-7.823l2.828 2.828h-5.656l2.828-2.828z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            class="bn-tooltips-wrap bn-tooltips-web bn-select bn-select__auto [&amp;_.bn-select-field]:border-none [&amp;_.bn-select-field]:w-auto [&amp;_.bn-select-field]:h-auto [&amp;_.bn-select-field]:p-0 [&amp;_.bn-select-field-input]:overflow-visible [&amp;_.bn-select-field-input]:w-[16px] [&amp;_.bn-select-field-input]:h-[16px] [&amp;_.bn-select-field-arrow]:hidden"
+                          >
+                            <div class="bn-tooltips-ele bn-select-trigger">
+                              <div
+                                class="bn-select-field data-single data-size-middle data-borderless"
+                                role="combobox"
+                                tabindex="0"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                                aria-controls="bn-select-1fcw4bz1"
+                                aria-label="Select an option"
+                              >
+                                <div class="bn-select-field-input">
+                                  <div
+                                    class="flex items-center cursor-pointer relative text-[--color-IconNormal] hover:text-[--color-SecondaryText]"
+                                  >
+                                    <svg
+                                      class="bn-svg h-[16px] w-[16px]"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M19 3h-3v4h-3v10h3v4h3v-4h3V7h-3V3zM11 11H8V7H5v4H2v6h3v4h3v-4h3v-6z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                                <svg
+                                  fill="IconNormal"
+                                  class="bn-svg bn-select-field-arrow"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M16.5 8.49v2.25L12 15.51l-4.5-4.77V8.49h9z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="bn-tooltips-wrap bn-tooltips-web">
+                            <div
+                              aria-describedby="bn-tooltips-QTqaxY4o"
+                              class="bn-tooltips-ele"
+                            >
+                              <div
+                                class="flex items-center cursor-pointer relative text-[--color-IconNormal] hover:text-[--color-SecondaryText]"
+                              >
+                                <svg
+                                  class="bn-svg h-[16px] w-[16px]"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M21 4H3v3h18V4zM8 10.5H3v3h5v-3zM3 17h5v3H3v-3zm12.5-8.1l5.5 3.175v6.35l-5.5 3.176-5.5-3.176v-6.35l5.5-3.176zm2.25 6.35a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="bn-tooltips-wrap bn-tooltips-web">
+                            <div
+                              aria-describedby="bn-tooltips-Avdv3vpS"
+                              class="bn-tooltips-ele"
+                            >
+                              <div
+                                class="flex items-center cursor-pointer relative text-[--color-IconNormal] hover:text-[--color-SecondaryText]"
+                              >
+                                <svg
+                                  class="bn-svg h-[16px] w-[16px]"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M13.8 3h-3.6v2.027c-.66.17-1.285.431-1.858.77L6.91 4.363 4.363 6.91l1.434 1.433a7.157 7.157 0 00-.77 1.858H3v3.6h2.027c.17.66.431 1.285.77 1.858L4.363 17.09l2.546 2.546 1.433-1.434c.573.339 1.197.6 1.858.77V21h3.6v-2.027a7.157 7.157 0 001.858-.77l1.433 1.434 2.546-2.546-1.434-1.434a7.16 7.16 0 00.77-1.857H21v-3.6h-2.027a7.158 7.158 0 00-.77-1.858l1.434-1.433-2.546-2.546-1.434 1.434a7.156 7.156 0 00-1.857-.77V3zm-4.5 9a2.7 2.7 0 115.4 0 2.7 2.7 0 01-5.4 0z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            class="bn-tooltips-wrap bn-tooltips-web bn-select bn-select__auto [&amp;_.bn-select-field]:border-none [&amp;_.bn-select-field]:w-auto [&amp;_.bn-select-field]:h-auto [&amp;_.bn-select-field]:p-0 [&amp;_.bn-select-field]:gap-0"
+                          >
+                            <div class="bn-tooltips-ele bn-select-trigger">
+                              <div
+                                class="bn-select-field data-single data-size-middle data-borderless"
+                                role="combobox"
+                                tabindex="0"
+                                aria-haspopup="listbox"
+                                aria-expanded="false"
+                                aria-controls="bn-select-m9yp9dCd"
+                                aria-label="Select an option"
+                              >
+                                <div class="bn-select-field-input">
+                                  <div
+                                    class="typography-caption1 text-SecondaryText md:text-TertiaryText"
+                                  >
+                                    Giá gần nhất
+                                  </div>
+                                </div>
+                                <svg
+                                  fill="IconNormal"
+                                  class="bn-svg bn-select-field-arrow"
+                                  viewBox="0 0 24 24"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M16.5 8.49v2.25L12 15.51l-4.5-4.77V8.49h9z"
+                                    fill="currentColor"
+                                  ></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          class="draggableHandle flex items-center justify-center h-full gap-[--space-m]"
+                        ></div>
+                      </div>
+                      <div
+                        class="flex cursor-pointer items-center justify-end absolute w-[30px] h-[20px] right-[-1px]"
+                        style="
+                          background: linear-gradient(
+                            to right,
+                            transparent,
+                            var(--color-BasicBg),
+                            var(--color-BasicBg)
+                          );
+                          visibility: hidden;
+                        "
+                      >
+                        <svg
+                          class="bn-svg w-[16px] h-[16px] text-IconNormal"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            clip-rule="evenodd"
+                            d="M12.288 12l-3.89 3.89 1.768 1.767L15.823 12l-1.768-1.768-3.889-3.889-1.768 1.768 3.89 3.89z"
+                            fill="currentColor"
+                          ></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div
+                      class="flex items-center whitespace-nowrap gap-[--space-m]"
+                    >
+                      <div class="bn-flex gap-[16px]">
+                        <div class="flex flex-row gap-[--space-m]">
+                          <div
+                            class="typography-caption0 cursor-pointer text-[--color-PrimaryText]"
+                          >
+                            Gốc
+                          </div>
+                          <div
+                            class="typography-caption0 cursor-pointer text-[--color-TertiaryText]"
+                          >
+                            Trading View
+                          </div>
+                          <div
+                            class="typography-caption0 cursor-pointer text-[--color-TertiaryText]"
+                          >
+                            Chi tiết
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="draggableCancel h-full relative">
+                  <div
+                    class="focus-area h-full flex-1 block"
+                    data-testid="kline"
+                  >
+                    <div class="flex kline-wrap dark bg-BasicBg" dir="ltr">
+                      <div class="kline-container" style="cursor: crosshair">
+                        <canvas
+                          width="937"
+                          height="446"
+                          class="scene"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 937px;
+                            height: 446px;
+                            z-index: 200;
+                          "
+                        ></canvas
+                        ><canvas
+                          width="937"
+                          height="446"
+                          class="frame"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 937px;
+                            height: 446px;
+                            z-index: 100;
+                          "
+                        ></canvas
+                        ><canvas
+                          width="937"
+                          height="446"
+                          class="mark"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 937px;
+                            height: 446px;
+                            z-index: 900;
+                          "
+                        ></canvas
+                        ><canvas
+                          width="937"
+                          height="446"
+                          class="info"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 937px;
+                            height: 446px;
+                            z-index: 910;
+                          "
+                        ></canvas
+                        ><canvas
+                          width="937"
+                          height="446"
+                          class="hit"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 937px;
+                            height: 446px;
+                            z-index: 1000;
+                          "
+                        ></canvas>
+                        <div
+                          class="kline-title-wrap"
+                          style="
+                            position: absolute;
+                            left: 0px;
+                            top: 0px;
+                            width: 100%;
+                            height: 0px;
+                            z-index: 2000;
+                          "
+                        >
+                          <div
+                            class="title-wrapper-container"
+                            style="
+                              top: 0px;
+                              left: 0px;
+                              max-width: 862.703px;
+                              padding: 3px 4px;
+                            "
+                          >
+                            <div
+                              class="chart-title-row"
+                              style="background: rgba(24, 26, 32, 0.5)"
+                            >
+                              <div class="icon-box">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M7.92656 8.11751L10.5192 5.52486L11.6977 6.70337L7.92648 10.4746L6.74797 9.2961L6.74805 9.29602L4.15527 6.70325L5.33378 5.52474L7.92656 8.11751Z"
+                                    fill="#929AA5"
+                                  ></path>
+                                </svg>
+                              </div>
+                              <div class="chart-title-indicator-container">
+                                <span
+                                  class="default-label-box"
+                                  key="t"
+                                  style="padding-right: 8px"
+                                  >2025/08/07 19:00</span
+                                ><span
+                                  class="default-label-box"
+                                  key="O"
+                                  style="padding-right: 8px"
+                                  >Mở:</span
+                                ><span
+                                  class="default-label-box"
+                                  key="o"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >0,21411</span
+                                ><span
+                                  class="default-label-box"
+                                  key="H"
+                                  style="padding-right: 8px"
+                                  >Trần:</span
+                                ><span
+                                  class="default-label-box"
+                                  key="h"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >0,21460</span
+                                ><span
+                                  class="default-label-box"
+                                  key="L"
+                                  style="padding-right: 8px"
+                                  >Sàn:</span
+                                ><span
+                                  class="default-label-box"
+                                  key="l"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >0,21352</span
+                                ><span
+                                  class="default-label-box"
+                                  key="C"
+                                  style="padding-right: 8px"
+                                  >Đóng:</span
+                                ><span
+                                  class="default-label-box"
+                                  key="c"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >0,21354</span
+                                ><span
+                                  class="default-label-box title_change_label"
+                                  key="CHANGE"
+                                  style="padding-right: 8px"
+                                  >BIẾN ĐỘNG:</span
+                                ><span
+                                  class="default-label-box title_change_value"
+                                  key="change"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >-0,27%</span
+                                ><span
+                                  class="default-label-box title_amplitude_label"
+                                  key="AMP"
+                                  style="padding-right: 8px"
+                                  >BIÊN ĐỘ:</span
+                                ><span
+                                  class="default-label-box title_amplitude_value"
+                                  key="amp"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(246, 70, 93);
+                                  "
+                                  >0,50%</span
+                                >
+                              </div>
+                            </div>
+                            <div class="chart-title-row" isfold="false">
+                              <div class="icon-box">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M7.92656 8.11751L10.5192 5.52486L11.6977 6.70337L7.92648 10.4746L6.74797 9.2961L6.74805 9.29602L4.15527 6.70325L5.33378 5.52474L7.92656 8.11751Z"
+                                    fill="#929AA5"
+                                  ></path>
+                                </svg>
+                              </div>
+                              <div
+                                class="chart-title-indicator-container"
+                                key="@MA"
+                              >
+                                <span
+                                  class="default-label-box"
+                                  key="MA[0]"
+                                  style="padding-right: 8px; display: block"
+                                  >MA(7):</span
+                                ><span
+                                  class="default-label-box"
+                                  key="MA[0]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(240, 185, 11);
+                                    display: block;
+                                  "
+                                  >0,21347</span
+                                ><span
+                                  class="default-label-box"
+                                  key="MA[1]"
+                                  style="padding-right: 8px; display: block"
+                                  >MA(25):</span
+                                ><span
+                                  class="default-label-box"
+                                  key="MA[1]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(235, 64, 181);
+                                    display: block;
+                                  "
+                                  >0,20834</span
+                                ><span
+                                  class="default-label-box"
+                                  key="MA[2]"
+                                  style="padding-right: 8px; display: block"
+                                  >MA(99):</span
+                                ><span
+                                  class="default-label-box"
+                                  key="MA[2]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(179, 133, 248);
+                                    display: block;
+                                  "
+                                  >0,20509</span
+                                >
+                                <div class="indicator-title-toolbox">
+                                  <div
+                                    class="icon-box"
+                                    id="@MA-visible"
+                                    tooltip="Ẩn"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M12 14.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+                                        fill="currentColor"
+                                      ></path>
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M6.555 6.31L1 12l5.555 5.69a7.572 7.572 0 0010.89 0L23 12l-5.555-5.69a7.572 7.572 0 00-10.89 0zM17 12a5 5 0 11-10 0 5 5 0 0110 0z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                    <div
+                                      class="tooltip-wrap up"
+                                      style="display: none"
+                                    >
+                                      <div class="tooltip-text">Ẩn</div>
+                                      <div class="tooltip-arrow"></div>
+                                    </div>
+                                  </div>
+                                  <div class="icon-box" tooltip="Cài đặt">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M13.8 3h-3.6v2.027c-.66.17-1.285.431-1.858.77L6.91 4.363 4.363 6.91l1.434 1.433a7.157 7.157 0 00-.77 1.858H3v3.6h2.027c.17.66.431 1.285.77 1.858L4.363 17.09l2.546 2.546 1.433-1.434c.573.339 1.197.6 1.858.77V21h3.6v-2.027a7.157 7.157 0 001.858-.77l1.433 1.434 2.546-2.546-1.434-1.434a7.16 7.16 0 00.77-1.857H21v-3.6h-2.027a7.158 7.158 0 00-.77-1.858l1.434-1.433-2.546-2.546-1.434 1.434a7.156 7.156 0 00-1.857-.77V3zm-4.5 9a2.7 2.7 0 115.4 0 2.7 2.7 0 01-5.4 0z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                  <div class="icon-box" tooltip="Đóng">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M6.697 4.575L4.575 6.697 9.88 12l-5.304 5.303 2.122 2.122L12 14.12l5.303 5.304 2.122-2.122L14.12 12l5.304-5.303-2.122-2.122L12 9.88 6.697 4.575z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            class="title-wrapper-container"
+                            style="
+                              top: 310.5px;
+                              left: 0px;
+                              max-width: 862.703px;
+                              padding: 3px 4px;
+                            "
+                          >
+                            <div class="chart-title-row" isfold="false">
+                              <div class="icon-box">
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 16 16"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    fill-rule="evenodd"
+                                    clip-rule="evenodd"
+                                    d="M7.92656 8.11751L10.5192 5.52486L11.6977 6.70337L7.92648 10.4746L6.74797 9.2961L6.74805 9.29602L4.15527 6.70325L5.33378 5.52474L7.92656 8.11751Z"
+                                    fill="#929AA5"
+                                  ></path>
+                                </svg>
+                              </div>
+                              <div class="chart-title-indicator-container">
+                                <span
+                                  class="default-label-box"
+                                  key="VOL[0]"
+                                  style="padding-right: 8px; display: block"
+                                  >Vol(DOGE):</span
+                                ><span
+                                  class="default-label-box"
+                                  key="VOL[0]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(234, 236, 239);
+                                    display: block;
+                                  "
+                                  >76,681M</span
+                                ><span
+                                  class="default-label-box"
+                                  key="VOL[1]"
+                                  style="padding-right: 8px; display: block"
+                                  >Vol(USDT)</span
+                                ><span
+                                  class="default-label-box"
+                                  key="VOL[1]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(234, 236, 239);
+                                    display: block;
+                                  "
+                                  >16,414M</span
+                                ><span
+                                  class="default-label-box"
+                                  key="VOL[2]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(95, 195, 215);
+                                    display: block;
+                                  "
+                                  >157,691M</span
+                                ><span
+                                  class="default-label-box"
+                                  key="VOL[3]Series"
+                                  style="
+                                    padding-right: 8px;
+                                    color: rgb(214, 56, 100);
+                                    display: block;
+                                  "
+                                  >118,043M</span
+                                >
+                                <div class="indicator-title-toolbox">
+                                  <div
+                                    class="icon-box"
+                                    id="@VOL-visible"
+                                    tooltip="Ẩn"
+                                  >
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M12 14.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+                                        fill="currentColor"
+                                      ></path>
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M6.555 6.31L1 12l5.555 5.69a7.572 7.572 0 0010.89 0L23 12l-5.555-5.69a7.572 7.572 0 00-10.89 0zM17 12a5 5 0 11-10 0 5 5 0 0110 0z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                  <div class="icon-box" tooltip="Cài đặt">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M13.8 3h-3.6v2.027c-.66.17-1.285.431-1.858.77L6.91 4.363 4.363 6.91l1.434 1.433a7.157 7.157 0 00-.77 1.858H3v3.6h2.027c.17.66.431 1.285.77 1.858L4.363 17.09l2.546 2.546 1.433-1.434c.573.339 1.197.6 1.858.77V21h3.6v-2.027a7.157 7.157 0 001.858-.77l1.433 1.434 2.546-2.546-1.434-1.434a7.16 7.16 0 00.77-1.857H21v-3.6h-2.027a7.158 7.158 0 00-.77-1.858l1.434-1.433-2.546-2.546-1.434 1.434a7.156 7.156 0 00-1.857-.77V3zm-4.5 9a2.7 2.7 0 115.4 0 2.7 2.7 0 01-5.4 0z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                  <div class="icon-box" tooltip="Đóng">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        d="M6.697 4.575L4.575 6.697 9.88 12l-5.304 5.303 2.122 2.122L12 14.12l5.303 5.304 2.122-2.122L14.12 12l5.304-5.303-2.122-2.122L12 9.88 6.697 4.575z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="bn-flex absolute right-0 bottom-0">
+                        <div
+                          class="absolute top-[-5px] translate-y-[-100%] right-[4px] z-[9999]"
+                        >
+                          <div
+                            class="bn-flex flex-col items-end gap-[4px]"
+                          ></div>
+                        </div>
+                        <div
+                          class="bn-flex items-center justify-center cursor-pointer text-IconNormal hover:text-PrimaryText"
+                          style="width: 74.2969px; height: 32px"
+                        >
+                          <svg
+                            class="bn-svg h-[16px] w-[16px]"
+                            size="12"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M3 3h18v2.5H3V3zM13.25 13.5v-3H17l-5-5-5 5h3.75v3H7l5 5H3V21h18v-2.5h-9l5-5h-3.75z"
+                              fill="currentColor"
+                            ></path>
+                          </svg>
+                        </div>
+                      </div>
+                      <div class="absolute h-full">
+                        <div
+                          class="absolute justify-center h-full z-10 bg-BasicBg transition-all border-solid border-0 border-r-[1px] border-r-Line w-0"
+                        >
+                          <div
+                            class="flex kline-draw-panel_down absolute w-full text-center bg-BasicBg h-5 left-0 z-20 cursor-pointer up top-0 !hidden"
+                          >
+                            <svg
+                              class="bn-svg h-5 w-5 mx-auto text-IconNormal hover:text-PrimaryText"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M12.11 11.824l-3.888 3.889-1.768-1.768 5.657-5.657 1.768 1.768 3.889 3.89L16 15.712l-3.89-3.89z"
+                                fill="currentColor"
+                              ></path>
+                            </svg>
+                          </div>
+                          <div
+                            class="flex flex-col items-center bg-BasicBg absolute h-full w-full overflow-x-hidden overflow-y-auto scroll-smooth no-scrollbar"
+                          >
+                            <div
+                              class="flex flex-col border-Line border-solid border-0 border-b-[1px] last:border-b-0 py-[4px] gap-[4px]"
+                            >
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-rT87nf9h"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      d="M6 3.592L7.416 3 19 14.891l-.588 1.432h-6.44L7.415 21 6 20.409V3.591z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-PrimaryText"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-uU9zCSF4"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M13.5 3h-3v6h3V3zm0 12h-3v6h3v-6zM9 10.5v3H3v-3h6zm12 3v-3h-6v3h6z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              class="flex flex-col border-Line border-solid border-0 border-b-[1px] last:border-b-0 py-[4px] gap-[4px]"
+                            >
+                              <div
+                                class="relative flex items-center justify-center"
+                              >
+                                <div
+                                  class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                                >
+                                  <div
+                                    aria-describedby="bn-tooltips-wP2yQYRy"
+                                    class="bn-tooltips-ele"
+                                  >
+                                    <svg
+                                      class="bn-svg w-[24px] h-[24px]"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M21 6.5a3.5 3.5 0 10-6.696 1.428l-6.376 6.376a3.5 3.5 0 101.768 1.768l6.375-6.376A3.5 3.5 0 0021 6.5z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                                <div
+                                  class="bn-tooltips-wrap bn-tooltips-web absolute w-[12px] h-full rounded-[4px] justify-center items-center hover:bg-CardBg text-IconNormal hover:text-PrimaryText cursor-pointer left-[calc(100%-5px)]"
+                                >
+                                  <div
+                                    aria-describedby="bn-tooltips-H356o1fD"
+                                    class="bn-tooltips-ele"
+                                  >
+                                    <svg
+                                      class="bn-svg h-3 w-3"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M12.288 12l-3.89 3.89 1.768 1.767L15.823 12l-1.768-1.768-3.889-3.889-1.768 1.768 3.89 3.89z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                              <div
+                                class="relative flex items-center justify-center"
+                              >
+                                <div
+                                  class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                                >
+                                  <div
+                                    aria-describedby="bn-tooltips-mOZBG0Qr"
+                                    class="bn-tooltips-ele"
+                                  >
+                                    <svg
+                                      class="bn-svg w-[24px] h-[24px]"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M21 11.999l-7.071-7.071-1.768 1.768 4.055 4.054H2.999v2.5h13.216l-4.054 4.053 1.768 1.768L21 12v-.001z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                                <div
+                                  class="bn-tooltips-wrap bn-tooltips-web absolute w-[12px] h-full rounded-[4px] justify-center items-center hover:bg-CardBg text-IconNormal hover:text-PrimaryText cursor-pointer left-[calc(100%-5px)]"
+                                >
+                                  <div
+                                    aria-describedby="bn-tooltips-XGJAycVK"
+                                    class="bn-tooltips-ele"
+                                  >
+                                    <svg
+                                      class="bn-svg h-3 w-3"
+                                      viewBox="0 0 24 24"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                    >
+                                      <path
+                                        fill-rule="evenodd"
+                                        clip-rule="evenodd"
+                                        d="M12.288 12l-3.89 3.89 1.768 1.767L15.823 12l-1.768-1.768-3.889-3.889-1.768 1.768 3.89 3.89z"
+                                        fill="currentColor"
+                                      ></path>
+                                    </svg>
+                                  </div>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-oNEyIUry"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M21 6.996a3 3 0 01-5.599 1.5H8v-3h7.401A2.999 2.999 0 0121 6.996zm-12.401 11.5a3 3 0 110-3H16v3H8.599zm-.599-5h8v-3H8v3z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-PvKHssfT"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M3 5.639a3 3 0 001.75 2.728v6.524a3 3 0 103.969 3.998h6.553a3 3 0 103.978-3.978V8.367a3 3 0 10-3.978-3.978H8.728A3 3 0 003 5.639zm12.272 1.25H8.728A3.012 3.012 0 017.25 8.367v6.524c.659.303 1.19.836 1.487 1.498h6.535c.3-.653.826-1.179 1.478-1.478V8.367a3.012 3.012 0 01-1.478-1.478z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-6skTMsZI"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M16 20h3V4h-3v16zm-8.5-1h3V8H14V5H4v3h3.5v11z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              class="flex flex-col border-Line border-solid border-0 border-b-[1px] last:border-b-0 py-[4px] gap-[4px]"
+                            >
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-YzPnkmUU"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M12 3a9 9 0 00-9 9v4h5.98v-4a3.02 3.02 0 016.04 0v4H21v-4a9 9 0 00-9-9zm9 15h-5.98v3H21v-3zM8.98 18H3v3h5.98v-3z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-SHov8nED"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M10 4H4v6h2.5V6.5H10V4zm7.474 13.5h-3.5V20h6v-6h-2.5v3.5zM16.258 4l3.89 3.89-1.768 1.767-3.89-3.89L16.259 4zm.708 7.07l-3.89-3.888-8.131 8.132v3.889h3.889l8.132-8.132z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-T7JgPAEt"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M7 10V8a5 5 0 0110 0h-2.5a2.5 2.5 0 00-5 0v2H19v11H5V10h2zm6.5 8v-5h-3v5h3z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-Oo6HKMji"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      d="M12 14.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+                                      fill="currentColor"
+                                    ></path>
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M6.555 6.31L1 12l5.555 5.69a7.572 7.572 0 0010.89 0L23 12l-5.555-5.69a7.572 7.572 0 00-10.89 0zM17 12a5 5 0 11-10 0 5 5 0 0110 0z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              class="flex flex-col border-Line border-solid border-0 border-b-[1px] last:border-b-0 py-[4px] gap-[4px]"
+                            >
+                              <div
+                                class="bn-tooltips-wrap bn-tooltips-web h-[32px] w-[32px] p-[4px] cursor-pointer hover:text-PrimaryText text-IconNormal"
+                              >
+                                <div
+                                  aria-describedby="bn-tooltips-yA8lFtfM"
+                                  class="bn-tooltips-ele"
+                                >
+                                  <svg
+                                    class="bn-svg w-[24px] h-[24px]"
+                                    viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                  >
+                                    <path
+                                      fill="currentColor"
+                                      d="M3 4h18v3H3z"
+                                    ></path>
+                                    <path
+                                      fill-rule="evenodd"
+                                      clip-rule="evenodd"
+                                      d="M15 2H9v2h6V2zm4 5H5v14h14V7zm-8.5 2H8v9h2.5V9zm3 0H16v9h-2.5V9z"
+                                      fill="currentColor"
+                                    ></path>
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            class="flex kline-draw-panel_down absolute w-full text-center bg-BasicBg h-5 left-0 z-20 cursor-pointer down bottom-0"
+                          >
+                            <svg
+                              class="bn-svg h-5 w-5 mx-auto text-IconNormal hover:text-PrimaryText"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                fill-rule="evenodd"
+                                clip-rule="evenodd"
+                                d="M12.11 12.178L16 8.287l1.768 1.768-5.657 5.657-1.768-1.768-3.889-3.889 1.768-1.768 3.889 3.89z"
+                                fill="currentColor"
+                              ></path>
+                            </svg>
+                          </div>
+                        </div>
+                        <div
+                          class="bn-tooltips-wrap bn-tooltips-web z-20 absolute bottom-[48px] transition-all left-[2px]"
+                        >
+                          <div
+                            aria-describedby="bn-tooltips-ScHQkXSm"
+                            class="bn-tooltips-ele"
+                          >
+                            <div
+                              class="flex items-center justify-center w-[12px] h-[32px] cursor-pointer rounded bg-BasicBg hover:bg-Line text-IconNormal hover:text-PrimaryText border-Line border-solid border-[1px]"
+                            >
+                              <svg
+                                class="bn-svg min-w-[12px] h-[12px]"
+                                viewBox="0 0 24 24"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  fill-rule="evenodd"
+                                  clip-rule="evenodd"
+                                  d="M12.288 12l-3.89 3.89 1.768 1.767L15.823 12l-1.768-1.768-3.889-3.889-1.768 1.768 3.89 3.89z"
+                                  fill="currentColor"
+                                ></path>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        class="flex justify-center items-center absolute bg-[--color-CardBg] border border-solid border-[--color-InputLine] rounded-[--radii-s] cursor-pointer opacity-80"
+                        style="
+                          right: 84.2969px;
+                          bottom: 37px;
+                          width: 22px;
+                          height: 22px;
+                          display: none;
+                        "
+                      >
+                        <svg
+                          class="bn-svg min-h-[16px] min-w-[16px] text-[--color-IconNormal]"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            fill-rule="evenodd"
+                            clip-rule="evenodd"
+                            d="M13.121 5l7.071 7.071-.025.025.025.025-7.07 7.071L11 17.072l4.975-4.976L11 7.121 13.121 5zm-7 0l7.071 7.071-.025.025.025.025-7.07 7.071L4 17.072l4.975-4.976L4 7.121 6.121 5z"
+                            fill="currentColor"
+                          ></path>
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          class="trading-page-close-button css-1kmo7tn"
+        >
+          <path
+            fill-rule="evenodd"
+            clip-rule="evenodd"
+            d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-7.233 0l3.006 3.005-1.768 1.768L12 13.767l-3.005 3.005-1.768-1.768 3.005-3.005-3.005-3.005 1.768-1.767L12 10.23l3.005-3.005 1.768 1.767L13.767 12z"
+            fill="currentColor"
+          ></path>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <span class="react-resizable-handle react-resizable-handle-se"></span>
+</div>
