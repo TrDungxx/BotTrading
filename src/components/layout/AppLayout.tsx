@@ -5,36 +5,28 @@ import Header from './Header';
 import { useAuth } from '../../context/AuthContext';
 
 export default function AppLayout() {
-  const { isAuthenticated, isGuestMode } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
-  // Close sidebar on window resize (mobile)
+
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024 && sidebarOpen) {
-        setSidebarOpen(false);
-      }
+    const onResize = () => {
+      if (window.innerWidth >= 1024 && sidebarOpen) setSidebarOpen(false);
     };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [sidebarOpen]);
-  
-  // Chỉ cho phép truy cập nếu đã authenticated (không cho phép guest mode truy cập protected routes)
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
   return (
-    <div className="flex min-h-screen bg-dark-900">
+    <div className="flex h-dvh bg-dark-900">                 {/* ⬅️ khóa chiều cao theo viewport */}
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      
-      <div className="flex flex-1 flex-col min-h-screen">
+
+      <div className="flex flex-1 flex-col min-h-0">         {/* ⬅️ rất quan trọng */}
         <Header setSidebarOpen={setSidebarOpen} />
-        <main className="flex-1 p-4 lg:p-6 mt-16 lg:ml-64">
-          <div className="container mx-auto max-w-7xl">
-            <Outlet />
-          </div>
+
+        <main className="flex-1 min-h-0 overflow-hidden pt-14 md:pt-16 lg:ml-64">          {/* ⬅️ offset cho header, giữ offset sidebar */}
+          <Outlet />
         </main>
       </div>
     </div>

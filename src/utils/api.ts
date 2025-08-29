@@ -320,6 +320,12 @@ getMyActiveIndicators: () =>
 
 //----------------- Admin Indicator API --------------------
 
+getAllIndicatorsHistory: () =>
+    apiRequest('/history/getAllIndicators', { method: 'GET' }),
+
+  getIndicatorById: (id: string | number) =>
+    apiRequest('/indicator/getById', { method: 'GET', params: { id } }),
+
   getAllIndicatorConfigs: () =>
     apiRequest('/m-sys/indicators', { method: 'GET' }),
 
@@ -346,6 +352,7 @@ getIndicatorStats: () =>
 
 toggleIndicatorStatus: (id: number) =>
   apiRequest('/m-sys/indicators/toggle-status', { method: 'PUT', body: { id } }),
+
 
 //----------------- SuperAdmin Indicator API --------------------
 

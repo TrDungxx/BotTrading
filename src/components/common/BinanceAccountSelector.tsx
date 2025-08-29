@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { binanceAccountApi } from '../../utils/api';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 
 interface Props {
   onSelect?: (id: number) => void;
+  // Nếu bạn vẫn muốn hiển thị trạng thái multi-assets ở UI,
+  // ta sẽ gọi đúng 1 lần sau khi select xong
   onMultiAssetsModeChange?: (isMulti: boolean) => void;
 }
 
@@ -19,69 +21,63 @@ const BinanceAccountSelector: React.FC<Props> = ({
   const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
+  // Chống chạy 2 lần ở React 18 StrictMode
+  const restoredRef = useRef(false);
+
+  // 1) Load danh sách account (HTTP)
   useEffect(() => {
-  binanceAccountApi.getMyAccounts().then((res) => {
-    const accs = (res?.Data?.accounts || []) as BinanceAccount[];
-    setAccounts(accs);
-  });
-}, []);
+    let mounted = true;
+    binanceAccountApi.getMyAccounts().then((res) => {
+      if (!mounted) return;
+      const accs = (res?.Data?.accounts || []) as BinanceAccount[];
+      setAccounts(accs);
+    });
+    return () => { mounted = false; };
+  }, []);
 
-// ✅ Khi accounts đã có => khôi phục selected ID
-useEffect(() => {
-  if (accounts.length === 0) return;
+  // 2) Restore account từ localStorage (chỉ 1 lần khi đã có accounts)
+  useEffect(() => {
+    if (restoredRef.current || accounts.length === 0) return;
 
-  const savedId = localStorage.getItem('selectedBinanceAccountId');
-  const parsedId = savedId ? parseInt(savedId) : null;
-  const found = accounts.find((acc) => acc.id === parsedId);
+    const savedId = localStorage.getItem('selectedBinanceAccountId');
+    const parsedId = savedId ? parseInt(savedId, 10) : NaN;
+    const restore = accounts.find((a) => a.id === parsedId) ?? accounts[0];
 
-  if (found) {
-    setSelectedAccountId(found.id);
-    binanceWS.setCurrentAccountId(found.id);
+    if (restore) {
+      restoredRef.current = true;
+      doSelect(restore.id, /*persist*/ true, /*emit*/ true);
+    }
+  }, [accounts]);
 
-    // ✅ Gửi 2 lệnh cần thiết
-    binanceWS.send({ action: 'selectBinanceAccount', binanceAccountId: found.id });
-    binanceWS.send({ action: 'getMultiAssetsMode' });
-    onSelect?.(found.id);
-     binanceWS.send({
-    action: "subscribeAccountUpdates",
-    types: ["balance", "positions", "orders"],
-  });
-
-    // ✅ Lắng nghe phản hồi multiAssetsMode
-    const handler = (msg: any) => {
-      if (msg?.type === 'getMultiAssetsMode') {
-        const isMulti = !!msg.multiAssetsMargin;
-        onMultiAssetsModeChange?.(isMulti);
-        localStorage.setItem(`multiAssetsMode_${found.id}`, String(isMulti));
-        binanceWS.removeMessageHandler(handler);
-      }
-    };
-
-    binanceWS.onMessage(handler);
-  }
-}, [accounts]);
-
-
+  // 3) Handle user change
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = parseInt(e.target.value);
+    const id = parseInt(e.target.value, 10);
+    if (!Number.isFinite(id) || id === selectedAccountId) return;
+    doSelect(id, /*persist*/ true, /*emit*/ true);
+  };
+
+  // 4) Thao tác chọn account gói gọn 1 chỗ
+  const doSelect = (
+    id: number,
+    persist = true,
+    emit = true,
+  ) => {
     setSelectedAccountId(id);
-    localStorage.setItem('selectedBinanceAccountId', String(id)); // ✅ Lưu lại ID
+    if (persist) localStorage.setItem('selectedBinanceAccountId', String(id));
 
-    binanceWS.send({ action: 'selectBinanceAccount', binanceAccountId: id });
+    // chỉ chọn account qua service (không subscribe ở đây)
     binanceWS.setCurrentAccountId(id);
-    binanceWS.send({ action: 'getMultiAssetsMode' });
+    binanceWS.selectAccount(id);
 
-    const handler = (msg: any) => {
-      if (msg?.type === 'getMultiAssetsMode') {
-        const isMulti = !!msg.multiAssetsMargin;
-        onMultiAssetsModeChange?.(isMulti);
+    // Nếu UI cần hiển thị multi-assets -> hỏi 1 lần và trả ra callback
+    if (onMultiAssetsModeChange) {
+      binanceWS.getMultiAssetsMode((isMulti) => {
+        onMultiAssetsModeChange(isMulti);
         localStorage.setItem(`multiAssetsMode_${id}`, String(isMulti));
-        binanceWS.removeMessageHandler(handler);
-      }
-    };
+      });
+    }
 
-    binanceWS.onMessage(handler);
-    onSelect?.(id);
+    if (emit) onSelect?.(id);
   };
 
   return (

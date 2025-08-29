@@ -1,68 +1,87 @@
-// FloatingPositionTag.tsx
-import React, { useEffect, useState } from 'react';
-import { binancePublicWS } from '../binancewebsocket/binancePublicWS';
-
-interface PositionData {
-  symbol: string;
-  positionAmt: string;
-  entryPrice: string;
-  markPrice?: string; // nếu bạn dùng markPrice để tính PnL
-}
+import React, { useEffect, useCallback, useState } from 'react';
+import type { ISeriesApi } from 'lightweight-charts';
 
 interface Props {
-  position?: PositionData;
   visible?: boolean;
+  // giá đang dùng để bám theo (mark price) — bắt buộc
+  price: number;
+  // số lượng vị thế để xác định LONG/SHORT cho màu nút đóng
+  positionAmt: number;
+  // đã tính sẵn ở Position:
+  pnl: number;
+  roi: number;
+  // để quy đổi price -> Y
+  series?: ISeriesApi<'Candlestick'> | ISeriesApi<'Line'>;
+  containerRef?: React.RefObject<HTMLDivElement>;
+  offset?: number; // lề trái px, default 12
+  onClosePosition?: () => void; // optional callback đóng lệnh
 }
 
-const FloatingPositionTag: React.FC<Props> = ({ position, visible = true }) => {
-  const [markPrice, setMarkPrice] = useState<number>(0);
-  const [pnl, setPnl] = useState<number>(0);
+const FloatingPositionTag: React.FC<Props> = ({
+  visible = true,
+  price,
+  positionAmt,
+  pnl,
+  roi,
+  series,
+  containerRef,
+  offset = 12,
+  onClosePosition,
+}) => {
+  const [y, setY] = useState(0);
 
-  // Lắng nghe markPrice theo symbol
+  const recalcY = useCallback(() => {
+    if (!series || !containerRef?.current || !price) return;
+    const coord = series.priceToCoordinate(price);
+    if (coord == null) return;
+    const h = containerRef.current.clientHeight;
+    setY(Math.max(8, Math.min(h - 8, coord)));
+  }, [series, containerRef, price]);
+
+  useEffect(() => { recalcY(); }, [recalcY]);
+
   useEffect(() => {
-    if (!position?.symbol) return;
-    const symbol = position.symbol.toUpperCase();
+    if (!containerRef?.current) return;
+    const el = containerRef.current;
+    const ro = new ResizeObserver(() => recalcY());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef, recalcY]);
 
-    const handleMarkPrice = (price: string) => {
-      setMarkPrice(parseFloat(price));
-    };
+  if (!visible || !price) return null;
 
-    binancePublicWS.subscribeMarkPrice(symbol, handleMarkPrice);
-
-    return () => {
-      binancePublicWS.unsubscribeMarkPrice(symbol);
-    };
-  }, [position?.symbol]);
-
-  // Tính lại PnL mỗi khi markPrice thay đổi
-  useEffect(() => {
-    if (!position || !markPrice) return;
-
-    const entry = parseFloat(position.entryPrice || '0');
-    const size = parseFloat(position.positionAmt || '0');
-    const pnlNow = (markPrice - entry) * size;
-    setPnl(pnlNow);
-  }, [position, markPrice]);
-
-  if (!visible || !position) return null;
+  const isLong = positionAmt > 0;
+  const pnlCls = pnl > 0 ? 'text-[#0ecb81]' : pnl < 0 ? 'text-[#f6465d]' : 'text-white';
 
   return (
-    <div className="absolute top-[100px] left-[140px] z-[50] bg-dark-600 border border-dark-400 rounded px-3 py-2 shadow-lg flex items-center space-x-2 text-white text-sm">
-      <span>
-        PnL:{" "}
-        <span className={pnl > 0 ? "text-[#0ecb81]" : pnl < 0 ? "text-[#f6465d]" : ""}>
-          {pnl.toFixed(2)} USDT
+    <div
+      className="pointer-events-auto absolute z-[50] select-none"
+      style={{ transform: `translate(${Math.max(0, offset)}px, ${Math.max(0, y - 16)}px)` }}
+    >
+      <div className="flex items-center gap-2 bg-dark-600/90 border border-dark-400 rounded px-3 py-1.5 shadow-md">
+        <span className="text-xs text-white/80">
+          PnL:&nbsp;
+          <b className={pnlCls}>{(pnl >= 0 ? '+' : '') + pnl.toFixed(2)} USDT</b>
+          &nbsp;(<span className={pnlCls}>{(roi >= 0 ? '+' : '') + roi.toFixed(2)}%</span>)
         </span>
-      </span>
-      <button className="text-xs px-2 py-1 bg-dark-400 rounded hover:bg-dark-300">TP/SL</button>
-      <button
-        className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-white"
-        onClick={() => {
-          // TODO: Gửi lệnh đóng lệnh
-        }}
-      >
-        ×
-      </button>
+
+        <button
+          type="button"
+          className="text-[11px] px-2 py-[3px] bg-dark-400 rounded hover:bg-dark-300 text-white"
+        >
+          TP/SL
+        </button>
+
+        <button
+          type="button"
+          className="text-[11px] px-2 py-[3px] rounded text-white"
+          style={{ background: isLong ? '#f6465d' : '#0ecb81' }}
+          onClick={onClosePosition}
+          title="Đóng vị thế"
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 };

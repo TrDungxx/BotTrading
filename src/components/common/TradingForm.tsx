@@ -54,6 +54,25 @@ const [tpSlValues, setTpSlValues] = useState({
   const [stopPrice, setStopPrice] = useState('');
   const [stopPriceType, setStopPriceType] = useState<'MARK' | 'LAST'>('MARK');
 
+  // ==== Helpers: safe wrappers (dùng if service chưa có method) ====
+  const changeMarginTypeWS = (symbol: string, mode: 'cross' | 'isolated') => {
+    const marginType = mode === 'isolated' ? 'ISOLATED' : 'CROSSED';
+    if ((binanceWS as any).changeMarginType) {
+      (binanceWS as any).changeMarginType(symbol, marginType);
+    } else {
+      // fallback: gọi private sendAuthed nếu có
+      (binanceWS as any).sendAuthed?.({ action: 'changeMarginType', symbol, marginType });
+    }
+  };
+
+  const adjustLeverageWS = (symbol: string, lev: number) => {
+    if ((binanceWS as any).adjustLeverage) {
+      (binanceWS as any).adjustLeverage(symbol, lev);
+    } else {
+      (binanceWS as any).sendAuthed?.({ action: 'adjustLeverage', symbol, leverage: lev });
+    }
+  };
+
   // ============================ USE EFFECTS ===============================
   useEffect(() => {
   const token = localStorage.getItem('authToken');
@@ -103,23 +122,21 @@ const [tpSlValues, setTpSlValues] = useState({
   }, []);
 
   useEffect(() => {
-    if (!selectedAccountId) return;
-    binanceWS.send({
-      action: 'selectBinanceAccount',
-      binanceAccountId: selectedAccountId,
-      market: selectedMarket,
-    });
+  if (!selectedAccountId) return;
 
-    binanceWS.send({ action: 'getMultiAssetsMode' });
+  // chọn account qua wrapper (có queue authed an toàn)
+  binanceWS.setCurrentAccountId(selectedAccountId);
+  binanceWS.selectAccount(selectedAccountId);
 
-    const modeCheckHandler = (msg: any) => {
-      if (msg.type === 'getMultiAssetsMode') {
-        setMultiAssetsMode(msg.multiAssetsMargin);
-        binanceWS.removeMessageHandler(modeCheckHandler);
-      }
-    };
-    binanceWS.onMessage(modeCheckHandler);
-  }, [selectedAccountId, selectedSymbol]);
+  // lấy Multi-Assets Mode (one-shot callback, không cần tự remove)
+  binanceWS.getMultiAssetsMode((isMulti) => {
+    setMultiAssetsMode(isMulti);
+    localStorage.setItem(
+      `multiAssetsMode_${selectedAccountId}`,
+      String(isMulti)
+    );
+  });
+}, [selectedAccountId]);
 
   useEffect(() => {
     if (price > 0) setPriceValue(price.toFixed(2));
@@ -136,48 +153,33 @@ const [tpSlValues, setTpSlValues] = useState({
     }
   }, [percent, price, internalBalance]);
 
-  useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (!token) return;
-
-    binanceWS.connect(token, (msg) => {
-      if (msg.type === 'authenticated') {
-        binanceWS.getMyBinanceAccounts();
-      }
-
-      if (msg.type === 'myBinanceAccounts') {
-        const firstAccount = msg.data?.accounts?.[0];
-        if (firstAccount?.id) {
-          binanceWS.selectAccount(firstAccount.id);
-          setSelectedAccountId(firstAccount.id);
-        }
-      }
-
-      if (msg.type === 'futuresDataLoaded') {
-        const usdt = msg.data?.balances?.find((b: any) => b.asset === 'USDT');
-        if (usdt) {
-          setInternalBalance(parseFloat(usdt.availableBalance || '0'));
-        }
-      }
-    });
-  }, []);
+  
 // ============================ HANDLE MODE SWITCH ===============================
   const handleChangeMode = (newMode: boolean) => {
-  // Gửi lệnh lên WebSocket đổi chế độ
-  binanceWS.send({
-    action: 'changeMultiAssetsMode',
-    multiAssetsMargin: newMode,
-  });
-  binanceWS.send({
-    action: 'changePositionMode',
-    dualSidePosition: newMode, // true: HEDGE, false: ONE_WAY
-  });
-  setTimeout(() => {
-    binanceWS.send({ action: 'getPositionMode' });
-  }, 500); // delay nhẹ 500ms
+  // 1) Đổi Multi-Assets Margin
+  binanceWS.changeMultiAssetsMode(
+    newMode,
+    () => {
+      // 2) Khi BE xác nhận đổi multi-assets thành công -> đổi luôn Position Mode
+      // Map theo ý bạn: true => HEDGE, false => ONE-WAY
+      binanceWS.changePositionMode(
+        newMode,
+        () => {
+          // 3) Xác nhận lại cả 2 trạng thái từ server (không set tay)
+          binanceWS.getMultiAssetsMode((isMulti) => {
+            setMultiAssetsMode(isMulti);
+            const accId = binanceWS.getCurrentAccountId();
+            if (accId) localStorage.setItem(`multiAssetsMode_${accId}`, String(isMulti));
+          });
 
-  // ❌ KHÔNG setMultiAssetsMode ở đây
-  // ✅ Chờ WebSocket gửi lại phản hồi 'multiAssetsMargin'
+          binanceWS.getPositionMode((dual) => {
+            // nếu bạn có state riêng cho position mode, set ở đây
+            // setDualSidePosition(dual)
+          });
+        }
+      );
+    },
+  );
 };
 
 useEffect(() => {
@@ -202,70 +204,70 @@ useEffect(() => {
 
   // ============================ ORDER ===============================
   const placeOrder = () => {
-    if (!amount) return alert('Vui lòng nhập số lượng');
+  if (!amount) return alert('Vui lòng nhập số lượng');
 
-    const market = 'futures';
-    const positionSide = tradeSide === 'buy' ? 'LONG' : 'SHORT';
+  const qty = parseFloat(amount);
+  const isFutures = selectedMarket === 'futures';
+  const side = (tradeSide.toUpperCase() as 'BUY' | 'SELL');
 
-    const basePayload: any = {
-      action: 'placeOrder',
-      symbol: selectedSymbol,
-      side: tradeSide.toUpperCase(),
-      quantity: parseFloat(amount),
-      market: selectedMarket,
-    };
-
-   if (selectedMarket === 'futures') {
-  basePayload.reduceOnly = !!reduceOnly;
-
-  // Gán positionSide theo chế độ hiện tại
-  if (multiAssetsMode) {
-    // ✅ HEDGE mode
-    basePayload.positionSide = tradeSide === 'buy' ? 'LONG' : 'SHORT';
-  } else {
-    // ✅ ONE-WAY mode
-    basePayload.positionSide = 'BOTH'; // hoặc có thể bỏ hẳn dòng này nếu bạn muốn Binance tự hiểu
-  }
-}
-
-    if (orderType === 'limit') {
-      if (!priceValue) return alert('Vui lòng nhập giá limit');
-      basePayload.type = 'LIMIT';
-      basePayload.price = parseFloat(priceValue);
-      basePayload.timeInForce = tif;
-    } else if (orderType === 'market') {
-      basePayload.type = 'MARKET';
-    } else if (orderType === 'stop-limit') {
-      if (!stopPrice || !priceValue) return alert('Vui lòng nhập cả giá stop và limit');
-      basePayload.type = 'STOP';
-      basePayload.stopPrice = parseFloat(stopPrice);
-      basePayload.price = parseFloat(priceValue);
-      basePayload.timeInForce = tif;
-    }
-
-    binanceWS.send(basePayload);
-
-    // Gửi thêm các lệnh TP/SL (nếu có)
-    tpSlOrders.forEach((o) => {
-      const side = tradeSide === 'buy' ? 'SELL' : 'BUY';
-
-      const payload = {
-        action: 'placeOrder',
-        market: selectedMarket,
-        symbol: selectedSymbol,
-        side,
-        type: o.type,
-        stopPrice: o.stopPrice,
-        triggerType: o.triggerType,
-        quantity: parseFloat(amount),
-        reduceOnly: true,
-        positionSide,
-      };
-      binanceWS.send(payload);
-    });
-
-    setTpSlOrders([]); // reset sau khi gửi
+  // payload cơ bản
+  const order: any = {
+    symbol: selectedSymbol,
+    side,
+    quantity: qty,
+    market: selectedMarket, // 'spot' | 'futures'
   };
+
+  // type theo UI
+  if (orderType === 'limit') {
+    if (!priceValue) return alert('Vui lòng nhập giá limit');
+    order.type = 'LIMIT';
+    order.price = parseFloat(priceValue);
+    order.timeInForce = tif; // 'GTC' | 'IOC' | 'FOK'
+  } else if (orderType === 'market') {
+    order.type = 'MARKET';
+  } else if (orderType === 'stop-limit') {
+    // ⚠️ Service hiện hỗ trợ 'STOP_MARKET' (không có giá limit).
+    // Nếu bạn thật sự cần Stop-Limit, mở rộng wrapper để nhận 'STOP'.
+    if (!stopPrice /* || !priceValue */) return alert('Nhập stop (và limit nếu cần)');
+    order.type = 'STOP_MARKET';
+    order.stopPrice = parseFloat(stopPrice);
+    // order.price = parseFloat(priceValue); // bật nếu BE hỗ trợ STOP (stop-limit)
+    // order.timeInForce = tif;
+  }
+
+  // futures options
+  if (isFutures) {
+    order.reduceOnly = !!reduceOnly;
+    order.positionSide = (multiAssetsMode
+      ? (tradeSide === 'buy' ? 'LONG' : 'SHORT') // HEDGE
+      : 'BOTH'                                  // ONE-WAY
+    );
+  }
+
+  // ✅ gửi qua wrapper (tự queue nếu chưa authed)
+  binanceWS.placeOrder(order);
+
+  // TP/SL phụ (nếu có)
+  tpSlOrders.forEach((o) => {
+    binanceWS.placeOrder({
+      symbol: selectedSymbol,
+      market: selectedMarket,
+      side: tradeSide === 'buy' ? 'SELL' : 'BUY',
+      type: o.type,               // 'STOP_MARKET' | 'TAKE_PROFIT_MARKET'
+      stopPrice: o.stopPrice,
+      triggerType: o.triggerType, // nếu BE dùng
+      quantity: qty,
+      reduceOnly: true,
+      positionSide: isFutures
+        ? (tradeSide === 'buy' ? 'LONG' : 'SHORT')
+        : undefined,
+    } as any);
+  });
+
+  setTpSlOrders([]);
+};
+
 
   //const handleClosePosition = () => {
   //if (!amount || parseFloat(amount) === 0) return alert('Nhập số lượng để đóng vị thế');
@@ -572,34 +574,29 @@ useEffect(() => {
         Đóng vị thế (Close Position)
       </button>*/}
 
-      {/* Các modal */}
+      
+      {/* Modals */}
       <MarginModeModal
         isOpen={isMarginOpen}
         onClose={() => setIsMarginOpen(false)}
         onSelect={(mode) => {
           setMarginMode(mode);
-          binanceWS.send({
-            action: 'changeMarginType',
-            symbol: selectedSymbol,
-            marginType: mode === 'isolated' ? 'ISOLATED' : 'CROSSED',
-          });
+          changeMarginTypeWS(selectedSymbol, mode); // ✅ wrapper an toàn
         }}
         selectedMode={marginMode}
         symbol={selectedSymbol}
       />
+
       <LeverageModal
         isOpen={isLeverageOpen}
         onClose={() => setIsLeverageOpen(false)}
         leverage={leverage}
         onChange={(val) => {
           setLeverage(val);
-          binanceWS.send({
-            action: 'adjustLeverage',
-            symbol: selectedSymbol,
-            leverage: val,
-          });
+          adjustLeverageWS(selectedSymbol, val); // ✅ wrapper an toàn
         }}
       />
+
       <TpSlModal
         isOpen={isTpSlModalOpen}
         onClose={() => setIsTpSlModalOpen(false)}
@@ -617,6 +614,7 @@ useEffect(() => {
         onSubmit={(orders, values) => {
           setTpSlOrders(orders);
           setTpSlValues(values);
+          setTpSl(true);
         }}
       />
 

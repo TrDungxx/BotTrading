@@ -38,3 +38,18 @@ export interface User {
   binanceAccountId?: number; // ✅ thêm dòng này
   internalAccountId: number;
 }
+
+export type PositionData = {
+  symbol: string;
+  positionAmt: string;
+  entryPrice: string;
+  markPrice?: string;
+};
+
+export type FloatingInfo = {
+  symbol: string;
+  pnl: number;
+  roi: number;
+  price: number;
+  positionAmt: number;
+};

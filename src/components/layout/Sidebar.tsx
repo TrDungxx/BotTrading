@@ -14,6 +14,8 @@ import {
   Users,
   Settings as SettingsIcon,
   Building2,
+  Zap,
+  Atom,
   Cpu,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -40,16 +42,19 @@ const authenticatedNavigation = [
   //{ name: <FormattedMessage id="nav.portfolio" />, href: '/portfolio', icon: Briefcase },
   { name: <FormattedMessage id="nav.tradingTerminal" />, href: '/terminal', icon: Activity },
   { name: "Config Bot", href: '/config-bot', icon: SettingsIcon },
+  { name: "BOT" , href: '/bots/new', icon: Bot },
   { name: "Indicators", href: '/indicators', icon: LineChart },
   { name: "Binance Accounts", href: '/binance-accounts', icon: Building2 },
   { name: <FormattedMessage id="nav.orderHistory" />, href: '/history', icon: History },
   { name: <FormattedMessage id="nav.settings" />, href: '/settings', icon: Lock },
+  
 ];
 
 // Admin navigation - chỉ hiển thị cho type 1
 const adminNavigation = [
   { name: "Admin System", href: '/admin', icon: Shield },
   { name: "Admin Dashboard", href: '/admin/dashboard', icon: LayoutDashboard },
+  { name: "Terminal Indicator", href: '/admin/terminalindicator', icon: Atom },
   { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
   { name: "System Stats", href: '/admin/system', icon: Cpu },
   //{ name: "User Management", href: '/admin/users', icon: Users },

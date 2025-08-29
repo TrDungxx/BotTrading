@@ -194,9 +194,45 @@
 .trading-chart-container {
   height: 100%;
   min-height: 500px;
+  max-width: 1400px; /* hoặc kích thước bạn muốn */
+  margin: 0 auto;    /* căn giữa */
+  padding: 0 1rem;   /* khoảng cách hai bên */
 }
 .chart-container {
   display: grid;
   grid-template-rows: 75% 25%;
   height: 100%;
+}
+html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
+ 
+
+.btn-signal {
+  padding: 6px 12px; /* nhỏ gọn */
+  font-size: 0.85rem;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn-long {
+  background-color: rgba(16, 185, 129, 0.15); /* xanh pastel */
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-short {
+  background-color: rgba(239, 68, 68, 0.15); /* đỏ pastel */
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.btn-exit {
+  background-color: rgba(107, 114, 128, 0.15); /* xám nhạt */
+  color: #6b7280;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.btn-signal:hover {
+  transform: translateY(-1px);
+  background-color: rgba(255, 255, 255, 0.05);
 }

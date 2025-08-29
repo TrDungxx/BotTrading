@@ -2,22 +2,26 @@ import React, { useEffect, useState } from "react";
 import { binancePublicWS } from "../binancewebsocket/binancePublicWS";
 import { binanceWS } from "../binancewebsocket/BinanceWebSocketService";
 import PopupPosition from "../popupposition/PopupPosition";
-interface PositionData {
-  symbol: string;
-  positionAmt: string;
-  entryPrice: string;
-  markPrice?: string;
-  margin?: number;
-}
+import { PositionData,FloatingInfo } from "../../utils/types";
 
 interface PositionProps {
   positions?: PositionData[];
   market?: "spot" | "futures";
+  onPositionCountChange?: (n: number) => void;
+  onFloatingInfoChange?: (info: {
+    symbol: string;
+    pnl: number;
+    roi: number;
+    price: number;       // mark price hiện tại
+    positionAmt: number; // để xác định LONG/SHORT
+  } | null) => void;
 }
 
 const Position: React.FC<PositionProps> = ({
   positions: externalPositions,
   market,
+  onPositionCountChange,
+  onFloatingInfoChange,
 }) => {
   const [positions, setPositions] = useState<PositionData[]>([]);
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
@@ -27,123 +31,150 @@ const Position: React.FC<PositionProps> = ({
   const [targetTP, setTargetTP] = useState("");
   const [targetSL, setTargetSL] = useState("");
   const [currentPnl, setCurrentPnl] = useState(0); // => tính tổng từ all positions
+
+  const symbolStepMap: Record<string, number> = {
+  // ví dụ: "DOGEUSDT": 1, "BTCUSDT": 0.001
+};
+const getStepSize = (symbol: string) => symbolStepMap[symbol] ?? 0.001;
+const roundToStep = (qty: number, step: number) => {
+  if (step <= 0) return qty;
+  const precision = Math.max(0, (step.toString().split('.')[1] || '').length);
+  // floor để không vượt khối lượng vị thế
+  return Number((Math.floor(qty / step) * step).toFixed(precision));
+};
+
+useEffect(() => {
+  // chọn vị thế theo symbol đang hiển thị (tuỳ bạn lấy selectedSymbol ở đâu; ví dụ từ localStorage)
+  const selectedSymbol = localStorage.getItem('selectedSymbol') || positions[0]?.symbol;
+  const pos = positions.find(p => p.symbol === selectedSymbol && parseFloat(p.positionAmt) !== 0);
+
+  if (!pos) {
+    onFloatingInfoChange?.(null);
+    return;
+  }
+
+  const entry = parseFloat(pos.entryPrice || '0');
+  const size  = parseFloat(pos.positionAmt || '0');
+  const mp    = parseFloat(pos.markPrice || '0');
+
+  const pnl = (mp - entry) * size;
+  const notional = entry * Math.abs(size);
+  const roi = notional ? (pnl / notional) * 100 : 0;
+
+  onFloatingInfoChange?.({
+    symbol: pos.symbol,
+    pnl,
+    roi,
+    price: mp, // dùng mark price cho Floating
+    positionAmt: size,
+  });
+}, [positions, onFloatingInfoChange]);
+
+
   // Load từ props hoặc localStorage
-  useEffect(() => {
+   useEffect(() => {
     if (!externalPositions || externalPositions.length === 0) {
-      const raw = localStorage.getItem("positions");
+      const raw = localStorage.getItem('positions');
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
           setPositions(parsed);
+          // đếm vị thế != 0
+          onPositionCountChange?.(
+            parsed.filter((p: any) => parseFloat(p.positionAmt) !== 0).length
+          );
         } catch {}
       }
     } else {
       setPositions(externalPositions);
+      onPositionCountChange?.(
+        externalPositions.filter((p) => parseFloat(p.positionAmt) !== 0).length
+      );
     }
-  }, [externalPositions]);
+  }, [externalPositions, onPositionCountChange]);
 
-  useEffect(() => {
+ useEffect(() => {
     binanceWS.setPositionUpdateHandler((rawPositions) => {
-      // ⚠️ Nếu không có vị thế nào hoặc toàn bộ đã đóng
       if (!Array.isArray(rawPositions) || rawPositions.length === 0) {
         setPositions([]);
-        localStorage.removeItem("positions");
+        localStorage.removeItem('positions');
+        onPositionCountChange?.(0);
         return;
       }
-
-      // ⚠️ Lọc bỏ vị thế đã đóng
-      const filtered = rawPositions.filter(
-        (p: any) => parseFloat(p.positionAmt) !== 0
-      );
-
+      const filtered = rawPositions.filter((p: any) => parseFloat(p.positionAmt) !== 0);
       if (filtered.length === 0) {
         setPositions([]);
-        localStorage.removeItem("positions");
+        localStorage.removeItem('positions');
+        onPositionCountChange?.(0);
         return;
       }
-
-      // ✅ Chuẩn hóa dữ liệu
       const cleaned = filtered.map((p: any) => ({
         symbol: p.symbol,
-        positionAmt: p.positionAmt ?? "0",
-        entryPrice: p.entryPrice ?? "0",
-        markPrice: undefined, // sẽ được cập nhật từ WS public
+        positionAmt: p.positionAmt ?? '0',
+        entryPrice: p.entryPrice ?? '0',
+        markPrice: undefined,
       }));
-
       setPositions(cleaned);
-      localStorage.setItem("positions", JSON.stringify(cleaned));
+      localStorage.setItem('positions', JSON.stringify(cleaned));
+      onPositionCountChange?.(cleaned.length);
     });
 
-    // ✅ Lấy danh sách vị thế ngay khi mount
-    binanceWS.send({ action: "getPositions" });
+    binanceWS.getPositions();
 
     return () => {
-      binanceWS.setPositionUpdateHandler(() => {}); // cleanup
+      binanceWS.setPositionUpdateHandler(() => {});
     };
-  }, []);
+  }, [onPositionCountChange]);
   // 🔁 Lắng nghe WS để bắt ACCOUNT_UPDATE.a.P
   useEffect(() => {
     const handler = (msg: any) => {
-      // ✅ Nếu có vị thế trong update từ server
       if (msg?.a?.P && Array.isArray(msg.a.P)) {
         const rawPositions = msg.a.P;
-
-        const filtered = rawPositions.filter(
-          (p: any) => parseFloat(p.pa) !== 0
-        );
-
+        const filtered = rawPositions.filter((p: any) => parseFloat(p.pa) !== 0);
         if (filtered.length === 0) {
           setPositions([]);
-          localStorage.removeItem("positions");
+          localStorage.removeItem('positions');
+          onPositionCountChange?.(0);
           return;
         }
-
         const cleaned = filtered.map((p: any) => ({
           symbol: p.s,
-          positionAmt: p.pa ?? "0",
-          entryPrice: p.ep ?? "0",
+          positionAmt: p.pa ?? '0',
+          entryPrice: p.ep ?? '0',
           markPrice: undefined,
         }));
-
         setPositions(cleaned);
-        localStorage.setItem("positions", JSON.stringify(cleaned));
+        localStorage.setItem('positions', JSON.stringify(cleaned));
+        onPositionCountChange?.(cleaned.length);
       }
     };
-
     binanceWS.onMessage(handler);
     return () => binanceWS.removeMessageHandler(handler);
-  }, []);
+  }, [onPositionCountChange]);
 
   // Subscribe markPrice theo từng symbol
   useEffect(() => {
     if (!positions || positions.length === 0) return;
     if (market !== "futures") return;
-
     const subscribed: string[] = [];
-
     positions.forEach((pos) => {
       const symbol = pos.symbol;
       if (!symbol || subscribed.includes(symbol)) return;
       subscribed.push(symbol);
-
       binancePublicWS.subscribeMarkPrice(symbol, (markPriceRaw) => {
-        const markPrice = parseFloat(markPriceRaw).toFixed(6); // chuẩn hóa để so sánh
-
-        setPositions((prev) => {
-          const updated = prev.map((p) => {
-            if (p.symbol !== symbol) return p;
-            if (p.markPrice === markPrice) return p;
-            return { ...p, markPrice };
-          });
-          return [...updated];
-        });
-      });
+  const markPrice = parseFloat(markPriceRaw).toFixed(6);
+  setPositions((prev) => {
+    const updated = prev.map((p) =>
+      p.symbol !== symbol ? p : { ...p, markPrice }
+    );
+    // ✅ lưu lại để nơi khác dùng cùng markPrice
+    localStorage.setItem("positions", JSON.stringify(updated));
+    return updated;
+  });
+});
     });
-
     return () => {
-      subscribed.forEach((symbol) => {
-        binancePublicWS.unsubscribeMarkPrice(symbol);
-      });
+      subscribed.forEach((symbol) => binancePublicWS.unsubscribeMarkPrice(symbol));
     };
   }, [positions, market]);
 
@@ -169,56 +200,52 @@ const Position: React.FC<PositionProps> = ({
   };
 
   const handleCloseAllMarket = () => {
-    console.log("🔥 Gửi lệnh đóng tất cả MKT");
-
+    console.log('🔥 Gửi lệnh đóng tất cả MKT');
     positions.forEach((pos) => {
-      const size = parseFloat(pos.positionAmt || "0");
-      if (size === 0) return;
+      const rawSize = parseFloat(pos.positionAmt || '0');
+      if (rawSize === 0) return;
 
-      const side = size > 0 ? "SELL" : "BUY";
-      const positionSide = size > 0 ? "LONG" : "SHORT";
+      const side = rawSize > 0 ? 'SELL' : 'BUY';
+      // TODO: lấy từ binanceWS.getPositionMode() nếu có
+      const isHedge = true;
+      const positionSide = (isHedge
+        ? (rawSize > 0 ? 'LONG' : 'SHORT')
+        : 'BOTH') as 'LONG' | 'SHORT' | 'BOTH';
 
-      const order = {
-        action: "placeOrder",
+      const absSize = Math.abs(rawSize);
+      const step = getStepSize(pos.symbol);
+      const qty = roundToStep(absSize, step);
+      if (qty <= 0) return;
+
+      binanceWS.placeOrder({
         symbol: pos.symbol,
-        side,
-        type: "MARKET",
-        quantity: Math.abs(size),
-        market: "futures",
-
+        market: 'futures',
+        type: 'MARKET',
+        side: side as 'BUY' | 'SELL',
         positionSide,
-      };
-
-      console.log("📤 Đóng MKT:", order);
-      binanceWS.send(order);
+        quantity: qty,
+      });
     });
-  };
+  }; // <-- đóng ngoặc bị thiếu trước đó
+
 
   const handleCloseAllByPnl = () => {
     console.log("🔪 Gửi lệnh đóng tất cả theo PnL > 5%");
-
     positions.forEach((pos) => {
       const size = parseFloat(pos.positionAmt || "0");
       const pnlPercent = calculatePnlPercentage(pos);
-
       if (size === 0 || pnlPercent < 5) return;
-
       const side = size > 0 ? "SELL" : "BUY";
       const positionSide = size > 0 ? "LONG" : "SHORT";
-
-      const order = {
-        action: "placeOrder",
+      binanceWS.placeOrder({
         symbol: pos.symbol,
-        side,
+        side: side as "BUY" | "SELL",
         type: "MARKET",
         quantity: Math.abs(size),
         market: "futures",
         reduceOnly: true,
-        positionSide,
-      };
-
-      console.log("📤 Đóng theo PnL > 5%:", order);
-      binanceWS.send(order);
+        positionSide: positionSide as "LONG" | "SHORT",
+      });
     });
   };
 

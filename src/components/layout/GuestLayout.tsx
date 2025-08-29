@@ -36,8 +36,7 @@ export default function GuestLayout() {
       
       <div className="flex flex-1 flex-col min-h-screen">
         <Header setSidebarOpen={setSidebarOpen} />
-        <main className="flex-1 p-4 lg:p-6 mt-16 lg:ml-64">
-          <div className="container mx-auto max-w-7xl">
+        <main className="flex-1 p-4 lg:p-6 mt-16 lg:ml-64 w-full">
             {/* Guest mode banner */}
             <div className="mb-6 p-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
               <div className="flex items-center justify-between">
@@ -56,7 +55,6 @@ export default function GuestLayout() {
               </div>
             </div>
             <Outlet />
-          </div>
         </main>
       </div>
     </div>

@@ -25,6 +25,8 @@ import MonitoringSystem from './pages/admin/MonitoringSystem';
 import AdminDashBoard from './pages/admin/AdminDashboard';
 import AccountStats from './pages/user/AccountStats';
 import SystemStats from './pages/admin/SystemStats';
+import DCABot from './pages/user/DCABot';
+import TerminalIndicatorLayout from './pages/admin/TerminalIndicator';
 function App() {
   return (
     <LanguageProvider>
@@ -55,6 +57,7 @@ function App() {
 
             <Route index element={<Dashboard />} />
             <Route path="bots" element={<Bots />} />
+            <Route path="bots/new" element={<DCABot />} />
             <Route path="portfolio" element={<Portfolio />} />
             <Route path="terminal" element={<TradingTerminal />} />
             <Route path="market" element={<MarketAnalysis />} />
@@ -74,6 +77,7 @@ function App() {
             />
             {/* Admin routes - chỉ type 1 mới truy cập được */}
             <Route path="admin" element={<AdminSystem />} />
+            <Route path="admin/terminalindicator" element={<TerminalIndicatorLayout />} />
             <Route path="admin/users" element={<AdminSystem />} />
             <Route path="admin/settings" element={<AdminSystem />} />
             <Route path="admin/monitoring" element={<MonitoringSystem />} />
