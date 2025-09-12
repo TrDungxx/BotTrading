@@ -4,19 +4,42 @@
 type MarketType = 'spot' | 'futures';
 type WsState = 'closed' | 'connecting' | 'open' | 'authenticated';
 
+// ==== Types for placing orders ====
+export type WorkingType = 'MARK' | 'LAST';
+
+export interface PlaceOrderPayload {
+  symbol: string;
+  side: 'BUY' | 'SELL';
+  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
+  market: 'futures' | 'spot';
+
+  // qty/price
+  quantity: number;
+  price?: number;     // LIMIT
+  stopPrice?: number; // *_MARKET (TP/SL)
+
+  // futures-only (optional)
+  reduceOnly?: boolean;
+  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
+  timeInForce?: 'GTC' | 'IOC' | 'FOK';
+
+  // trigger theo Binance Futures
+  workingType?: WorkingType; // 'MARK' | 'LAST'
+}
+
 class BinanceWebSocketService {
   private socket: WebSocket | null = null;
   private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
+
   // ===== add fields =====
-private authInFlight = false;
-private authedOnceKeys = new Set<string>();
-
-private pushAuthedUnique(key: string, msg: any) {
-  if (this.authedOnceKeys.has(key)) return;
-  this.authedOnceKeys.add(key);
-  this.authedQueue.push(msg);
-}
-
+  private authInFlight = false;
+  private authedOnceKeys = new Set<string>();
+  private pushAuthedUnique(key: string, msg: any) {
+    if (this.authedOnceKeys.has(key)) return;
+    this.authedOnceKeys.add(key);
+    this.authedQueue.push(msg);
+  }
+private noPositionRiskSupport = true;
   // ===== State & queues =====
   private state: WsState = 'closed';
   private openResolvers: Array<() => void> = [];
@@ -34,6 +57,24 @@ private pushAuthedUnique(key: string, msg: any) {
   private subscriptions: Map<string, any> = new Map();
   private callbacks: Map<string, (data: any) => void> = new Map();
 
+  // ==== NEW: coalesce risk requests ====
+  private pendingRiskSymbols = new Set<string>();
+  private riskDebounceTimer: number | null = null;
+
+  // ---- cache leverage theo symbol ----
+private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
+
+private setLeverageFor(symbol: string, lev: any) {
+  const n = Number(lev);
+  if (Number.isFinite(n) && n > 0) {
+    this.symbolLeverage.set(symbol.toUpperCase(), n);
+    console.log("LEV CACHE SET ✅", symbol.toUpperCase(), n);
+  }
+}
+private getLeverageFor(symbol: string) {
+  return this.symbolLeverage.get(symbol.toUpperCase());
+}
+
   // ========= Helpers =========
   private waitForOpen(): Promise<void> {
     if (this.state === 'open' || this.state === 'authenticated') return Promise.resolve();
@@ -43,6 +84,17 @@ private pushAuthedUnique(key: string, msg: any) {
     if (this.state === 'authenticated') return Promise.resolve();
     return new Promise(res => this.authResolvers.push(res));
   }
+
+  // === Position Risk (để backfill leverage/IM) ===
+// Client fallback: server không support -> dùng futures snapshot
+public requestPositionRisk(symbols?: string[]) {
+  this.getFuturesAccount(); // kéo leverage/isolatedWallet qua snapshot
+}
+
+// (không còn dùng tới)
+private _sendGetPositionRisk(symbols?: string[]) {
+  // no-op
+}
 
   public setCurrentAccountId(id: number) {
     this.currentAccountId = id;
@@ -62,70 +114,75 @@ private pushAuthedUnique(key: string, msg: any) {
     this.messageHandlers.push(handler);
   }
   public removeMessageHandler(handler: (data: any) => void) {
-    this.messageHandlers = this.messageHandlers.filter((h) => h !== handler);
+    this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
   }
 
   public isConnected() {
     return this.socket?.readyState === WebSocket.OPEN;
   }
-//changeposition
-public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw:any)=>void) {
-  this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
 
-  if (!onDone) return;
-  const once = (m:any) => {
-    // BE của bạn có thể trả { type:'changePositionMode', dualSidePosition, success:true }
-    if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
-      onDone(true, m);
-      this.removeMessageHandler(once);
-    } else if (m?.success === false && m?.error) {
-      onDone(false, m);
-      this.removeMessageHandler(once);
+  // changeposition
+  public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
+    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
+
+    if (!onDone) return;
+    const once = (m: any) => {
+      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
+        onDone(true, m);
+        this.removeMessageHandler(once);
+      } else if (m?.success === false && m?.error) {
+        onDone(false, m);
+        this.removeMessageHandler(once);
+      }
+    };
+    this.onMessage(once);
+  }
+
+  public getPositionMode(onResult?: (dual: boolean) => void) {
+    this.sendAuthed({ action: 'getPositionMode' });
+    if (!onResult) return;
+    const once = (m: any) => {
+      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
+        onResult(m.dualSidePosition);
+        this.removeMessageHandler(once);
+      }
+    };
+    this.onMessage(once);
+  }
+
+  // Public: đóng WS + dọn state
+  public disconnect(reason?: string) {
+    try { this.socket?.close(1000, reason || 'client disconnect'); } catch {}
+    this.socket = null;
+    this.state = 'closed';
+    this.authInFlight = false;
+    this.openResolvers.splice(0);
+    this.authResolvers.splice(0);
+    this.preAuthQueue = [];
+    this.authedQueue = [];
+    this.accountSubActive = false;
+    this.messageHandlers = [];
+    this.callbacks.clear();
+    this.subscriptions.clear();
+    this.pendingRiskSymbols.clear();
+    if (this.riskDebounceTimer != null) {
+      clearTimeout(this.riskDebounceTimer);
+      this.riskDebounceTimer = null;
     }
-  };
-  this.onMessage(once);
-}
+  }
 
-public getPositionMode(onResult?: (dual: boolean)=>void) {
-  this.sendAuthed({ action: 'getPositionMode' });
-  if (!onResult) return;
-  const once = (m:any) => {
-    if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
-      onResult(m.dualSidePosition);
-      this.removeMessageHandler(once);
-    }
-  };
-  this.onMessage(once);
-}
-// Public: đóng WS + dọn state
-public disconnect(reason?: string) {
-  try { this.socket?.close(1000, reason || 'client disconnect'); } catch {}
-  this.socket = null;
-  this.state = 'closed';
-  this.authInFlight = false;
-  this.openResolvers.splice(0); // bỏ pending resolvers
-  this.authResolvers.splice(0);
-  this.preAuthQueue = [];
-  this.authedQueue = [];
-  this.accountSubActive = false;
-  this.messageHandlers = [];
-  this.callbacks.clear();
-  this.subscriptions.clear();
-}
+  // Public: chờ tới khi AUTHENTICATED (dùng được cho select)
+  public async waitUntilAuthenticated() {
+    if (this.state === 'authenticated') return;
+    await this.waitForOpen();
+    await this.waitForAuth();
+  }
 
-// Public: chờ tới khi AUTHENTICATED (dùng được cho select)
-public async waitUntilAuthenticated() {
-  if (this.state === 'authenticated') return;
-  await this.waitForOpen();
-  await this.waitForAuth();
-}
-
-// Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
-public async selectAccountAndWait(id: number, settleMs = 160) {
-  this.selectAccount(id);
-  await new Promise(res => setTimeout(res, settleMs)); // khớp với flushAuthed (120ms)
-}
-
+  // Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
+  public async selectAccountAndWait(id: number, settleMs = 160) {
+    this.selectAccount(id);
+    await new Promise(res => setTimeout(res, settleMs)); // khớp với flushAuthed (120ms)
+  }
 
   // ========= Connect (idempotent) =========
   public connect(token: string, onMessage: (data: any) => void) {
@@ -166,33 +223,82 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
     };
 
     sock.onmessage = (event) => {
+
+      
       if (this.socket !== sock) return;
       console.log('📥 RAW WS MSG:', event.data);
       try {
         const data = JSON.parse(event.data);
+     // Phản hồi adjustLeverage từ backend: { symbol, leverage, ... }
+if (data?.symbol && Number.isFinite(data?.leverage)) {
+  this.setLeverageFor(data.symbol, data.leverage);
+  this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
+  // không return, để các handler khác cũng nhận được gói gốc (nếu cần)
+}
+
         console.log('📥 WS Parsed:', data);
 
-        // ===== AUTHENTICATED =====
-        if (data?.type === 'authenticated') {
-  this.state = 'authenticated';
-  this.authInFlight = false;
-  this.authResolvers.splice(0).forEach(r => r());
-  this.flushAuthed();
-
-  // ❌ Đừng auto select/subscribe ở đây
-  // ❌ Đừng auto getPositions/getFuturesAccount ở đây
+        // Forward snapshot futures account để UI merge leverage/iw
+if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount') && Array.isArray(data.positions)) {
+  console.log("FUTURES SNAPSHOT ▶", data.positions.map((r:any)=>({
+    s: r.symbol ?? r.s, lev: r.leverage ?? r.l, im: r.positionInitialMargin ?? r.im
+  })));
+  for (const r of data.positions) {
+    const sym = String(r.symbol ?? r.s ?? "");
+    if (!sym) continue;
+    const lev = Number(r.leverage ?? r.l);
+    if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
+  }
+  this.messageHandlers.forEach(h => h(data));
   return;
 }
 
-        // ====== HANDLE getPositions (array) ======
-        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
-          console.log('✅ Nhận được positions:', data);
-          localStorage.setItem('positions', JSON.stringify(data));
-          if (this.positionUpdateHandler) this.positionUpdateHandler(data);
-          // forward cho listeners khác nếu cần
-          this.messageHandlers.forEach((h) => h(data));
+
+        // ⬅️ ADD: server không hỗ trợ getPositionRisk → chuyển sang fallback
+if (data?.type === 'error' && data?.action === 'getPositionRisk') {
+  this.noPositionRiskSupport = true;
+  console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
+  this.getFuturesAccount();   // kéo leverage/isolatedWallet qua đây
+  return;                     // dừng xử lý message này
+}
+
+
+        // ===== AUTHENTICATED =====
+        if (data?.type === 'authenticated') {
+          this.state = 'authenticated';
+          this.authInFlight = false;
+          this.authResolvers.splice(0).forEach(r => r());
+          this.flushAuthed();
+          // ❌ Đừng auto select/subscribe ở đây
+          // ❌ Đừng auto getPositions/getFuturesAccount ở đây
           return;
         }
+
+        // ====== HANDLE getPositions (array) — RAW Position Risk ======
+        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
+  // ✅ nếu packet có leverage thì cache lại luôn
+  try {
+    for (const r of data) {
+      const sym = String(r.symbol ?? "");
+      const lev = Number(r.leverage ?? r.l);
+      if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
+    }
+  } catch {}
+
+  if (this.positionUpdateHandler) this.positionUpdateHandler(data);
+
+  try {
+    const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
+    if (symbols.length) {
+      if (this.noPositionRiskSupport) this.getFuturesAccount();
+      else this.requestPositionRisk(symbols);
+    }
+  } catch {}
+
+  this.messageHandlers.forEach(h => h(data));
+  return;
+}
+
 
         // ====== MiniTicker (public) ======
         if (data.e === '24hrMiniTicker' || data.action === 'miniTickerUpdate') {
@@ -257,25 +363,61 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
         }
 
         // ====== ACCOUNT UPDATE (Spot/Futures) ======
-        if (data.type === 'update' && data.channel === 'account') {
-          if (data.orders && this.orderUpdateHandler) {
-            console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
-            localStorage.setItem('openOrders', JSON.stringify(data.orders));
-            this.orderUpdateHandler(data.orders);
-          }
+if (data?.type === 'update' && data?.channel === 'account') {
+  if (data.orders && this.orderUpdateHandler) {
+    console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
+    localStorage.setItem('openOrders', JSON.stringify(data.orders));
+    this.orderUpdateHandler(data.orders);
+  }
 
-          // positions từ account update
-          if (data.a?.P && this.positionUpdateHandler) {
-            const positions = data.a.P.map((p: any) => ({
-              symbol: p.s,
-              positionAmt: p.pa,
-              entryPrice: p.ep,
-            }));
-            console.log('📦 [WS] Cập nhật positions từ account:', positions);
-            localStorage.setItem('positions', JSON.stringify(positions));
-            this.positionUpdateHandler(positions);
-          }
-        }
+  if (Array.isArray(data?.a?.P) && this.positionUpdateHandler) {
+    const positions = data.a.P.map((p: any) => {
+      const sym = String(p.s);
+      const levFromPacket = Number(p.l);
+      const lev = (Number.isFinite(levFromPacket) && levFromPacket > 0)
+        ? levFromPacket
+        : this.getLeverageFor(sym); // ✅ lấy từ cache nếu packet không có
+
+    return {
+        symbol: sym,
+        positionAmt: p.pa,
+        entryPrice: p.ep,
+        breakEvenPrice: p.bep,
+        marginType: (p.mt || '').toString().toLowerCase(),
+        isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
+        positionSide: p.ps,
+        leverage: lev, // ✅ enrich
+        // markPrice đến từ kênh khác
+      };
+    });
+
+    console.log("ACCOUNT_UPDATE ENRICH", positions.map(p => ({ s: p.symbol, lev: p.leverage })));
+
+    this.positionUpdateHandler(positions);
+
+    // Nếu còn thiếu lev ở bất kỳ position nào -> kéo snapshot để backfill
+    try {
+      const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
+      if (needBackfill) this.getFuturesAccount();
+    } catch (e) {
+      console.warn('position backfill check err:', e);
+    }
+  }
+
+  this.messageHandlers.forEach(h => h(data));
+  return;
+}
+
+
+if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
+  const { s: symbol, l: leverage } = data.ac || {};
+  if (symbol && Number.isFinite(leverage)) {
+    this.setLeverageFor(symbol, leverage); // ✅ cache
+    this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
+  }
+  return;
+}
+
 
         // ====== Multi Assets Mode ======
         if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
@@ -286,12 +428,18 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
           if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
             localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
           }
-          this.messageHandlers.forEach((h) => h(data));
+          this.messageHandlers.forEach(h => h(data));
+          return;
+        }
+
+        // ====== POSITION RISK (backfill leverage/IM) ======
+        if (data?.type === 'positionRisk' && Array.isArray(data.data)) {
+          this.messageHandlers.forEach(h => h(data));
           return;
         }
 
         // ====== Forward còn lại ======
-        this.messageHandlers.forEach((h) => h(data));
+        this.messageHandlers.forEach(h => h(data));
       } catch (error) {
         console.error('❌ WS parse error:', error);
       }
@@ -325,19 +473,18 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
   }
 
   private sendAuthed(data: any) {
-  if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
-    if (data?.action === 'selectBinanceAccount') {
-      // đưa lên đầu + khử trùng
-      this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
-    } else {
-      this.authedQueue.push(data);
+    if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
+      if (data?.action === 'selectBinanceAccount') {
+        // đưa lên đầu + khử trùng
+        this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
+      } else {
+        this.authedQueue.push(data);
+      }
+      return;
     }
-    return;
+    console.log('📤 WS Sending (authed):', data);
+    this.socket.send(JSON.stringify(data));
   }
-  console.log('📤 WS Sending (authed):', data);
-  this.socket.send(JSON.stringify(data));
-}
-
 
   private flushPreAuth() {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
@@ -350,45 +497,46 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
   }
 
   private flushAuthed() {
-  if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') return;
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') return;
 
-  const q = this.authedQueue;
-  this.authedQueue = [];
+    const q = this.authedQueue;
+    this.authedQueue = [];
 
-  const selects = q.filter(m => m.action === 'selectBinanceAccount');
-  const subs    = q.filter(m => m.action === 'subscribeAccountUpdates');
-  const others  = q.filter(m => m.action !== 'selectBinanceAccount' && m.action !== 'subscribeAccountUpdates');
+    const selects = q.filter(m => m.action === 'selectBinanceAccount');
+    const subs    = q.filter(m => m.action === 'subscribeAccountUpdates');
+    const others  = q.filter(m => m.action !== 'selectBinanceAccount' && m.action !== 'subscribeAccountUpdates');
 
-  const send = (m: any) => this.socket!.send(JSON.stringify(m));
+    const send = (m: any) => this.socket!.send(JSON.stringify(m));
 
-  if (selects.length) {
-    selects.forEach(send);
-    // đợi server “ghi” xong account, rồi mới bắn phần còn lại
-    setTimeout(() => {
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
-        this.authedQueue.push(...subs, ...others);
-        return;
-      }
-      subs.forEach(send);
-      others.forEach(send);
-    }, 120);
-  } else {
-    // không có select thì flush bình thường
-    [...subs, ...others].forEach(send);
+    if (selects.length) {
+      selects.forEach(send);
+      // đợi server “ghi” xong account, rồi mới bắn phần còn lại
+      setTimeout(() => {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
+          this.authedQueue.push(...subs, ...others);
+          return;
+        }
+        subs.forEach(send);
+        others.forEach(send);
+      }, 120);
+    } else {
+      // không có select thì flush bình thường
+      [...subs, ...others].forEach(send);
+    }
   }
-}
 
   // ========= Auth & session =========
   public authenticate(token: string) {
-  if (this.state === 'authenticated' || this.authInFlight) return;
-  this.authInFlight = true;
+    if (this.state === 'authenticated' || this.authInFlight) return;
+    this.authInFlight = true;
 
-  // chỉ gửi auth 1 lần
-  this.sendOpen({ action: 'authenticate', token });
+    // chỉ gửi auth 1 lần
+    this.sendOpen({ action: 'authenticate', token });
 
-  // chỉ xếp hàng getMyBinanceAccounts 1 lần
-  this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
-}
+    // chỉ xếp hàng getMyBinanceAccounts 1 lần
+    this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
+    this.pushAuthedUnique('getFuturesAccount', { action: 'getFuturesAccount' });
+  }
 
   public getMyBinanceAccounts() {
     this.sendAuthed({ action: 'getMyBinanceAccounts' });
@@ -416,47 +564,36 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
   }
 
   public getFuturesAccount(id?: number) {
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
-  this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
-}
+    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+    if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
+    this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
+  }
 
   public getSpotAccount(id?: number) {
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
-  this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
-}
+    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+    if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
+    this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
+  }
 
-  public getMultiAssetsMode(
-  onResult?: (isMulti: boolean, raw: any) => void
-) {
-  // gửi yêu cầu
-  this.sendAuthed({ action: 'getMultiAssetsMode' });
+  public getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
+    // gửi yêu cầu
+    this.sendAuthed({ action: 'getMultiAssetsMode' });
 
-  if (!onResult) return;
+    if (!onResult) return;
 
-  // one-shot handler
-  const once = (msg: any) => {
-    if (msg?.type === 'getMultiAssetsMode') {
-      const isMulti = !!msg.multiAssetsMargin;
-      onResult(isMulti, msg);
-      this.removeMessageHandler(once);
-    }
-  };
-  this.onMessage(once);
-}
+    // one-shot handler
+    const once = (msg: any) => {
+      if (msg?.type === 'getMultiAssetsMode') {
+        const isMulti = !!msg.multiAssetsMargin;
+        onResult(isMulti, msg);
+        this.removeMessageHandler(once);
+      }
+    };
+    this.onMessage(once);
+  }
 
   // ========= Orders =========
-  public placeOrder(payload: {
-    symbol: string;
-    side: 'BUY' | 'SELL';
-    type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
-    quantity: number;
-    price?: number;
-    market: 'futures' | 'spot';
-    reduceOnly?: boolean;
-    positionSide?: 'LONG' | 'SHORT';
-  }) {
+  public placeOrder(payload: PlaceOrderPayload) {
     this.sendAuthed({ action: 'placeOrder', ...payload });
   }
 
@@ -474,28 +611,28 @@ public async selectAccountAndWait(id: number, settleMs = 160) {
     this.sendAuthed(payload);
   }
 
-
-
   public cancelAllOrders(symbol: string, market: 'spot' | 'futures') {
     const payload = { action: 'cancelAllOrders', symbol, market };
     console.log('🛑 Gửi yêu cầu huỷ tất cả lệnh:', payload);
     this.sendAuthed(payload);
   }
-private accountSubActive = false;
+
+  private accountSubActive = false;
+
   // ========= Realtime account updates =========
-  public subscribeAccountUpdates(onOrderUpdate: (orders:any[]) => void, types = ['orders','positions','balance']) {
-  if (this.accountSubActive) return;
-  this.accountSubActive = true;
-  this.orderUpdateHandler = onOrderUpdate;
-  this.sendAuthed({ action: 'subscribeAccountUpdates', types });
-}
+  public subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
+    if (this.accountSubActive) return;
+    this.accountSubActive = true;
+    this.orderUpdateHandler = onOrderUpdate;
+    this.sendAuthed({ action: 'subscribeAccountUpdates', types });
+  }
 
   public unsubscribeAccountUpdates(types: string[] = []) {
-  const payload = { action: 'unsubscribeAccountUpdates', types };
-  console.log('🔕 Hủy đăng ký cập nhật real-time:', payload);
-  this.sendAuthed(payload);
-  this.accountSubActive = false; // ⬅️ thêm dòng này
-}
+    const payload = { action: 'unsubscribeAccountUpdates', types };
+    console.log('🔕 Hủy đăng ký cập nhật real-time:', payload);
+    this.sendAuthed(payload);
+    this.accountSubActive = false;
+  }
 
   public changeMultiAssetsMode(
     multiAssetsMargin: boolean,

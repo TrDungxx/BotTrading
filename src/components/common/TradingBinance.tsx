@@ -14,6 +14,8 @@ import MAHeader from './popupchart/MAHeader';
 import MASettings from './popupchart/MASetting';
 import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
+import ToolTpSl from './popupchart/ToolTpSl';
+import ToolMini from './popupchart/ToolMini';
 
 type Candle = CandlestickData<UTCTimestamp>;
 type VolumeBar = HistogramData<UTCTimestamp>;
@@ -74,6 +76,16 @@ const TradingBinance: React.FC<Props> = ({
   const [maHeaderVisible, setMaHeaderVisible] = useState(true);
   const [showMASettings, setShowMASettings] = useState(false);
   const [maVisible, setMaVisible] = useState({ ma7: true, ma25: true, ma99: true });
+  
+//tool tplsl
+const [tpSlEnabled, setTpSlEnabled] = useState(false);
+const lastCandleTime = (candles.at(-1)?.time ?? null) as UTCTimestamp | null;
+// lấy lastPrice từ cây nến cuối
+const lastPrice: number | null = candles.length ? candles[candles.length - 1].close : null;
+
+// suy ra side từ vị thế hiện tại (dương = LONG, âm = SHORT). Không có vị thế thì mặc định LONG.
+const positionSide: 'LONG' | 'SHORT' =
+  parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG';
 
   // --- chỉ khởi tạo chart 1 lần
   useEffect(() => {
@@ -336,6 +348,21 @@ const TradingBinance: React.FC<Props> = ({
           onClose={() => setShowMASettings(false)}
         />
       )}
+      {/* Mini header Tool – ngay dưới MAHeader */}
+<ToolMini
+  chart={chartRef.current}
+  series={candleSeries.current}
+  containerEl={containerRef.current}
+  lastPrice={candles.length ? candles[candles.length - 1].close : null}
+  lastCandleTime={lastCandleTime}
+  positionSide={parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG'}
+  topOffsetClass="top-10"
+  onTrigger={(type, price) => {
+    console.log('[TP/SL trigger]', type, price);
+    // gửi lệnh reduceOnly MARKET nếu bạn muốn
+  }}
+/>
+
 
       {/* Phao PnL */}
       <FloatingPositionTag
