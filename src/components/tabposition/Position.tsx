@@ -126,29 +126,32 @@ const Position: React.FC<PositionProps> = ({
   // Chuẩn hóa và cập nhật positions (KHÔNG dính localStorage)
   const applyPositions = React.useCallback((raw: any[]) => {
     const cleaned: PositionCalc[] = (raw || []).map((p: any) => {
-      const upNum = Number(p.up ?? p.unrealizedPnl);
-      return {
-        symbol: p.symbol ?? p.s,
-        positionAmt: String(p.positionAmt ?? p.pa ?? "0"),
-        entryPrice: String(p.entryPrice ?? p.ep ?? "0"),
-        breakEvenPrice: String(p.breakEvenPrice ?? p.bep ?? p.ep ?? "0"),
-        markPrice: p.markPrice ?? p.mp,
-        leverage: Number(p.leverage ?? p.l ?? 0) || undefined,
-        marginType: (p.marginType ?? p.mt ?? "").toString().toLowerCase(),
-        isolatedWallet:
-          p.iw !== undefined
-            ? Number(p.iw)
-            : p.isolatedWallet !== undefined
-            ? Number(p.isolatedWallet)
-            : undefined,
-        unrealizedPnl: Number.isFinite(upNum) ? upNum : undefined,
-        positionInitialMargin:
-          p.positionInitialMargin !== undefined
-            ? Number(p.positionInitialMargin)
-            : undefined,
-        positionSide: p.ps || p.positionSide,
-      } as PositionCalc;
-    }).filter(p => Math.abs(parseFloat(p.positionAmt)) > 1e-9);
+  const symbol = String(p.symbol ?? p.s);
+  const levFromPkt = Number(p.leverage ?? p.l);
+  const levHydrate = Number.isFinite(levFromPkt) && levFromPkt > 0
+    ? levFromPkt
+    : binanceWS.getLeverage(symbol, 'futures', NaN); // ← lấy từ cache/LS nếu có
+
+  const upNum = Number(p.up ?? p.unrealizedPnl);
+  return {
+    symbol,
+    positionAmt: String(p.positionAmt ?? p.pa ?? "0"),
+    entryPrice: String(p.entryPrice ?? p.ep ?? "0"),
+    breakEvenPrice: String(p.breakEvenPrice ?? p.bep ?? p.ep ?? "0"),
+    markPrice: p.markPrice ?? p.mp,
+    leverage: Number.isFinite(levHydrate) && levHydrate > 0 ? levHydrate : undefined, // ← set
+    marginType: (p.marginType ?? p.mt ?? "").toString().toLowerCase(),
+    isolatedWallet:
+      p.iw !== undefined ? Number(p.iw)
+      : p.isolatedWallet !== undefined ? Number(p.isolatedWallet)
+      : undefined,
+    unrealizedPnl: Number.isFinite(upNum) ? upNum : undefined,
+    positionInitialMargin:
+      p.positionInitialMargin !== undefined ? Number(p.positionInitialMargin) : undefined,
+    positionSide: p.ps || p.positionSide,
+  } as PositionCalc;
+}).filter(p => Math.abs(parseFloat(p.positionAmt)) > 1e-9);
+
 
     setPositions(cleaned);
     onPositionCountChange?.(cleaned.length);
@@ -438,14 +441,14 @@ useEffect(() => {
               const size = parseFloat(pos.positionAmt || "0");
               const pnl = calcUnrealized(pos);
               // 👉 Log để debug leverage, margin, roi
-    console.log("ROW DEBUG", pos.symbol, {
+    {/* console.log("ROW DEBUG", pos.symbol, {
   qty: pos.positionAmt,
   entry: pos.entryPrice,
   mark: pos.markPrice,
   lev: pos.leverage,
   im: getInitialMargin(pos),
   roi: calculatePnlPercentage(pos),
-});
+});*/}
 
               const pnlClass =
                 pnl > 0

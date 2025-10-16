@@ -72,6 +72,43 @@ const [tpSlValues, setTpSlValues] = useState({
       (binanceWS as any).sendAuthed?.({ action: 'adjustLeverage', symbol, leverage: lev });
     }
   };
+  // ====== LEVERAGE LOCAL STORAGE HELPERS ======
+const levKey = (
+  accId: number | null,
+  market: 'spot' | 'futures',
+  symbol: string
+) => `tw_leverage_${accId ?? 'na'}_${market}_${symbol}`;
+
+const saveLeverageLS = (
+  accId: number | null,
+  market: 'spot' | 'futures',
+  symbol: string,
+  lev: number
+) => {
+  try {
+    localStorage.setItem(levKey(accId, market, symbol), String(lev));
+  } catch {}
+};
+
+const loadLeverageLS = (
+  accId: number | null,
+  market: 'spot' | 'futures',
+  symbol: string,
+  fallback = 2
+) => {
+  try {
+    const v = localStorage.getItem(levKey(accId, market, symbol));
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+useEffect(() => {
+  const lev = loadLeverageLS(selectedAccountId, selectedMarket, selectedSymbol, 2);
+  setLeverage(lev);
+}, [selectedAccountId, selectedMarket, selectedSymbol]);
 
   // ============================ USE EFFECTS ===============================
   useEffect(() => {
@@ -587,15 +624,19 @@ useEffect(() => {
         symbol={selectedSymbol}
       />
 
-      <LeverageModal
-        isOpen={isLeverageOpen}
-        onClose={() => setIsLeverageOpen(false)}
-        leverage={leverage}
-        onChange={(val) => {
-          setLeverage(val);
-          adjustLeverageWS(selectedSymbol, val); // ✅ wrapper an toàn
-        }}
-      />
+     <LeverageModal
+  isOpen={isLeverageOpen}
+  onClose={() => setIsLeverageOpen(false)}
+  leverage={leverage}
+  onChange={(val) => {
+    setLeverage(val);
+    // LƯU LOCAL ngay lập tức
+    saveLeverageLS(selectedAccountId, selectedMarket, selectedSymbol, val);
+
+    // Gửi WS đổi leverage như cũ
+    adjustLeverageWS(selectedSymbol, val);
+  }}
+/>
 
       <TpSlModal
         isOpen={isTpSlModalOpen}

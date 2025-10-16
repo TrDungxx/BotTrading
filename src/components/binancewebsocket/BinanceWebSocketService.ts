@@ -64,15 +64,52 @@ private noPositionRiskSupport = true;
   // ---- cache leverage theo symbol ----
 private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
 
-private setLeverageFor(symbol: string, lev: any) {
-  const n = Number(lev);
-  if (Number.isFinite(n) && n > 0) {
-    this.symbolLeverage.set(symbol.toUpperCase(), n);
-    console.log("LEV CACHE SET ✅", symbol.toUpperCase(), n);
+// ====== LocalStorage helpers cho Leverage ======
+private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
+  return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
+}
+
+private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
+  try {
+    const key = this.levKey(this.currentAccountId, market, symbol);
+    localStorage.setItem(key, String(lev));
+  } catch {}
+}
+
+private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
+  if (!this.currentAccountId) return;
+  const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith(prefix)) continue;
+    const sym = k.slice(prefix.length).toUpperCase();
+    const v = localStorage.getItem(k);
+    const n = v ? Number(v) : NaN;
+    if (sym && Number.isFinite(n) && n > 0) {
+      this.symbolLeverage.set(sym, n);
+    }
   }
 }
-private getLeverageFor(symbol: string) {
-  return this.symbolLeverage.get(symbol.toUpperCase());
+
+private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
+  try {
+    const key = this.levKey(this.currentAccountId, market, symbol);
+    const v = localStorage.getItem(key);
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
+  const n = Number(lev);
+  if (Number.isFinite(n) && n > 0) {
+    const sym = symbol.toUpperCase();
+    this.symbolLeverage.set(sym, n);
+    this.saveLeverageLS(sym, n, market);   // ✅ persist
+    console.log("LEV CACHE SET ✅", sym, n);
+  }
 }
 
   // ========= Helpers =========
@@ -240,14 +277,11 @@ if (data?.symbol && Number.isFinite(data?.leverage)) {
 
         // Forward snapshot futures account để UI merge leverage/iw
 if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount') && Array.isArray(data.positions)) {
-  console.log("FUTURES SNAPSHOT ▶", data.positions.map((r:any)=>({
-    s: r.symbol ?? r.s, lev: r.leverage ?? r.l, im: r.positionInitialMargin ?? r.im
-  })));
   for (const r of data.positions) {
     const sym = String(r.symbol ?? r.s ?? "");
     if (!sym) continue;
     const lev = Number(r.leverage ?? r.l);
-    if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
+    if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures'); // ✅
   }
   this.messageHandlers.forEach(h => h(data));
   return;
@@ -375,8 +409,8 @@ if (data?.type === 'update' && data?.channel === 'account') {
       const sym = String(p.s);
       const levFromPacket = Number(p.l);
       const lev = (Number.isFinite(levFromPacket) && levFromPacket > 0)
-        ? levFromPacket
-        : this.getLeverageFor(sym); // ✅ lấy từ cache nếu packet không có
+  ? levFromPacket
+  : (this.getLeverage(p.s, 'futures') || undefined); // ✅ lấy từ cache nếu packet không có
 
     return {
         symbol: sym,
@@ -412,7 +446,7 @@ if (data?.type === 'update' && data?.channel === 'account') {
 if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
   const { s: symbol, l: leverage } = data.ac || {};
   if (symbol && Number.isFinite(leverage)) {
-    this.setLeverageFor(symbol, leverage); // ✅ cache
+    this.setLeverageFor(symbol, leverage, 'futures'); // ✅
     this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
   }
   return;
@@ -543,11 +577,28 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
   }
 
   public selectAccount(id: number) {
-    console.log('⚙️ Selecting account with ID:', id);
-    this.currentAccountId = id;
-    localStorage.setItem('selectedBinanceAccountId', String(id));
-    this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
+  console.log('⚙️ Selecting account with ID:', id);
+  this.currentAccountId = id;
+  localStorage.setItem('selectedBinanceAccountId', String(id));
+  // ✅ nạp cache leverage từ local cho account này
+  this.hydrateLeverageCacheFromLS('futures');
+  this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
+}
+
+public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
+  const sym = symbol.toUpperCase();
+  const cache = this.symbolLeverage.get(sym);
+  if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
+
+  const fromLS = this.loadLeverageLS(sym, market);
+  if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
+    // đồng bộ lại vào cache cho lần sau
+    this.symbolLeverage.set(sym, fromLS as number);
+    return fromLS as number;
   }
+  return fallback;
+}
+
 
   public getBalances(market: 'spot' | 'futures' | 'both') {
     console.log('🔎 Getting balances for market:', market);
