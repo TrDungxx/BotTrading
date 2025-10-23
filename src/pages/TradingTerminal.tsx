@@ -1002,9 +1002,7 @@ const updateCurrentOrders = (orders: Order[]) => {
   }
 };
 
-binanceWS.setPositionUpdateHandler((positions) => {
-  localStorage.setItem('positions', JSON.stringify(positions));
-});
+
 // Ẩn khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1457,6 +1455,8 @@ useEffect(() => {
   return () => clearTimeout(timer);
 }, []);
 
+
+
   return (
     
     <div className="h-[calc(100dvh-4rem)] bg-dark-900 flex flex-col">
@@ -1718,6 +1718,7 @@ useEffect(() => {
       market={selectedMarket}
       floating={floatingInfo} 
       showPositionTag={chartSettings.positionTag}
+      onRequestSymbolChange={(sym) => setSelectedSymbol(sym)}
     />
   </div>
 </section>

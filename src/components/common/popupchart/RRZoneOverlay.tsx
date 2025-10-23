@@ -13,7 +13,7 @@ type Props = {
 
   tpPrice: number | null;
   slPrice: number | null;
-
+ allowEntryDrag?: boolean; 
   zoneWidthPx?: number;
   side: Side;
 
@@ -34,6 +34,7 @@ const RRZoneOverlay: React.FC<Props> = ({
   slPrice,
   side,
   onEntryChange,
+  allowEntryDrag = false,
   onChange,
   tickSize = 0.0001,
   preserveOffsetsOnEntryDrag = true,
@@ -122,7 +123,7 @@ const RRZoneOverlay: React.FC<Props> = ({
     root.style.height = `${containerEl.clientHeight}px`;
     root.style.right = "auto";
     root.style.bottom = "auto";
-    root.style.pointerEvents = "none";
+    root.style.pointerEvents = "none"; // để bắt được pointerdown
     root.style.zIndex = "3";
 
     // CẮT TRÀN + cô lập paint/layout
@@ -249,6 +250,9 @@ const RRZoneOverlay: React.FC<Props> = ({
       div.style.borderTop = `1px dashed rgba(148,163,184,0.9)`;
       div.style.cursor = "ns-resize";
       div.style.pointerEvents = "auto";
+      // chỉ cho kéo khi allowEntryDrag = true
+      div.style.cursor = allowEntryDrag ? "ns-resize" : "default";
+      div.style.pointerEvents = allowEntryDrag ? "auto" : "none";
       div.style.background = "transparent";
       div.style.overflow = "hidden";
       (div as any).dataset.edge = "entry";
@@ -369,6 +373,7 @@ const RRZoneOverlay: React.FC<Props> = ({
       const t = ev.target as HTMLElement;
       const edge = (t?.dataset?.edge as "tp" | "sl" | "entry" | undefined) ?? undefined;
       if (edge) {
+        if (edge === "entry" && !allowEntryDrag) return; // KHÓA entry
         dragging.current = edge;
         ev.preventDefault();
       }
@@ -392,16 +397,18 @@ const RRZoneOverlay: React.FC<Props> = ({
       }
 
       // entry
-      onEntryChange?.(price);
+      // entry
+onEntryChange?.(price);
 
-      if (preserveOffsetsOnEntryDrag) {
-        const delta = price - entryPrice;
-        let nextTp = tpPrice != null ? snap(tpPrice + delta) : null;
-        let nextSl = slPrice != null ? snap(slPrice + delta) : null;
+if (preserveOffsetsOnEntryDrag) {
+  const delta = price - entryPrice;
+  let nextTp = tpPrice != null ? snap(tpPrice + delta) : null;
+  let nextSl = slPrice != null ? snap(slPrice + delta) : null;
 
-        const guarded = guardTpSl(price, nextTp, nextSl);
-        onChange?.({ tp: guarded.tp, sl: guarded.sl });
-      }
+  // ❌ KHÔNG guard khi kéo entry, để TP/SL chạy song song tự nhiên
+  onChange?.({ tp: nextTp, sl: nextSl });
+}
+
     };
 
     const onUp = () => {

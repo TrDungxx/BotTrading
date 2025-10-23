@@ -14,7 +14,6 @@ import MAHeader from './popupchart/MAHeader';
 import MASettings from './popupchart/MASetting';
 import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
-import ToolTpSl from './popupchart/ToolTpSl';
 import ToolMini from './popupchart/ToolMini';
 
 type Candle = CandlestickData<UTCTimestamp>;
@@ -35,6 +34,9 @@ interface Props {
   market: 'spot' | 'futures';
   floating?: { pnl: number; roi: number; price: number; positionAmt: number } | null;
   showPositionTag?: boolean;
+
+  // callback đổi symbol từ Tool khác
+  onRequestSymbolChange?: (symbol: string) => void;
 }
 
 const toTs = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
@@ -50,11 +52,71 @@ function calculateMA(data: CandlestickData<Time>[], period: number): LineData<Ti
   return out;
 }
 
+/* ============================
+   AUTO TICK-SIZE / PRECISION
+   ============================ */
+type SymbolMeta = {
+  tickSize: number;          // PRICE_FILTER.tickSize
+  stepSize?: number;         // LOT_SIZE / MARKET_LOT_SIZE.stepSize (nếu cần)
+  precision: number;         // số chữ số thập phân của tickSize
+};
+
+const symbolMetaCache = new Map<string, SymbolMeta>();
+
+const countDecimals = (n: number) => {
+  const s = n.toString();
+  if (s.includes('e-')) return parseInt(s.split('e-')[1], 10);
+  return s.split('.')[1]?.length ?? 0;
+};
+
+async function getSymbolMeta(symbol: string, market: 'spot' | 'futures'): Promise<SymbolMeta> {
+  const key = `${market}:${symbol.toUpperCase()}`;
+  const cached = symbolMetaCache.get(key);
+  if (cached) return cached;
+
+  const base =
+    market === 'futures'
+      ? 'https://fapi.binance.com/fapi/v1/exchangeInfo'
+      : 'https://api.binance.com/api/v3/exchangeInfo';
+
+  const res = await fetch(`${base}?symbol=${symbol.toUpperCase()}`);
+  const json = await res.json();
+  const info = json?.symbols?.[0];
+  if (!info) throw new Error('exchangeInfo not found');
+
+  const PRICE_FILTER = (info.filters || []).find((f: any) => f.filterType === 'PRICE_FILTER');
+  const LOT_FILTER = (info.filters || []).find((f: any) =>
+    ['MARKET_LOT_SIZE', 'LOT_SIZE'].includes(f.filterType)
+  );
+
+  const tickSize = Number(PRICE_FILTER?.tickSize ?? '0.01') || 0.01;
+  const stepSize = Number(LOT_FILTER?.stepSize ?? '0.00000001') || 0.00000001;
+  const precision = Math.max(countDecimals(tickSize), 0);
+
+  const meta: SymbolMeta = { tickSize, stepSize, precision };
+  symbolMetaCache.set(key, meta);
+  return meta;
+}
+
+// Fallback khi không lấy được exchangeInfo (mạng lỗi, v.v.)
+function heuristicMetaFromPrice(lastPrice?: number): SymbolMeta {
+  const p = lastPrice ?? 1;
+  let tick = 0.01;
+  if (p >= 1000) tick = 1;
+  else if (p >= 100) tick = 0.1;
+  else if (p >= 1) tick = 0.01;
+  else if (p >= 0.1) tick = 0.0001;
+  else tick = 0.00001;
+  return { tickSize: tick, precision: countDecimals(tick) };
+}
+/* ============================ */
+
 const TradingBinance: React.FC<Props> = ({
   selectedSymbol,
   selectedInterval,
   market,
   floating,
+  onRequestSymbolChange,
   showPositionTag = true,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -76,18 +138,17 @@ const TradingBinance: React.FC<Props> = ({
   const [maHeaderVisible, setMaHeaderVisible] = useState(true);
   const [showMASettings, setShowMASettings] = useState(false);
   const [maVisible, setMaVisible] = useState({ ma7: true, ma25: true, ma99: true });
-  
-//tool tplsl
-const [tpSlEnabled, setTpSlEnabled] = useState(false);
-const lastCandleTime = (candles.at(-1)?.time ?? null) as UTCTimestamp | null;
-// lấy lastPrice từ cây nến cuối
-const lastPrice: number | null = candles.length ? candles[candles.length - 1].close : null;
 
-// suy ra side từ vị thế hiện tại (dương = LONG, âm = SHORT). Không có vị thế thì mặc định LONG.
-const positionSide: 'LONG' | 'SHORT' =
-  parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG';
+  // tool tp/sl
+  const lastCandleTime = (candles.at(-1)?.time ?? null) as UTCTimestamp | null;
 
-  // --- chỉ khởi tạo chart 1 lần
+  // vị thế hiện tại xác định side
+  const positionSide: 'LONG' | 'SHORT' =
+    parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG';
+
+  /* -------------------------
+     Khởi tạo chart 1 lần
+     ------------------------- */
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -164,9 +225,56 @@ const positionSide: 'LONG' | 'SHORT' =
       ma99Ref.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // NOTE: mount once
+  }, []); // mount once
 
-  // --- chọn position để hiển thị phao
+  /* --------------------------------------
+     Auto set priceFormat theo symbol/market
+     -------------------------------------- */
+  useEffect(() => {
+    const chart = chartRef.current;
+    const cs = candleSeries.current;
+    if (!chart || !cs) return;
+
+    (async () => {
+      let meta: SymbolMeta;
+      try {
+        meta = await getSymbolMeta(selectedSymbol, market);
+      } catch {
+        // fallback nếu exchangeInfo lỗi: ước lượng theo giá nến cuối
+        const last = candles.at(-1)?.close;
+        meta = heuristicMetaFromPrice(last);
+      }
+
+      const { tickSize, precision } = meta;
+
+      // Áp cho tất cả series giá
+      cs.applyOptions({
+        priceFormat: { type: 'price', minMove: tickSize, precision },
+      });
+      ma7Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
+      ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
+      ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
+
+      // Làm trục Y “dày” & đúng số thập phân
+      chart.priceScale('right').applyOptions({
+  autoScale: true,
+  alignLabels: true,
+  borderVisible: true,
+  scaleMargins: { top: 0.06, bottom: 0.06 },
+});
+chart.applyOptions({
+  localization: {
+    // ép số chữ số thập phân theo precision của symbol
+    priceFormatter: (p: number) => p.toFixed(Math.max(precision, 4)),
+  },
+});
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSymbol, market]); // đổi coin/market → tự format lại
+
+  /* ----------------------------
+     Hiển thị phao theo vị thế
+     ---------------------------- */
   const pickPos = (list: any[]) => {
     const pos = list.find(
       (p) => (p.symbol || p.s) === selectedSymbol && parseFloat((p.positionAmt ?? p.pa) || '0') !== 0,
@@ -210,14 +318,15 @@ const positionSide: 'LONG' | 'SHORT' =
     return () => binanceWS.removeMessageHandler(handler);
   }, [selectedSymbol]);
 
-  // --- load lịch sử + subscribe WS khi đổi symbol/interval/market (KHÔNG tái tạo chart)
+  /* ---------------------------------------------------------
+     Load lịch sử + subscribe WS khi đổi symbol/interval/market
+     (KHÔNG tái tạo chart)
+     --------------------------------------------------------- */
   useEffect(() => {
     if (!candleSeries.current || !volumeSeries.current || !chartRef.current) return;
 
-    // tăng session để vô hiệu hóa update muộn
     const mySession = ++sessionRef.current;
 
-    // đóng WS cũ (nếu còn)
     try { wsRef.current?.close(); } catch {}
 
     const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://api.binance.com';
@@ -231,7 +340,7 @@ const positionSide: 'LONG' | 'SHORT' =
       const res = await fetch(url, { signal: controller.signal });
       const data = await res.json();
 
-      if (sessionRef.current !== mySession) return; // đã đổi symbol khác
+      if (sessionRef.current !== mySession) return;
 
       const cs: Candle[] = data.map((d: any) => ({
         time: toTs(d[0]),
@@ -257,7 +366,6 @@ const positionSide: 'LONG' | 'SHORT' =
 
       setCandles(cs);
 
-      // mở WS mới sau khi đã có lịch sử
       const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
       wsRef.current = ws;
 
@@ -273,7 +381,6 @@ const positionSide: 'LONG' | 'SHORT' =
         const vol: VolumeBar = { time: t, value: +k.v, color: +k.c >= +k.o ? '#26a69a' : '#ef5350' };
         volumeSeries.current?.update(vol);
 
-        // cập nhật MA khi đủ dữ liệu (setData 3 series: nhẹ với 500 điểm, không gây flicker)
         setCandles((prev) => {
           if (sessionRef.current !== mySession) return prev;
           const i = prev.findIndex((c) => c.time === candle.time);
@@ -289,7 +396,7 @@ const positionSide: 'LONG' | 'SHORT' =
       };
 
       ws.onerror = () => {
-        // tránh spam, có thể thêm retry nếu cần
+        // có thể bổ sung retry/backoff nếu cần
       };
     };
 
@@ -297,7 +404,6 @@ const positionSide: 'LONG' | 'SHORT' =
 
     return () => {
       controller.abort();
-      // chỉ đóng nếu vẫn là WS của phiên này
       if (wsRef.current) {
         try { wsRef.current.close(); } catch {}
       }
@@ -317,6 +423,19 @@ const positionSide: 'LONG' | 'SHORT' =
     maVisible.ma25 && { period: 25, value: candles.at(-1)?.close ?? 0, color: '#eb40b5' },
     maVisible.ma99 && { period: 99, value: candles.at(-1)?.close ?? 0, color: '#b385f8' },
   ].filter(Boolean) as { period: number; value: number; color: string }[];
+
+  React.useEffect(() => {
+    const handler = (ev: any) => {
+      const sym = ev?.detail?.symbol as string | undefined;
+      if (!sym) return;
+      if (sym !== selectedSymbol) {
+        onRequestSymbolChange?.(sym);
+        console.log('[Chart] switched to', sym);
+      }
+    };
+    window.addEventListener('chart-symbol-change-request', handler);
+    return () => window.removeEventListener('chart-symbol-change-request', handler);
+  }, [selectedSymbol, onRequestSymbolChange]);
 
   return (
     <div className="h-full w-full min-w-0 relative">
@@ -348,21 +467,58 @@ const positionSide: 'LONG' | 'SHORT' =
           onClose={() => setShowMASettings(false)}
         />
       )}
-      {/* Mini header Tool – ngay dưới MAHeader */}
-<ToolMini
-  chart={chartRef.current}
-  series={candleSeries.current}
-  containerEl={containerRef.current}
-  lastPrice={candles.length ? candles[candles.length - 1].close : null}
-  lastCandleTime={lastCandleTime}
-  positionSide={parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG'}
-  topOffsetClass="top-10"
-  onTrigger={(type, price) => {
-    console.log('[TP/SL trigger]', type, price);
-    // gửi lệnh reduceOnly MARKET nếu bạn muốn
-  }}
-/>
 
+      {/* Mini header Tool – ngay dưới MAHeader */}
+      <ToolMini
+        chartSymbol={selectedSymbol}
+        chart={chartRef.current}
+        series={candleSeries.current}
+        containerEl={containerRef.current}
+        lastPrice={candles.length ? candles[candles.length - 1].close : null}
+        lastCandleTime={lastCandleTime}
+        positionSide={positionSide}
+        topOffsetClass="top-10"
+        onPlace={({ side, entry, tp, sl }) => {
+          const symbol = selectedSymbol;
+          if (!symbol) return;
+
+          const qty = Math.abs(parseFloat(floatingPos?.positionAmt ?? '0'));
+          if (!qty || !Number.isFinite(qty)) {
+            console.warn('[Bracket] Không xác định được quantity của vị thế hiện tại');
+            return;
+          }
+
+          const exitSide = side === 'LONG' ? 'SELL' : 'BUY';
+
+          if (tp != null) {
+            binanceWS.placeOrder({
+              market: 'futures',
+              symbol,
+              side: exitSide,
+              type: 'TAKE_PROFIT_MARKET',
+              stopPrice: tp,
+              reduceOnly: true,
+              positionSide: side,
+              quantity: qty,
+            });
+          }
+
+          if (sl != null) {
+            binanceWS.placeOrder({
+              market: 'futures',
+              symbol,
+              side: exitSide,
+              type: 'STOP_MARKET',
+              stopPrice: sl,
+              reduceOnly: true,
+              positionSide: side,
+              quantity: qty,
+            });
+          }
+
+          console.log('[BRACKET placed]', { side, entry, tp, sl, qty, exitSide, symbol });
+        }}
+      />
 
       {/* Phao PnL */}
       <FloatingPositionTag
@@ -376,7 +532,7 @@ const positionSide: 'LONG' | 'SHORT' =
         offset={12}
       />
 
-      <div ref={containerRef} className="w-full h-full min-h-0 min-w-0" />
+      <div ref={containerRef} className="relative w-full h-full min-h-0 min-w-0" />
     </div>
   );
 };

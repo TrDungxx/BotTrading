@@ -20,6 +20,7 @@ interface BinanceAccount {
   description?: string;
 }
 
+
 const TradingForm: React.FC<Props> = ({ selectedSymbol, price }) => {
   const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -45,6 +46,26 @@ const [isMultiAssetsMode, setIsMultiAssetsMode] = useState<boolean>(false);
   const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<'spot' | 'futures'>('futures');
   const [internalBalance, setInternalBalance] = useState<number>(0);
+// ✅ mới: không dùng null làm key nữa
+type BalanceSource = 'ws-live' | 'snapshot' | 'database-cache' | 'none';
+
+const [balanceSource, setBalanceSource] = useState<BalanceSource>('none');
+
+const RANK: Record<BalanceSource, number> = {
+  'ws-live': 3,
+  'snapshot': 2,
+  'database-cache': 1,
+  'none': 0,
+};
+
+const setBalanceIfHigherPriority = (val: number, source: BalanceSource | null | undefined) => {
+  const s: BalanceSource = (source ?? 'none');
+  if (RANK[s] > RANK[balanceSource]) {
+    setInternalBalance(val);
+    setBalanceSource(s);
+  }
+};
+  
 const [tpSlValues, setTpSlValues] = useState({
   takeProfitPrice: '',
   stopLossPrice: '',
@@ -116,6 +137,13 @@ useEffect(() => {
   if (!token) return;
 
   binanceWS.connect(token, (msg) => {
+    if (msg?.type === 'accountInformation' && msg?.data) {
+  const liveAvail = Number(msg.data.availableBalance ?? 0);
+  if (Number.isFinite(liveAvail)) {
+    setBalanceIfHigherPriority(liveAvail, 'ws-live');
+  }
+}
+
     switch (msg.type) {
       case 'authenticated':
         binanceWS.getMyBinanceAccounts();

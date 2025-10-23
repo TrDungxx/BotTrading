@@ -96,6 +96,8 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
     }
   };
 
+  
+
   return (
   <div className="w-full p-4">
     <div className="flex space-x-4 border-b border-dark-700 mb-4">

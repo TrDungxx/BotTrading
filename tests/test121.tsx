@@ -3,7 +3,7 @@
 
 type MarketType = 'spot' | 'futures';
 type WsState = 'closed' | 'connecting' | 'open' | 'authenticated';
-type PositionsCb = (rows: any[]) => void;
+
 // ==== Types for placing orders ====
 export type WorkingType = 'MARK' | 'LAST';
 
@@ -12,10 +12,9 @@ export interface PlaceOrderPayload {
   side: 'BUY' | 'SELL';
   type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
   market: 'futures' | 'spot';
-  
 
   // qty/price
-  quantity?: number;
+  quantity: number;
   price?: number;     // LIMIT
   stopPrice?: number; // *_MARKET (TP/SL)
 
@@ -32,84 +31,6 @@ class BinanceWebSocketService {
   private socket: WebSocket | null = null;
   private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
 
-private lastPositions: any[] = [];
-public onPositions?: PositionsCb;
-
-private handlePositions(msg: any) {
-  const rows = Array.isArray(msg.positions) ? msg.positions : [];
-  this.lastPositions = rows;
-  this.onPositions?.(rows);
-}
-
-public subscribePositions(cb: PositionsCb) {
-  this.onPositions = cb;
-  // emit ngay dữ liệu mới nhất nếu đã có
-  if (this.lastPositions.length) cb(this.lastPositions);
-  return () => {
-    if (this.onPositions === cb) this.onPositions = undefined;
-  };
-}
-
-// gọi ở nơi KHỞI TẠO ỨNG DỤNG (App/TradingTerminal) – xem mục 2
-public async initAfterConnect() {
-  await this.waitUntilAuthenticated();
-
-  // 1) chọn account (ưu tiên saved)
-  const saved = localStorage.getItem('selectedBinanceAccountId');
-  if (saved) {
-    await this.selectAccountAndWait(Number(saved), 200);
-  }
-
-  // 2) subscribe realtime (orders/positions/balance)
-  this.subscribeAccountUpdates((orders) => {
-    localStorage.setItem('openOrders', JSON.stringify(orders || []));
-    if (this.orderUpdateHandler) this.orderUpdateHandler(orders || []);
-  });
-
-  // 3) kéo snapshot nền (đừng spam)
-  this.getFuturesAccount();
-  this.getPositions();
-}
-
-
-// ===== add near other private fields =====
-private lastAccountInfoEmit: number = 0;
-private refreshTimer: any = null;
-
-// Chuẩn hoá phát event account info
-private emitAccountInformation(payload: {
-  availableBalance?: number;
-  totalWalletBalance?: number;
-  totalMarginBalance?: number;
-  totalUnrealizedProfit?: number;
-  multiAssetsMargin?: boolean;
-  source: 'ws-live' | 'snapshot' | 'database-cache';
-}) {
-  // làm sạch về number
-  const toNum = (v: any) => (typeof v === 'string' ? parseFloat(v) : Number(v ?? 0));
-  const info = {
-    availableBalance: toNum(payload.availableBalance),
-    totalWalletBalance: toNum(payload.totalWalletBalance),
-    totalMarginBalance: toNum(payload.totalMarginBalance),
-    totalUnrealizedProfit: toNum(payload.totalUnrealizedProfit),
-    multiAssetsMargin: !!payload.multiAssetsMargin,
-    source: payload.source,
-  };
-  this.lastAccountInfoEmit = Date.now();
-  this.messageHandlers.forEach(h => h({ type: 'accountInformation', data: info }));
-}
-
-// Debounce refresh snapshot (hạn chế spam)
-private scheduleAccountRefresh(ms = 350) {
-  if (this.refreshTimer) {
-    clearTimeout(this.refreshTimer);
-    this.refreshTimer = null;
-  }
-  this.refreshTimer = setTimeout(() => {
-    this.getFuturesAccount();
-  }, ms);
-}
-
   // ===== add fields =====
   private authInFlight = false;
   private authedOnceKeys = new Set<string>();
@@ -118,7 +39,8 @@ private scheduleAccountRefresh(ms = 350) {
     this.authedOnceKeys.add(key);
     this.authedQueue.push(msg);
   }
-private noPositionRiskSupport = true;
+  private noPositionRiskSupport = true;
+
   // ===== State & queues =====
   private state: WsState = 'closed';
   private openResolvers: Array<() => void> = [];
@@ -132,64 +54,96 @@ private noPositionRiskSupport = true;
   private orderUpdateHandler: ((orders: any[]) => void) | null = null;
   private positionUpdateHandler: ((positions: any[]) => void) | null = null;
 
-  // Subscriptions / callbacks cho stream
+  // Subscriptions / callbacks
   private subscriptions: Map<string, any> = new Map();
   private callbacks: Map<string, (data: any) => void> = new Map();
 
-  // ==== NEW: coalesce risk requests ====
+  // RAM replay cho positions
+  private lastPositions: any[] | null = null;
+
+  // ==== coalesce risk requests ====
   private pendingRiskSymbols = new Set<string>();
   private riskDebounceTimer: number | null = null;
 
   // ---- cache leverage theo symbol ----
-private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
+  private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
 
-// ====== LocalStorage helpers cho Leverage ======
-private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
-  return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
+  // ====== LocalStorage helpers cho Leverage ======
+  private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
+    return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
+  }
+// thêm trong class BinanceWebSocketService
+
+private chooseAccountAndBoot(accounts: any[]) {
+  if (!Array.isArray(accounts) || accounts.length === 0) return;
+
+  // ưu tiên id đã lưu trong LS
+  const saved = Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  let target = Number.isFinite(saved) && saved > 0
+    ? saved
+    : Number(accounts[0]?.id || accounts[0]?.binanceAccountId || 0);
+
+  if (!target) return;
+
+  // select + boot
+  this.selectAccount(target);
+  setTimeout(() => {
+    this.getFuturesAccount(target);
+    this.getPositions(target);
+  }, 160);
 }
 
-private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
-  try {
-    const key = this.levKey(this.currentAccountId, market, symbol);
-    localStorage.setItem(key, String(lev));
-  } catch {}
+/** Dùng ở UI: đảm bảo đã có accountId để gọi API */
+public ensureAccountSelected() {
+  if (this.currentAccountId || Number(localStorage.getItem('selectedBinanceAccountId') || 0) > 0) {
+    return; // đã có
+  }
+  // yêu cầu LIST account; khi về sẽ auto-select trong onmessage
+  this.getMyBinanceAccounts();
 }
 
-private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
-  if (!this.currentAccountId) return;
-  const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith(prefix)) continue;
-    const sym = k.slice(prefix.length).toUpperCase();
-    const v = localStorage.getItem(k);
-    const n = v ? Number(v) : NaN;
-    if (sym && Number.isFinite(n) && n > 0) {
-      this.symbolLeverage.set(sym, n);
+  private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
+    try {
+      const key = this.levKey(this.currentAccountId, market, symbol);
+      localStorage.setItem(key, String(lev));
+    } catch {}
+  }
+
+  private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
+    if (!this.currentAccountId) return;
+    const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefix)) continue;
+      const sym = k.slice(prefix.length).toUpperCase();
+      const v = localStorage.getItem(k);
+      const n = v ? Number(v) : NaN;
+      if (sym && Number.isFinite(n) && n > 0) {
+        this.symbolLeverage.set(sym, n);
+      }
     }
   }
-}
 
-private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
-  try {
-    const key = this.levKey(this.currentAccountId, market, symbol);
-    const v = localStorage.getItem(key);
-    const n = v ? Number(v) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : undefined;
-  } catch {
-    return undefined;
+  private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
+    try {
+      const key = this.levKey(this.currentAccountId, market, symbol);
+      const v = localStorage.getItem(key);
+      const n = v ? Number(v) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    } catch {
+      return undefined;
+    }
   }
-}
 
-private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
-  const n = Number(lev);
-  if (Number.isFinite(n) && n > 0) {
-    const sym = symbol.toUpperCase();
-    this.symbolLeverage.set(sym, n);
-    this.saveLeverageLS(sym, n, market);   // ✅ persist
-    console.log("LEV CACHE SET ✅", sym, n);
+  private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
+    const n = Number(lev);
+    if (Number.isFinite(n) && n > 0) {
+      const sym = symbol.toUpperCase();
+      this.symbolLeverage.set(sym, n);
+      this.saveLeverageLS(sym, n, market);   // persist
+      console.log("LEV CACHE SET ✅", sym, n);
+    }
   }
-}
 
   // ========= Helpers =========
   private waitForOpen(): Promise<void> {
@@ -201,19 +155,13 @@ private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures')
     return new Promise(res => this.authResolvers.push(res));
   }
 
-  // === Position Risk (để backfill leverage/IM) ===
-// Client fallback: server không support -> dùng futures snapshot
-public requestPositionRisk(symbols?: string[]) {
-  this.getFuturesAccount(); // kéo leverage/isolatedWallet qua snapshot
-}
-public getAccountInformation() {
-  // Server của bạn đã có getFuturesAccount → dùng làm nguồn account info
-  this.getFuturesAccount();
-}
-// (không còn dùng tới)
-private _sendGetPositionRisk(symbols?: string[]) {
-  // no-op
-}
+  // === Position Risk (backfill leverage/IM) ===
+  public requestPositionRisk(_symbols?: string[]) {
+    this.getFuturesAccount(); // fallback: kéo leverage/iw qua snapshot
+  }
+
+  // (không dùng)
+  private _sendGetPositionRisk(_symbols?: string[]) { /* no-op */ }
 
   public setCurrentAccountId(id: number) {
     this.currentAccountId = id;
@@ -223,12 +171,12 @@ private _sendGetPositionRisk(symbols?: string[]) {
   }
 
   public setPositionUpdateHandler(handler: (positions: any[]) => void) {
-  this.positionUpdateHandler = handler;
-  // ✅ nếu snapshot đã về trước đó, đẩy lại ngay vào UI
-  if (Array.isArray(this.lastPositions) && this.lastPositions.length) {
-    try { handler(this.lastPositions); } catch {}
+    this.positionUpdateHandler = handler;
+    if (this.lastPositions) {
+      try { handler(this.lastPositions); } catch {}
+    }
   }
-}
+
   public setOrderUpdateHandler(handler: ((orders: any[]) => void) | null) {
     this.orderUpdateHandler = handler;
   }
@@ -294,7 +242,7 @@ private _sendGetPositionRisk(symbols?: string[]) {
     }
   }
 
-  // Public: chờ tới khi AUTHENTICATED (dùng được cho select)
+  // Public: chờ tới khi AUTHENTICATED
   public async waitUntilAuthenticated() {
     if (this.state === 'authenticated') return;
     await this.waitForOpen();
@@ -304,7 +252,7 @@ private _sendGetPositionRisk(symbols?: string[]) {
   // Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
   public async selectAccountAndWait(id: number, settleMs = 160) {
     this.selectAccount(id);
-    await new Promise(res => setTimeout(res, settleMs)); // khớp với flushAuthed (120ms)
+    await new Promise(res => setTimeout(res, settleMs)); // khớp flushAuthed (120ms)
   }
 
   // ========= Connect (idempotent) =========
@@ -337,7 +285,7 @@ private _sendGetPositionRisk(symbols?: string[]) {
       // Gắn handler global
       if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
 
-      // Khôi phục accountId từ localStorage (chỉ set state; gửi select sau khi authenticated)
+      // Khôi phục accountId từ localStorage (chỉ set state; sẽ select sau khi authenticated)
       const saved = localStorage.getItem('selectedBinanceAccountId');
       if (saved !== null) {
         const parsed = Number(saved);
@@ -346,145 +294,131 @@ private _sendGetPositionRisk(symbols?: string[]) {
     };
 
     sock.onmessage = (event) => {
-
-      
       if (this.socket !== sock) return;
       console.log('📥 RAW WS MSG:', event.data);
       try {
         const data = JSON.parse(event.data);
 
-        // ---- EARLY: nếu gói WS có top-level availableBalance (định dạng giống bạn paste) ----
-if (
-  (typeof (data as any)?.availableBalance === 'string' || typeof (data as any)?.availableBalance === 'number') &&
-  // kèm vài dấu hiệu là "tài khoản futures"
-  ((data as any)?.multiAssetsMargin !== undefined ||
-   (data as any)?.totalWalletBalance !== undefined ||
-   (data as any)?.assets !== undefined)
-) {
-  this.emitAccountInformation({
-    availableBalance: (data as any).availableBalance,
-    totalWalletBalance: (data as any).totalWalletBalance,
-    totalMarginBalance: (data as any).totalMarginBalance,
-    totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-    multiAssetsMargin: !!(data as any).multiAssetsMargin,
-    source: 'ws-live',
-  });
-  // không return; để các handler khác vẫn nhận được gói gốc nếu cần
-}
-     // --- FORWARD SNAPSHOT POSITIONS (no cache) ---
-// 1) Array thuần
-if (Array.isArray(data) &&
-    data.length &&
-    data[0] &&
-    typeof data[0].symbol === "string" &&
-    data[0].positionAmt !== undefined) {
-  console.log("📥 WS positions[] snapshot:", data);
-  this.lastPositions = data;                 // ✅ nhớ cache
-  this.positionUpdateHandler?.(data);
-  this.onPositions?.(data); // nếu bạn còn dùng subscribePositions
-  return;
-}
+        // --- FORWARD SNAPSHOT POSITIONS (no cache) ---
+        // 1) Mảng thuần
+        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt !== undefined) {
+          console.log("📥 WS positions[] snapshot:", data);
+          this.lastPositions = data;
+          this.positionUpdateHandler?.(data);
+          return;
+        }
+        // 2) Bọc trong object.positions
+        if (data && Array.isArray((data as any).positions)) {
+          const arr = (data as any).positions;
+          console.log("📥 WS positions snapshot (wrapped):", arr);
+          this.lastPositions = arr;
+          this.positionUpdateHandler?.(arr);
+          return;
+        }
+        // 3) Bọc trong object.data
+        if (
+          (data?.type === "getPositions" || data?.type === "positions" || data?.type === "futuresPositions") &&
+          Array.isArray((data as any).data)
+        ) {
+          const arr = (data as any).data;
+          console.log("📥 WS positions snapshot (data):", arr);
+          this.lastPositions = arr;
+          this.positionUpdateHandler?.(arr);
+          return;
+        }
 
-// 2) { positions: [...] }
-if (data && Array.isArray((data as any).positions)) {
-  const rows = (data as any).positions;
-  console.log("📥 WS positions snapshot (wrapped):", rows);
-  this.lastPositions = rows;                 // ✅ nhớ cache
-  this.positionUpdateHandler?.(rows);
-  this.onPositions?.(rows);
-  return;
-}
+        // Nếu server trả mảng orders (kết quả của getOpenOrders)
+        if (Array.isArray(data) && data[0]?.orderId && data[0]?.symbol && data[0]?.status) {
+          console.log("📥 WS got openOrders array:", data);
+          localStorage.setItem("openOrders", JSON.stringify(data));
+          if (this.orderUpdateHandler) this.orderUpdateHandler(data);
+          return;
+        }
 
-// 3) { type: 'positions' | 'getPositions', data: [...] }
-if ((data?.type === "getPositions" || data?.type === "positions" || data?.type === "futuresPositions") &&
-    Array.isArray((data as any).data)) {
-  const rows = (data as any).data;
-  console.log("📥 WS positions snapshot (data):", rows);
-  this.lastPositions = rows;                 // ✅ nhớ cache
-  this.positionUpdateHandler?.(rows);
-  this.onPositions?.(rows);
-  return;
-}
-if (data?.symbol && Number.isFinite(data?.leverage)) {
-  this.setLeverageFor(data.symbol, data.leverage);
-  this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
-  // không return, để các handler khác cũng nhận được gói gốc (nếu cần)
-}
+        // Phản hồi leverage đơn
+        if (data?.symbol && Number.isFinite(data?.leverage)) {
+          this.setLeverageFor(data.symbol, data.leverage);
+          this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
+          // không return; để các handler khác cũng nhận gói gốc nếu cần
+        }
 
         console.log('📥 WS Parsed:', data);
 
         // Forward snapshot futures account để UI merge leverage/iw
-if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount')) {
-  // 4.1 backfill leverage nếu có positions
-  if (Array.isArray(data.positions)) {
-    for (const r of data.positions) {
-      const sym = String(r.symbol ?? r.s ?? "");
-      if (!sym) continue;
-      const lev = Number(r.leverage ?? r.l);
-      if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures');
-    }
-  }
+        if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount') && Array.isArray(data.positions)) {
+          for (const r of data.positions) {
+            const sym = String(r.symbol ?? r.s ?? "");
+            if (!sym) continue;
+            const lev = Number(r.leverage ?? r.l);
+            if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures');
+          }
+          this.messageHandlers.forEach(h => h(data));
+          return;
+        }
 
-  // 4.2 phát accountInformation (source: snapshot)
-  this.emitAccountInformation({
-    availableBalance: (data as any).availableBalance,
-    totalWalletBalance: (data as any).totalWalletBalance,
-    totalMarginBalance: (data as any).totalMarginBalance,
-    totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-    multiAssetsMargin: !!(data as any).multiAssetsMargin,
-    source: 'snapshot',
-  });
-
+        // server không hỗ trợ getPositionRisk → fallback
+        if (data?.type === 'error' && data?.action === 'getPositionRisk') {
+          this.noPositionRiskSupport = true;
+          console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
+          this.getFuturesAccount();
+          return;
+        }
+// Auto-select account khi có danh sách
+if (data?.type === 'getMyBinanceAccounts' && Array.isArray(data.accounts)) {
+  this.chooseAccountAndBoot(data.accounts);
+  // forward nếu UI có cần
   this.messageHandlers.forEach(h => h(data));
   return;
 }
-
-
-        // ⬅️ ADD: server không hỗ trợ getPositionRisk → chuyển sang fallback
-if (data?.type === 'error' && data?.action === 'getPositionRisk') {
-  this.noPositionRiskSupport = true;
-  console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
-  this.getFuturesAccount();   // kéo leverage/isolatedWallet qua đây
-  return;                     // dừng xử lý message này
-}
-
-
         // ===== AUTHENTICATED =====
         if (data?.type === 'authenticated') {
           this.state = 'authenticated';
           this.authInFlight = false;
           this.authResolvers.splice(0).forEach(r => r());
           this.flushAuthed();
-          // ❌ Đừng auto select/subscribe ở đây
-          // ❌ Đừng auto getPositions/getFuturesAccount ở đây
+
+          // 🔁 Auto boot: select account (nếu có) rồi kéo snapshot
+          let targetId = this.currentAccountId;
+          if (!targetId) {
+            const saved = Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+            targetId = Number.isFinite(saved) && saved > 0 ? saved : null;
+            if (targetId) this.currentAccountId = targetId;
+          }
+          if (targetId) {
+            // đưa select lên đầu hàng đợi nếu chưa có
+            this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: targetId });
+            setTimeout(() => {
+              this.getFuturesAccount(targetId!);
+              this.getPositions(targetId!);
+            }, 160);
+          }
           return;
         }
 
         // ====== HANDLE getPositions (array) — RAW Position Risk ======
         if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
-  // ✅ nếu packet có leverage thì cache lại luôn
-  try {
-    for (const r of data) {
-      const sym = String(r.symbol ?? "");
-      const lev = Number(r.leverage ?? r.l);
-      if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
-    }
-  } catch {}
+          try {
+            for (const r of data) {
+              const sym = String(r.symbol ?? "");
+              const lev = Number(r.leverage ?? r.l);
+              if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
+            }
+          } catch {}
 
-  if (this.positionUpdateHandler) this.positionUpdateHandler(data);
+          this.lastPositions = data;
+          if (this.positionUpdateHandler) this.positionUpdateHandler(data);
 
-  try {
-    const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
-    if (symbols.length) {
-      if (this.noPositionRiskSupport) this.getFuturesAccount();
-      else this.requestPositionRisk(symbols);
-    }
-  } catch {}
+          try {
+            const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
+            if (symbols.length) {
+              if (this.noPositionRiskSupport) this.getFuturesAccount();
+              else this.requestPositionRisk(symbols);
+            }
+          } catch {}
 
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
+          this.messageHandlers.forEach(h => h(data));
+          return;
+        }
 
         // ====== MiniTicker (public) ======
         if (data.e === '24hrMiniTicker' || data.action === 'miniTickerUpdate') {
@@ -503,23 +437,21 @@ if (data?.type === 'error' && data?.action === 'getPositionRisk') {
 
         // ====== ORDER UPDATE (futures) ======
         if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
-          this.scheduleAccountRefresh(350);
-  const o = data.o;
-  const order = {
-    orderId: o.i,
-    symbol: o.s,
-    side: o.S,
-    type: o.o,
-    price: o.p,
-    origQty: o.q,
-    executedQty: o.z ?? o.q ?? "0",
-    status: o.X,
-
-    stopPrice: o.sp,
-    workingType: o.wt,
-    time: o.T ?? data.T ?? Date.now(),
-    updateTime: data.T ?? o.T ?? Date.now(),
-  };
+          const o = data.o;
+          const order = {
+            orderId: o.i,
+            symbol: o.s,
+            side: o.S,
+            type: o.o,
+            price: o.p,
+            origQty: o.q,
+            executedQty: o.z ?? o.q ?? "0",
+            status: o.X,
+            stopPrice: o.sp,
+            workingType: o.wt,
+            time: o.T ?? data.T ?? Date.now(),
+            updateTime: data.T ?? o.T ?? Date.now(),
+          };
 
           let currentOrders: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
 
@@ -552,86 +484,67 @@ if (data?.type === 'error' && data?.action === 'getPositionRisk') {
           console.log('📦 Final openOrders:', currentOrders);
           localStorage.setItem('openOrders', JSON.stringify(currentOrders));
           if (this.orderUpdateHandler) this.orderUpdateHandler(currentOrders);
-          // Không return: để các handler khác vẫn nhận
+          // không return
         }
 
         // ====== ACCOUNT UPDATE (Spot/Futures) ======
-if (data?.type === 'update' && data?.channel === 'account') {
-  if (data.availableBalance !== undefined || data.totalWalletBalance !== undefined) {
-  this.emitAccountInformation({
-    availableBalance: data.availableBalance,
-    totalWalletBalance: data.totalWalletBalance,
-    totalMarginBalance: data.totalMarginBalance,
-    totalUnrealizedProfit: data.totalUnrealizedProfit,
-    multiAssetsMargin: data.multiAssetsMargin,
-    source: 'ws-live',
-  });
-} else {
-  // nếu không có số cụ thể, vẫn refresh nhẹ để kéo snapshot
-  this.scheduleAccountRefresh(350);
-}
+        if (data?.type === 'update' && data?.channel === 'account') {
+          if (data.orders && this.orderUpdateHandler) {
+            console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
+            localStorage.setItem('openOrders', JSON.stringify(data.orders));
+            this.orderUpdateHandler(data.orders);
+          }
 
-  if (data.orders && this.orderUpdateHandler) {
-    console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
-    localStorage.setItem('openOrders', JSON.stringify(data.orders));
-    this.orderUpdateHandler(data.orders);
-  }
+          if (Array.isArray(data?.a?.P) && this.positionUpdateHandler) {
+            const positions = data.a.P.map((p: any) => {
+              const sym = String(p.s);
+              const levFromPacket = Number(p.l);
+              const lev =
+                Number.isFinite(levFromPacket) && levFromPacket > 0
+                  ? levFromPacket
+                  : this.getLeverage(p.s, 'futures') || undefined;
 
-  if (Array.isArray(data?.a?.P) && this.positionUpdateHandler) {
-    const positions = data.a.P.map((p: any) => {
-      const sym = String(p.s);
-      const levFromPacket = Number(p.l);
-      const lev = (Number.isFinite(levFromPacket) && levFromPacket > 0)
-  ? levFromPacket
-  : (this.getLeverage(p.s, 'futures') || undefined); // ✅ lấy từ cache nếu packet không có
+              return {
+                symbol: sym,
+                positionAmt: p.pa,
+                entryPrice: p.ep,
+                breakEvenPrice: p.bep,
+                marginType: (p.mt || '').toString().toLowerCase(),
+                isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
+                positionSide: p.ps,
+                leverage: lev,
+              };
+            });
 
-    return {
-        symbol: sym,
-        positionAmt: p.pa,
-        entryPrice: p.ep,
-        breakEvenPrice: p.bep,
-        marginType: (p.mt || '').toString().toLowerCase(),
-        isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
-        positionSide: p.ps,
-        leverage: lev, // ✅ enrich
-        // markPrice đến từ kênh khác
-      };
-    });
+            console.log("ACCOUNT_UPDATE ENRICH", positions.map(p => ({ s: p.symbol, lev: p.leverage })));
+            this.lastPositions = positions;
+            this.positionUpdateHandler(positions);
 
-    console.log("ACCOUNT_UPDATE ENRICH", positions.map(p => ({ s: p.symbol, lev: p.leverage })));
+            try {
+              const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
+              if (needBackfill) this.getFuturesAccount();
+            } catch (e) {
+              console.warn('position backfill check err:', e);
+            }
+          }
 
-    this.positionUpdateHandler(positions);
+          this.messageHandlers.forEach(h => h(data));
+          return;
+        }
 
-    // Nếu còn thiếu lev ở bất kỳ position nào -> kéo snapshot để backfill
-    try {
-      const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
-      if (needBackfill) this.getFuturesAccount();
-    } catch (e) {
-      console.warn('position backfill check err:', e);
-    }
-  }
-
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-
-if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
-  const { s: symbol, l: leverage } = data.ac || {};
-  if (symbol && Number.isFinite(leverage)) {
-    this.setLeverageFor(symbol, leverage, 'futures'); // ✅
-    this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
-  }
-  return;
-}
-
+        if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
+          const { s: symbol, l: leverage } = data.ac || {};
+          if (symbol && Number.isFinite(leverage)) {
+            this.setLeverageFor(symbol, leverage, 'futures');
+            this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
+          }
+          return;
+        }
 
         // ====== Multi Assets Mode ======
         if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
           console.log('📥 [WS] Nhận multiAssetsMode:', data);
-          if (data.positions) {
-            localStorage.setItem('positions', JSON.stringify(data.positions));
-          }
+          // ❌ Không lưu positions vào localStorage để tránh “bóng ma”
           if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
             localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
           }
@@ -682,7 +595,6 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
   private sendAuthed(data: any) {
     if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
       if (data?.action === 'selectBinanceAccount') {
-        // đưa lên đầu + khử trùng
         this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
       } else {
         this.authedQueue.push(data);
@@ -717,7 +629,6 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
 
     if (selects.length) {
       selects.forEach(send);
-      // đợi server “ghi” xong account, rồi mới bắn phần còn lại
       setTimeout(() => {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
           this.authedQueue.push(...subs, ...others);
@@ -727,7 +638,6 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
         others.forEach(send);
       }, 120);
     } else {
-      // không có select thì flush bình thường
       [...subs, ...others].forEach(send);
     }
   }
@@ -740,7 +650,7 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
     // chỉ gửi auth 1 lần
     this.sendOpen({ action: 'authenticate', token });
 
-    // chỉ xếp hàng getMyBinanceAccounts 1 lần
+    // chỉ xếp hàng 1 lần
     this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
     this.pushAuthedUnique('getFuturesAccount', { action: 'getFuturesAccount' });
   }
@@ -750,28 +660,26 @@ if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
   }
 
   public selectAccount(id: number) {
-  console.log('⚙️ Selecting account with ID:', id);
-  this.currentAccountId = id;
-  localStorage.setItem('selectedBinanceAccountId', String(id));
-  // ✅ nạp cache leverage từ local cho account này
-  this.hydrateLeverageCacheFromLS('futures');
-  this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
-}
-
-public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
-  const sym = symbol.toUpperCase();
-  const cache = this.symbolLeverage.get(sym);
-  if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
-
-  const fromLS = this.loadLeverageLS(sym, market);
-  if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
-    // đồng bộ lại vào cache cho lần sau
-    this.symbolLeverage.set(sym, fromLS as number);
-    return fromLS as number;
+    console.log('⚙️ Selecting account with ID:', id);
+    this.currentAccountId = id;
+    localStorage.setItem('selectedBinanceAccountId', String(id));
+    // nạp cache leverage từ local cho account này
+    this.hydrateLeverageCacheFromLS('futures');
+    this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
   }
-  return fallback;
-}
 
+  public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
+    const sym = symbol.toUpperCase();
+    const cache = this.symbolLeverage.get(sym);
+    if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
+
+    const fromLS = this.loadLeverageLS(sym, market);
+    if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
+      this.symbolLeverage.set(sym, fromLS as number);
+      return fromLS as number;
+    }
+    return fallback;
+  }
 
   public getBalances(market: 'spot' | 'futures' | 'both') {
     console.log('🔎 Getting balances for market:', market);
@@ -800,12 +708,9 @@ public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2)
   }
 
   public getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-    // gửi yêu cầu
     this.sendAuthed({ action: 'getMultiAssetsMode' });
-
     if (!onResult) return;
 
-    // one-shot handler
     const once = (msg: any) => {
       if (msg?.type === 'getMultiAssetsMode') {
         const isMulti = !!msg.multiAssetsMargin;
@@ -821,14 +726,12 @@ public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2)
     this.sendAuthed({ action: 'placeOrder', ...payload });
   }
 
-  /** Lấy danh sách lệnh mở theo market (và optional symbol) */
   public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {
     const payload: any = { action: 'getOpenOrders', market };
     if (symbol) payload.symbol = symbol;
     this.sendAuthed(payload);
   }
 
-  /** Huỷ 1 lệnh theo orderId/symbol/market */
   public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
     const payload = { action: 'cancelOrder', symbol, orderId, market };
     console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
@@ -905,7 +808,6 @@ public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2)
       timestamp: Date.now(),
     });
 
-    // BE của bạn hình như yêu cầu auth → dùng authed
     this.sendAuthed(message);
     return subscriptionId;
   }
@@ -917,10 +819,11 @@ public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2)
     const message = { action: 'subscribePublicMiniTicker', symbol };
     console.log('📤 Gửi subscribePublicMiniTicker:', message);
 
-    // Nếu thực sự public thì có thể sendOpen; hiện để authed cho chắc
     this.sendAuthed(message);
     return id;
   }
 }
 
 export const binanceWS = new BinanceWebSocketService();
+
+gửi nốt file WS cho bạn

@@ -9,6 +9,9 @@ type Props = {
   enabled: boolean;
   onEnabledChange?: (v: boolean) => void;
 
+  /** Cho phép chỉnh/kéo Entry (được điều khiển từ ToolMini) */
+  canEditEntry?: boolean;
+
   // ENTRY
   entry: number | null;
   onEntryChange?: (v: number) => void;
@@ -28,38 +31,52 @@ type Props = {
   onChange?: (v: { tp?: number | null; sl?: number | null }) => void;
 
   // submit
+  canPlace?: boolean; // mặc định false
   onPlace?: () => void;
+   quantity?: number | null;                 // 👈 thêm
+  onQuantityChange?: (v: number) => void;   // 👈 thêm
 };
 
-const ToolTpSl: React.FC<Props> = ({
-  lastPrice,
-  positionSide,
-  enabled,
-  onEnabledChange,
+const ToolTpSl: React.FC<Props> = (props) => {
+  const {
+    lastPrice,
+    positionSide,
+    enabled,
+    onEnabledChange,
 
-  entry,
-  onEntryChange,
-  onHitEntry,
+    canEditEntry = true,
 
-  showTP,
-  showSL,
-  onToggleTP,
-  onToggleSL,
+    entry,
+    onEntryChange,
+    onHitEntry,
 
-  controlledTp,
-  controlledSl,
-  onChange,
+    showTP,
+    showSL,
+    onToggleTP,
+    onToggleSL,
+     quantity,
+  onQuantityChange,
 
-  onPlace,
-}) => {
+    controlledTp,
+    controlledSl,
+    onChange,
+canPlace = false,
+    onPlace,
+  } = props;
+
   const [entryInput, setEntryInput] = React.useState<number | "">("");
   const [tpInput, setTpInput] = React.useState<number | "">("");
   const [slInput, setSlInput] = React.useState<number | "">("");
-
+const [quantityInput, setQuantityInput] = React.useState<number | "">("");
   // sync inputs khi parent đổi
   React.useEffect(() => {
     if (entry != null) setEntryInput(Number(entry.toFixed(6)));
+    else setEntryInput("");
   }, [entry]);
+
+React.useEffect(() => {
+  if (quantity != null) setQuantityInput(quantity);
+}, [quantity]);
 
   React.useEffect(() => {
     if (controlledTp != null) setTpInput(Number(controlledTp.toFixed(6)));
@@ -71,8 +88,15 @@ const ToolTpSl: React.FC<Props> = ({
     else setSlInput("");
   }, [controlledSl]);
 
+  const handleNumeric = (val: string): number | "" => {
+    if (val === "") return "";
+    const n = Number(val);
+    return Number.isFinite(n) ? n : "";
+  };
+
   return (
     <div className="rounded-md border border-dark-600 p-2 bg-dark-800 text-xs">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="font-medium">TP/SL</div>
         <label className="inline-flex items-center gap-1">
@@ -85,26 +109,28 @@ const ToolTpSl: React.FC<Props> = ({
         </label>
       </div>
 
-      {/* ENTRY ROW */}
+      {/* ENTRY */}
       <div className="mt-2">
         <div className="text-[11px] text-gray-400 mb-1">Entry</div>
         <div className="flex gap-1">
           <input
-            className="w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs"
+            className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
+              !enabled || !canEditEntry ? "opacity-60 cursor-not-allowed" : ""
+            }`}
             type="number"
             step="0.000001"
             value={entryInput}
             onChange={(e) => {
-              const v = e.target.value === "" ? "" : Number(e.target.value);
+              const v = handleNumeric(e.target.value);
               setEntryInput(v);
-              if (v !== "" && isFinite(v as number)) onEntryChange?.(v as number);
+              if (v !== "" && canEditEntry) onEntryChange?.(v as number);
             }}
-            disabled={!enabled}
+            disabled={!enabled || !canEditEntry}
           />
           <button
             className="h-7 px-2 rounded border border-gray-500 text-gray-200 disabled:opacity-50 text-xs"
-            onClick={onHitEntry}
-            disabled={!enabled || lastPrice == null}
+            onClick={() => canEditEntry && onHitEntry?.()}
+            disabled={!enabled || !canEditEntry || lastPrice == null}
             title="Hit Last Price"
           >
             Hit
@@ -114,6 +140,37 @@ const ToolTpSl: React.FC<Props> = ({
           Side: <b>{positionSide}</b> • Last: {lastPrice ?? "—"}
         </div>
       </div>
+
+      {/* QTY */}
+<div className="mt-2">
+  <div className="text-[11px] text-gray-400 mb-1">Số lượng</div>
+  <div className="flex gap-1">
+    <input
+      className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
+        !enabled ? "opacity-60 cursor-not-allowed" : ""
+      }`}
+      type="number"
+      step="0.000001"
+      value={quantityInput}
+      onChange={(e) => {
+        const val = e.target.value;
+        if (val === "") {
+          setQuantityInput(""); // cho phép rỗng
+          onQuantityChange?.(0); // hoặc null nếu bạn muốn
+          return;
+        }
+        const n = Number(val);
+        if (Number.isFinite(n) && n >= 0) {
+          setQuantityInput(n);
+          onQuantityChange?.(n);
+        }
+      }}
+      disabled={!enabled}
+      placeholder="Nhập số lượng"
+    />
+  </div>
+</div>
+
 
       {/* SHOW TOGGLES */}
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -137,21 +194,23 @@ const ToolTpSl: React.FC<Props> = ({
         </label>
       </div>
 
-      {/* TP / SL INPUTS */}
+      {/* TP / SL */}
       <div className="mt-2 grid grid-cols-2 gap-2">
         {/* TP */}
         <div>
           <div className="text-[11px] text-gray-400 mb-1">Take Profit</div>
           <div className="flex gap-1">
             <input
-              className="w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs"
+              className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
+                !enabled || !showTP ? "opacity-60 cursor-not-allowed" : ""
+              }`}
               type="number"
               step="0.000001"
               value={tpInput}
               onChange={(e) => {
-                const v = e.target.value === "" ? "" : Number(e.target.value);
+                const v = handleNumeric(e.target.value);
                 setTpInput(v);
-                if (v !== "" && isFinite(v as number)) onChange?.({ tp: v as number });
+                if (v !== "" && enabled && showTP) onChange?.({ tp: v as number });
               }}
               disabled={!enabled || !showTP}
             />
@@ -171,14 +230,16 @@ const ToolTpSl: React.FC<Props> = ({
           <div className="text-[11px] text-gray-400 mb-1">Stop Loss</div>
           <div className="flex gap-1">
             <input
-              className="w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs"
+              className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
+                !enabled || !showSL ? "opacity-60 cursor-not-allowed" : ""
+              }`}
               type="number"
               step="0.000001"
               value={slInput}
               onChange={(e) => {
-                const v = e.target.value === "" ? "" : Number(e.target.value);
+                const v = handleNumeric(e.target.value);
                 setSlInput(v);
-                if (v !== "" && isFinite(v as number)) onChange?.({ sl: v as number });
+                if (v !== "" && enabled && showSL) onChange?.({ sl: v as number });
               }}
               disabled={!enabled || !showSL}
             />
@@ -194,32 +255,34 @@ const ToolTpSl: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* PLACE */}
-      <div className="mt-3 flex justify-end gap-2">
-        <button
-          className="h-7 px-3 rounded border border-dark-600 text-gray-300 hover:bg-dark-700/60"
-          disabled={!enabled}
-          onClick={() => {
-            // reset nhanh
-            setTpInput("");
-            setSlInput("");
-          }}
-        >
-          Reset
-        </button>
-        <button
-          className="h-7 px-3 rounded bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
-          disabled={!enabled || entry == null}
-          onClick={onPlace}
-          title="Place order(s)"
-        >
-          Place
-        </button>
-      </div>
+      {/* ACTIONS */}
+<div className="mt-3 flex justify-end gap-2">
+  <button
+    className="h-7 px-3 rounded border border-dark-600 text-gray-300 hover:bg-dark-700/60"
+    disabled={!enabled}
+    onClick={() => {
+      setTpInput("");
+      setSlInput("");
+      // (tuỳ chọn) đẩy reset lên parent:
+      // onChange?.({ tp: null, sl: null });
+    }}
+  >
+    Reset
+  </button>
 
-      <div className="mt-1 text-[11px] text-gray-500">
-        Tick TP/SL để hiện/ẩn trên chart. Kéo vạch trên chart hoặc nhập số ở đây.
-      </div>
+  {canPlace && (
+  <button
+    className="h-7 px-3 rounded bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+    disabled={!enabled || entry == null}
+    onClick={onPlace}
+    title="Xác nhận đặt lệnh"
+  >
+    Xác nhận
+  </button>
+)}
+</div>
+
+      
     </div>
   );
 };

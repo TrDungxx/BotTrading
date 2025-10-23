@@ -44,6 +44,7 @@ export type PositionData = {
   positionAmt: string;
   entryPrice: string;
   markPrice?: string;
+  leverage?: number;
 };
 
 export type FloatingInfo = {

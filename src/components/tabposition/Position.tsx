@@ -6,6 +6,19 @@ import { PositionData } from "../../utils/types";
 import PositionTpSlModal from "./function/PositionTpSlModal";
 import { Edit3 } from "lucide-react";
 
+// ngay đầu file Position.tsx hoặc cùng chỗ helpers
+function loadLeverageLS(
+  accountId?: number | null,
+  market?: 'spot' | 'futures',
+  symbol?: string
+) {
+  const key = `tw_leverage_${accountId ?? 'na'}_${market ?? 'futures'}_${symbol ?? ''}`;
+  const raw = localStorage.getItem(key);
+  const v = raw ? Number(raw) : NaN;
+  return Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+
 // mở rộng cho phần tính toán/hiển thị
 type PositionCalc = PositionData & {
   breakEvenPrice?: string; // bep
@@ -209,6 +222,9 @@ const Position: React.FC<PositionProps> = ({
   return () => binanceWS.removeMessageHandler(onWs);
 }, []);
 
+
+
+
 useEffect(() => {
   if (!positions.length) return;
   const needLev = positions.some(p => !(Number(p.leverage) > 0));
@@ -275,24 +291,55 @@ const calculatePnlPercentage = (pos: PositionCalc) => {
     });
   }, [positions, onFloatingInfoChange]);
 
-  // Load initial
-  useEffect(() => {
-    setPositions([]);
-    if (externalPositions && externalPositions.length) {
-      applyPositions(externalPositions);
-    } else {
-      binanceWS.getPositions();
+  
+// === Gắn handler positions và khôi phục khi reload ===
+useEffect(() => {
+  // 🪣 1. Hydrate từ localStorage để hiển thị ngay khi F5
+  try {
+    const cached = localStorage.getItem("positions");
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) {
+        console.log("🪣 Hydrated cached positions:", parsed);
+        setPositions(parsed);
+        onPositionCountChange?.(parsed.length);
+      }
     }
-  }, [externalPositions, applyPositions]);
+  } catch {}
 
-  // Private WS → positions
-  useEffect(() => {
-    binanceWS.setPositionUpdateHandler((rawPositions) => {
-      applyPositions(rawPositions || []);
-    });
-    binanceWS.getPositions();
-    return () => { binanceWS.setPositionUpdateHandler(() => {}); };
-  }, [applyPositions]);
+  // 🧠 2. Gắn handler chính (chỉ 1 nơi duy nhất)
+  binanceWS.setPositionUpdateHandler((raw: any[]) => {
+    const cleaned: PositionCalc[] = (raw || [])
+      .map((p) => ({
+        ...p,
+        positionAmt: String(p.positionAmt ?? p.pa ?? "0"),
+        entryPrice: String(p.entryPrice ?? p.ep ?? "0"),
+        markPrice: String(p.markPrice ?? p.mp ?? "0"),
+        symbol: String(p.symbol ?? p.s),
+        leverage: Number(p.leverage ?? p.l ?? 0),
+        unrealizedPnl: Number(p.unrealizedPnl ?? p.up ?? 0),
+        positionSide: p.positionSide ?? p.ps ?? "BOTH",
+      }))
+      .filter((p) => Math.abs(parseFloat(p.positionAmt)) > 1e-9);
+
+    setPositions(cleaned);
+    onPositionCountChange?.(cleaned.length);
+    if (!cleaned.length) onFloatingInfoChange?.(null);
+
+    // Lưu cache để lần F5 sau hiển thị ngay
+    try {
+      localStorage.setItem("positions", JSON.stringify(cleaned));
+    } catch {}
+  });
+
+  // 📡 3. Yêu cầu snapshot (sau khi handler đã gắn)
+  binanceWS.getPositions();
+
+  // 🧹 4. Cleanup khi unmount
+  return () => binanceWS.setPositionUpdateHandler(() => {});
+}, [onPositionCountChange, onFloatingInfoChange]);
+
+  
 
   // ACCOUNT_UPDATE.a.P
   useEffect(() => {
@@ -357,45 +404,151 @@ useEffect(() => {
   // Không cleanup toàn bộ ở đây! (giữ kết nối để realtime mượt)
 }, [symbolsKey, market]);
 
+// helper: chờ ACK huỷ lệnh cho 1 symbol (có timeout fallback)
+const waitForCancelAck = (symbol: string, timeoutMs = 800) =>
+  new Promise<void>((resolve) => {
+    const handler = (m: any) => {
+      // server trả: { symbol, canceledOrders, market, executionTime }
+      if (m && m.symbol === symbol && typeof m.canceledOrders === "number") {
+        binanceWS.removeMessageHandler(handler);
+        resolve();
+      }
+    };
+    binanceWS.onMessage(handler);
+    setTimeout(() => {
+      binanceWS.removeMessageHandler(handler);
+      resolve();
+    }, timeoutMs);
+  });
 
-  const handleCloseAllMarket = () => {
-    positions.forEach((pos) => {
-      const rawSize = parseFloat(pos.positionAmt || "0");
-      if (rawSize === 0) return;
-      const side = rawSize > 0 ? "SELL" : "BUY";
-      const isHedge = true;
-      const positionSide = (isHedge ? (rawSize > 0 ? "LONG" : "SHORT") : "BOTH") as "LONG" | "SHORT" | "BOTH";
-      const absSize = Math.abs(rawSize);
-      const step = getStepSize(pos.symbol);
-      const qty = roundToStep(absSize, step);
-      if (qty <= 0) return;
-      binanceWS.placeOrder({ symbol: pos.symbol, market: "futures", type: "MARKET", side: side as "BUY" | "SELL", positionSide, quantity: qty });
+// phiên bản có HUỶ LỆNH CHỜ + ĐÓNG MKT (giữ style cũ)
+const handleCloseAllMarket = async () => {
+  // lấy các vị thế đang mở
+  const actives = positions.filter(p => Number(p.positionAmt || 0) !== 0);
+
+  for (const pos of actives) {
+    const rawSize = Number(pos.positionAmt || 0);
+    if (!Number.isFinite(rawSize) || rawSize === 0) continue;
+
+    const symbol = pos.symbol;
+    const side = rawSize > 0 ? "SELL" : "BUY";
+    const isHedge = true;
+    const positionSide = (isHedge ? (rawSize > 0 ? "LONG" : "SHORT") : "BOTH") as "LONG" | "SHORT" | "BOTH";
+
+    const step = getStepSize(symbol);
+    const qty = roundToStep(Math.abs(rawSize), step);
+    if (qty <= 0) continue;
+
+    // 1) Huỷ TẤT CẢ lệnh chờ của symbol này và đợi ACK
+    try {
+      await binanceWS.cancelAllOrders(symbol, "futures");
+    } catch (e) {
+      console.warn("cancelAllOrders failed", symbol, e);
+    }
+    await waitForCancelAck(symbol, 800);
+
+    // 2) Đóng vị thế bằng MARKET (KHÔNG kèm reduceOnly để tránh lỗi server)
+    try {
+      await binanceWS.placeOrder({
+        symbol,
+        market: "futures",
+        type: "MARKET",
+        side: side as "BUY" | "SELL",
+        positionSide, // bạn đang chạy hedge → giữ nguyên như code cũ
+        quantity: qty,
+      });
+    } catch (e: any) {
+      // hiếm khi risk-engine còn kẹt exposure → chờ một nhịp rồi thử lại
+      const msg = String(e?.message || "").toLowerCase();
+      if (msg.includes("exposure") && msg.includes("exceed") && msg.includes("limit")) {
+        await new Promise(r => setTimeout(r, 400));
+        await binanceWS.placeOrder({
+          symbol,
+          market: "futures",
+          type: "MARKET",
+          side: side as "BUY" | "SELL",
+          positionSide,
+          quantity: qty,
+        });
+      } else if (msg.includes("position side") && msg.includes("not match")) {
+        // phòng trường hợp one-way: bỏ positionSide và thử lại
+        await binanceWS.placeOrder({
+          symbol,
+          market: "futures",
+          type: "MARKET",
+          side: side as "BUY" | "SELL",
+          quantity: qty,
+        });
+      } else {
+        console.error("placeOrder error", symbol, e);
+      }
+    }
+  }
+
+  // refresh lại danh sách
+  setTimeout(() => binanceWS.getPositions(), 300);
+};
+
+const handleCloseAllByPnl = () => {
+  positions.forEach((pos) => {
+    const size = parseFloat(pos.positionAmt || "0");
+    const pnlPercent = calculatePnlPercentage(pos);
+    if (size === 0 || pnlPercent < 5) return;
+
+    const side = size > 0 ? "SELL" : "BUY";
+    const positionSide = size > 0 ? "LONG" : "SHORT";
+
+    binanceWS.placeOrder({
+      symbol: pos.symbol,
+      side: side as "BUY" | "SELL",
+      type: "MARKET",
+      quantity: Math.abs(size),
+      market: "futures",
+      reduceOnly: true,
+      positionSide: positionSide as "LONG" | "SHORT",
     });
-    setPositions([]);
-    setTimeout(() => binanceWS.getPositions(), 500);
-  };
+  });
 
-  const handleCloseAllByPnl = () => {
-    positions.forEach((pos) => {
-      const size = parseFloat(pos.positionAmt || "0");
-      const pnlPercent = calculatePnlPercentage(pos);
-      if (size === 0 || pnlPercent < 5) return;
-      const side = size > 0 ? "SELL" : "BUY";
-      const positionSide = size > 0 ? "LONG" : "SHORT";
-      binanceWS.placeOrder({ symbol: pos.symbol, side: side as "BUY" | "SELL", type: "MARKET", quantity: Math.abs(size), market: "futures", reduceOnly: true, positionSide: positionSide as "LONG" | "SHORT" });
-    });
-    setTimeout(() => binanceWS.getPositions(), 400);
-  };
+  setTimeout(() => binanceWS.getPositions(), 400);
+};
 
-  useEffect(() => {
+useEffect(() => {
   if (!positions.length) return;
   const missingLev = positions.some(p => !(Number(p.leverage) > 0));
   if (missingLev) binanceWS.getFuturesAccount();
 }, [positions.map(p => `${p.symbol}:${p.leverage ?? 'na'}`).join('|')]);
 
-useEffect(() => {
-  console.log("POSITIONS STATE", positions);
-}, [positions]);
+
+
+// 👉 phát đi "active-tool-changed" + set localStorage để ToolMini bắt
+const activateAdvancedTool = (pos: PositionCalc) => {
+  const size = parseFloat(pos.positionAmt || "0");
+  if (!size) return;
+  const side = (size > 0 ? "LONG" : "SHORT") as "LONG" | "SHORT";
+  const payload = {
+    positionId: `${pos.symbol}:${pos.positionSide ?? side}`,
+    symbol: pos.symbol,
+    side,
+    entry: parseFloat(pos.entryPrice || "0"),
+  };
+
+  try {
+    localStorage.setItem("activeTool", JSON.stringify(payload));
+  } catch {}
+
+  // 🔥 phát sự kiện đổi chart nếu đang ở symbol khác
+  window.dispatchEvent(new CustomEvent("chart-symbol-change-request", { detail: { symbol: pos.symbol } }));
+
+  // phát sau 300ms cho chắc chart đã đổi
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("active-tool-changed", { detail: payload }));
+  }, 300);
+};
+
+const posAccountId =
+  (activePos as any)?.internalAccountId ??
+  (activePos as any)?.accountId ??
+  null;
 
   return (
     <div className="card">
@@ -537,24 +690,34 @@ useEffect(() => {
                     </div>
                   </td>
                   <td className="pr-4">
-                    <div className="flex items-center justify-end">
-                      <button
-                        onClick={() => {
-                          setActivePos(pos);
-                          setShowTpSl(true);
-                        }}
-                        className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
-                        title="TP/SL cho vị thế"
-                      >
-                        <Edit3 size={14} /> TP/SL
-                      </button>
-                    </div>
-                  </td>
+  <div className="flex items-center justify-end gap-2">
+    <button
+      onClick={() => {
+        setActivePos(pos);
+        setShowTpSl(true);
+      }}
+      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
+      title="TP/SL cho vị thế (modal)"
+    >
+      <Edit3 size={14} /> TP/SL
+    </button>
+
+    {/* 🔥 Nút Nâng cao: bật tool kéo trên chart */}
+    <button
+      onClick={() => activateAdvancedTool(pos)}
+      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-primary/60 text-primary hover:bg-dark-700"
+      title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
+    >
+      Nâng cao
+    </button>
+  </div>
+</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+        
 
         <PopupPosition
           isOpen={showPopup}
@@ -570,19 +733,26 @@ useEffect(() => {
         />
 
         {activePos && (
-          <PositionTpSlModal
-            isOpen={showTpSl}
-            onClose={() => setShowTpSl(false)}
-            symbol={activePos.symbol}
-            entryPrice={parseFloat(activePos.entryPrice || "0")}
-            markPrice={parseFloat(activePos.markPrice || "0")}
-            positionAmt={parseFloat(activePos.positionAmt || "0")}
-            getPriceTick={getPriceTick}
-            onSubmit={({ tpPrice, slPrice, trigger }) => {
-              sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
-            }}
-          />
-        )}
+  <PositionTpSlModal
+    isOpen={showTpSl}
+    onClose={() => setShowTpSl(false)}
+    symbol={activePos.symbol}
+    entryPrice={parseFloat(activePos.entryPrice || "0")}
+    markPrice={parseFloat(activePos.markPrice || "0")}
+    positionAmt={parseFloat(activePos.positionAmt || "0")}
+    getPriceTick={getPriceTick}
+    market={market}
+    leverage={
+      Number((activePos as any)?.leverage) ||
+      loadLeverageLS(posAccountId, market, activePos.symbol) ||
+      1
+    }
+    onSubmit={({ tpPrice, slPrice, trigger }) => {
+      sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
+    }}
+  />
+)}
+
       </div>
     </div>
   );
