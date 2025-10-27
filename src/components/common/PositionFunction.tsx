@@ -4,7 +4,14 @@ import OpenOrder from '../tabposition/OpenOrder';
 import OrderHistoryPosition from '../tabposition/OrderHistoryPosition';
 import TradeHistory from '../tabposition/TradeHistory';
 import PositionRealizedProfitHistory from '../tabposition/PositionRealizedProfitHistory';
+import { OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from '../binancewebsocket/BinanceWebSocketService';
 
+function countPending(symbol?: string) {
+  try {
+    const list = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]') as Array<{symbol:string; status:string}>;
+    return list.filter(o => o.status === 'NEW' && (!symbol || o.symbol === symbol)).length;
+  } catch { return 0; }
+}
 interface OrderBookData {
   bids: OrderBookEntry[];
   asks: OrderBookEntry[];
@@ -95,6 +102,30 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
         return null;
     }
   };
+useEffect(() => {
+  // init ngay khi render hoặc khi đổi symbol
+  setOpenOrderCount(countPending(selectedSymbol));
+
+  const onBus = (e: any) => {
+    const list = (e?.detail?.list ?? null) as Array<{symbol:string; status:string}> | null;
+    if (Array.isArray(list)) {
+      const n = list.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol)).length;
+      setOpenOrderCount(n);
+    } else {
+      setOpenOrderCount(countPending(selectedSymbol));
+    }
+  };
+  const onStorage = (ev: StorageEvent) => {
+    if (ev.key === OPEN_ORDERS_LS_KEY) setOpenOrderCount(countPending(selectedSymbol));
+  };
+
+  window.addEventListener(OPEN_ORDERS_EVENT, onBus as any);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(OPEN_ORDERS_EVENT, onBus as any);
+    window.removeEventListener('storage', onStorage);
+  };
+}, [selectedSymbol]);
 
   
 

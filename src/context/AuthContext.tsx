@@ -1,8 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { authApi } from '../utils/api';
+import {jwtDecode} from 'jwt-decode';
 
-import { authApi, ApiError } from '../utils/api';
-import jwtDecode from 'jwt-decode'; 
-
+// ========== Types ==========
 interface User {
   id: number;
   username: string;
@@ -24,165 +24,206 @@ interface User {
   DiscordWebhookUrl?: string | null;
   DiscordUsername?: string | null;
   DiscordNotificationsEnabled?: boolean;
-  DiscordSettings?: any; // hoặc bạn define thêm type nếu cần validate chặt hơn
+  DiscordSettings?: any;
 }
-
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isGuestMode: boolean;
+  isAuthenticating: boolean; // ✅ thêm vào type để khớp Provider
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string, email:string) => Promise<void>;
-
-  logout: () => void;
+  register: (username: string, password: string, email: string) => Promise<void>;
+  logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   enterGuestMode: () => void;
   exitGuestMode: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isGuestMode, setIsGuestMode] = useState(false);
-const [isAuthenticating, setIsAuthenticating] = useState(true); // ✅ thêm
-
-  useEffect(() => {
-  const fetchUser = async () => {
-    const token = localStorage.getItem('authToken');
-    console.log('Token hiện tại:', token);
-
-    if (!token) {
-      console.warn('⛔ Không có token → bỏ qua fetchUser');
-      setIsAuthenticating(false); // ✅ kết thúc xác thực
-      return;
-    }
-
-    try {
-      const res = await authApi.getCurrentUser();
-      const apiUser = res.Data?.user;
-      console.log("📥 Response data:", res.Data);
-console.log("📥 Raw user from API:", res.Data?.user);
-console.log("📥 DiscordWebhookUrl:", res.Data?.user?.DiscordWebhookUrl);
-console.log("📥 DiscordUsername:", res.Data?.user?.DiscordUsername);
-console.log("📥 DiscordNotificationsEnabled:", res.Data?.user?.DiscordNotificationsEnabled);
-console.log("📥 DiscordSettings:", res.Data?.user?.DiscordSettings);
-
-      console.log("Mapped user:", apiUser); 
-console.log("Final user role:", apiUser.role);
-
-      if (!apiUser) {
-        throw new Error('❌ API không trả về thông tin user');
-      }
-
-      const mappedUser: User = {
-  id: apiUser.id,
-  username: apiUser.Username || apiUser.username || '',
-  email: apiUser.Email || apiUser.email || '',
-  status: apiUser.Status ?? apiUser.status ?? 1,
-  type: apiUser.Type ?? apiUser.type ?? 3,
-  approved: apiUser.Approved ?? apiUser.approved ?? 1,
-  avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
-  internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
-  role: mapRole(
-    apiUser.Role ??
-    apiUser.role ??
-    apiUser.Type ??
-    apiUser.type ??
-    0
-  ),
-
-  // ✅ Các trường Discord cần thêm
-  DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
-  DiscordUsername: apiUser.DiscordUsername || '',
-  DiscordNotificationsEnabled: apiUser.DiscordNotificationsEnabled ?? false,
-  DiscordSettings: apiUser.DiscordSettings ?? null,
-};
-
-      setUser(mappedUser);
-    } catch (error) {
-      console.error('❌ Không khôi phục được user từ token:', error);
-      localStorage.removeItem('authToken');
-    } finally {
-      setIsAuthenticating(false); // ✅ kết thúc xác thực
-    }
-  };
-
-  fetchUser();
-}, []);
-
+// ========== Helpers ==========
 function mapRole(role: number | string): 'admin' | 'superadmin' | 'user' {
   if (role === 'superadmin' || role === 2 || role === 99) return 'superadmin';
   if (role === 'admin' || role === 1) return 'admin';
   return 'user';
 }
 
-
-  const login = async (username: string, password: string) => {
+function safeParseJSON<T = any>(raw: string, fallback: T): T {
   try {
-    const response = await authApi.login(username, password);
-    const data = response.Data;
+    const v = JSON.parse(raw);
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
-    console.log('Token nhận được:', data.token);
-    console.log('User:', data.user);
+// ========== Context ==========
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-    if (!data.user) throw new Error('API không trả về thông tin user');
+// ========== Provider ==========
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const didInit = useRef(false); // ✅ guard StrictMode
 
-    const apiUser = data.user;
+  useEffect(() => {
+    if (didInit.current) return; // chặn chạy 2 lần trong Dev StrictMode
+    didInit.current = true;
 
-    const mappedUser: User = {
-      id: apiUser.id,
-      username: apiUser.Username || apiUser.username || '',
-      email: apiUser.Email || apiUser.email || '',
-      status: apiUser.Status ?? apiUser.status ?? 1,
-      type: apiUser.Type ?? apiUser.type ?? 3,
-      approved: apiUser.Approved ?? apiUser.approved ?? 1,
-      avatar:
-        apiUser.Avatar ||
-        'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
-      internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
-      role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0),
+    const fetchUser = async () => {
+      const token = localStorage.getItem('authToken');
+      console.log('Token hiện tại:', token);
 
-      // ✅ Thêm các trường Discord
-      DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
-      DiscordUsername: apiUser.DiscordUsername || '',
-      DiscordNotificationsEnabled: apiUser.DiscordNotificationsEnabled || false,
-      DiscordSettings:
-        typeof apiUser.DiscordSettings === 'string'
-          ? JSON.parse(apiUser.DiscordSettings)
-          : apiUser.DiscordSettings || {
-              notifyOnLogin: false,
-              notifyOnAccountUpdate: false,
-              notifyOnError: true,
-              messageFormat: 'embed',
-              timezone: 'Asia/Ho_Chi_Minh',
-            },
+      if (!token) {
+        console.warn('⛔ Không có token → bỏ qua fetchUser');
+        setIsAuthenticating(false);
+        return;
+      }
+
+      // ✅ check token hết hạn để tránh gọi API vô ích
+      try {
+        const decoded: any = jwtDecode(token);
+        if (decoded?.exp && Date.now() / 1000 >= decoded.exp) {
+          console.warn('⛔ Token đã hết hạn → xoá & bỏ qua fetchUser');
+          localStorage.removeItem('authToken');
+          setIsAuthenticating(false);
+          return;
+        }
+      } catch {
+        // token hỏng → xem như không hợp lệ
+      }
+
+      try {
+        const res = await authApi.getCurrentUser();
+        const apiUser = res.Data?.user;
+        const apiRoleTop = res.Data?.role;
+
+        console.log('📥 Response data:', res.Data);
+        console.log('📥 Raw user from API:', apiUser);
+        console.log('📥 DiscordWebhookUrl:', apiUser?.DiscordWebhookUrl);
+        console.log('📥 DiscordUsername:', apiUser?.DiscordUsername);
+        console.log('📥 DiscordNotificationsEnabled:', apiUser?.DiscordNotificationsEnabled);
+        console.log('📥 DiscordSettings:', apiUser?.DiscordSettings);
+        console.log('Mapped user (raw):', apiUser);
+        console.log('Final user role (raw):', apiUser?.role);
+
+        if (!apiUser) {
+          throw new Error('❌ API không trả về thông tin user');
+        }
+
+        const parsedDiscordSettings =
+          typeof apiUser.DiscordSettings === 'string'
+            ? safeParseJSON(apiUser.DiscordSettings, {
+                notifyOnLogin: false,
+                notifyOnAccountUpdate: false,
+                notifyOnError: true,
+                messageFormat: 'embed',
+                timezone: 'Asia/Ho_Chi_Minh',
+              })
+            : (apiUser.DiscordSettings ?? {
+                notifyOnLogin: false,
+                notifyOnAccountUpdate: false,
+                notifyOnError: true,
+                messageFormat: 'embed',
+                timezone: 'Asia/Ho_Chi_Minh',
+              });
+
+        const mappedUser: User = {
+          id: apiUser.id,
+          username: apiUser.Username || apiUser.username || '',
+          email: apiUser.Email || apiUser.email || '',
+          status: apiUser.Status ?? apiUser.status ?? 1,
+          type: apiUser.Type ?? apiUser.type ?? 3,
+          approved: apiUser.Approved ?? apiUser.approved ?? 1,
+          avatar:
+            apiUser.Avatar ||
+            'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+          internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
+          role: mapRole(apiUser.Role ?? apiUser.role ?? apiRoleTop ?? apiUser.Type ?? apiUser.type ?? 0),
+
+          DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
+          DiscordUsername: apiUser.DiscordUsername || '',
+          DiscordNotificationsEnabled: !!apiUser.DiscordNotificationsEnabled,
+          DiscordSettings: parsedDiscordSettings,
+        };
+
+        setUser(mappedUser);
+      } catch (error) {
+        console.error('❌ Không khôi phục được user từ token:', error);
+        localStorage.removeItem('authToken');
+      } finally {
+        setIsAuthenticating(false);
+      }
     };
 
-    console.log('✅ Mapped user:', mappedUser);
-    setUser(mappedUser);
-    setIsGuestMode(false);
+    fetchUser();
+  }, []);
 
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
+  // ========== Actions ==========
+  const login = async (username: string, password: string) => {
+    try {
+      const response = await authApi.login(username, password);
+      const data = response.Data;
+
+      console.log('Token nhận được:', data.token);
+      console.log('User:', data.user);
+
+      if (!data.user) throw new Error('API không trả về thông tin user');
+
+      const apiUser = data.user;
+
+      const mappedUser: User = {
+        id: apiUser.id,
+        username: apiUser.Username || apiUser.username || '',
+        email: apiUser.Email || apiUser.email || '',
+        status: apiUser.Status ?? apiUser.status ?? 1,
+        type: apiUser.Type ?? apiUser.type ?? 3,
+        approved: apiUser.Approved ?? apiUser.approved ?? 1,
+        avatar:
+          apiUser.Avatar ||
+          'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=150',
+        internalAccountId: apiUser.InternalAccountId ?? apiUser.internalAccountId ?? apiUser.id,
+        role: mapRole(apiUser.Role ?? apiUser.role ?? apiUser.Type ?? apiUser.type ?? 0),
+
+        DiscordWebhookUrl: apiUser.DiscordWebhookUrl || '',
+        DiscordUsername: apiUser.DiscordUsername || '',
+        DiscordNotificationsEnabled: !!apiUser.DiscordNotificationsEnabled,
+        DiscordSettings:
+          typeof apiUser.DiscordSettings === 'string'
+            ? safeParseJSON(apiUser.DiscordSettings, {
+                notifyOnLogin: false,
+                notifyOnAccountUpdate: false,
+                notifyOnError: true,
+                messageFormat: 'embed',
+                timezone: 'Asia/Ho_Chi_Minh',
+              })
+            : apiUser.DiscordSettings || {
+                notifyOnLogin: false,
+                notifyOnAccountUpdate: false,
+                notifyOnError: true,
+                messageFormat: 'embed',
+                timezone: 'Asia/Ho_Chi_Minh',
+              },
+      };
+
+      console.log('✅ Mapped user:', mappedUser);
+      setUser(mappedUser);
+      setIsGuestMode(false);
+
+      if (data.token) {
+        localStorage.setItem('authToken', data.token);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-  } catch (error) {
-    console.error('Login error:', error);
-    throw error;
-  }
-};
+  };
 
-
-  const register = async (username: string,  password: string, email: string) => {
+  const register = async (username: string, password: string, email: string) => {
     try {
       const data = await authApi.register(username, password, email);
-      
-      console.log('Register API response:', data); // Debug log
-      
-      // Registration successful - user will be in pending state
-      // Don't set user state since they need approval first
-      
+      console.log('Register API response:', data);
+      // Đăng ký xong thường pending approve → không set user ở đây
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -200,13 +241,10 @@ function mapRole(role: number | string): 'admin' | 'superadmin' | 'user' {
 
   const logout = async () => {
     try {
-      // Call logout API
-      await authApi.logout(); 
+      await authApi.logout();
     } catch (error) {
       console.error('Logout API error:', error);
-      // Continue with logout even if API call fails
     } finally {
-      // Always clear local state
       setUser(null);
       setIsGuestMode(false);
       localStorage.removeItem('authToken');
@@ -242,6 +280,7 @@ function mapRole(role: number | string): 'admin' | 'superadmin' | 'user' {
   );
 }
 
+// ========== Hook ==========
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
+import { binanceWS, OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from '../binancewebsocket/BinanceWebSocketService';
 import { Trash2, ChevronDown } from 'lucide-react';
 
 type Market = 'spot' | 'futures';
 
-// Mở rộng kiểu để đọc đủ trường từ WS
 interface Order {
-  orderId: number;
+  orderId: number | string; // cho phép 'tmp_*' optimistic
   symbol: string;
   side: 'BUY' | 'SELL';
   type:
@@ -21,14 +20,11 @@ interface Order {
   origQty?: string | number;
   executedQty?: string | number;
   status: string;
-
-  // trigger fields
   stopPrice?: string | number;
   workingType?: 'MARK_PRICE' | 'LAST_PRICE' | 'INDEX_PRICE' | 'CONTRACT_PRICE' | string;
-
-  // optional timing
   time?: number;
   updateTime?: number;
+  _optimistic?: boolean;
 }
 
 interface OpenOrderProps {
@@ -39,100 +35,95 @@ interface OpenOrderProps {
 
 const dash = '—';
 
-function toNumber(v: any): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+// ---- helpers LS + event ----
+function readOrdersLS(): Order[] {
+  try { return JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]'); }
+  catch { return []; }
+}
+function writeOrdersLS(list: Order[]) {
+  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list } }));
 }
 
-function fmt(v: any): string {
-  const n = toNumber(v);
-  return n ? String(n) : dash;
-}
+function toNumber(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function fmt(v: any): string { const n = toNumber(v); return n ? String(n) : dash; }
 
 function mapWorkingType(w?: Order['workingType']): string {
   switch (w) {
-    case 'MARK_PRICE':
-      return 'Mark';
-    case 'LAST_PRICE':
-      return 'Last';
-    case 'INDEX_PRICE':
-      return 'Index';
-    case 'CONTRACT_PRICE':
-      return 'Contract';
-    default:
-      return dash;
+    case 'MARK_PRICE': return 'Mark';
+    case 'LAST_PRICE': return 'Last';
+    case 'INDEX_PRICE': return 'Index';
+    case 'CONTRACT_PRICE': return 'Contract';
+    default: return dash;
   }
 }
-
-function isTriggerMarket(type: Order['type']) {
-  return type === 'STOP_MARKET' || type === 'TAKE_PROFIT_MARKET';
-}
-function isStopOrTpLimit(type: Order['type']) {
-  return type === 'STOP' || type === 'TAKE_PROFIT';
-}
+const isTriggerMarket = (t: Order['type']) => t === 'STOP_MARKET' || t === 'TAKE_PROFIT_MARKET';
+const isStopOrTpLimit = (t: Order['type']) => t === 'STOP' || t === 'TAKE_PROFIT';
 
 const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPendingCountChange }) => {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [showCancelMenu, setShowCancelMenu] = useState(false);
 
-  // nhận dữ liệu từ WS
+  // ========== SUBSCRIBE REALTIME (event-bus + storage) ==========
+  useEffect(() => {
+    // khởi tạo từ LS (bao gồm optimistic)
+    const initAll = readOrdersLS();
+    const initFiltered = initAll.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+    setOpenOrders(initFiltered);
+    onPendingCountChange?.(initFiltered.length);
+
+    const onBus = (e: any) => {
+      const list: Order[] = e?.detail?.list ?? readOrdersLS();
+      const filtered = list.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+      setOpenOrders(filtered);
+      onPendingCountChange?.(filtered.length);
+    };
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === OPEN_ORDERS_LS_KEY) {
+        const list = readOrdersLS();
+        const filtered = list.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+        setOpenOrders(filtered);
+        onPendingCountChange?.(filtered.length);
+      }
+    };
+
+    window.addEventListener(OPEN_ORDERS_EVENT, onBus as any);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(OPEN_ORDERS_EVENT, onBus as any);
+      window.removeEventListener('storage', onStorage);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSymbol]);
+
+  // ========== WS callback (server push) ==========
   useEffect(() => {
     binanceWS.setOrderUpdateHandler((orders: any[]) => {
-      if (Array.isArray(orders)) {
-        localStorage.setItem('openOrders', JSON.stringify(orders));
-        const pending = orders.filter((o: Order) => o.status === 'NEW');
-        setOpenOrders(pending);
-        onPendingCountChange?.(pending.length);
-      }
+      if (!Array.isArray(orders)) return;
+      // Server vừa gửi snapshot/cập nhật -> ghi LS + phát event để đồng bộ toàn app
+      writeOrdersLS(orders as Order[]);
+      // (state sẽ được cập nhật bởi listener ở trên)
     });
+    return () => { binanceWS.setOrderUpdateHandler?.(null); };
+  }, []);
 
-    // init từ localStorage
-    const stored = localStorage.getItem('openOrders');
-    if (stored) {
-      try {
-        const parsed: Order[] = JSON.parse(stored);
-        const pending = parsed.filter((o) => o.status === 'NEW');
-        setOpenOrders(pending);
-        onPendingCountChange?.(pending.length);
-      } catch {
-        /* ignore */
-      }
-    }
-
-    return () => {
-      binanceWS.setOrderUpdateHandler?.(null);
-    };
-  }, [onPendingCountChange]);
-
-  // gọi getOpenOrders khi market/symbol đổi (debounce nhẹ)
+  // ========== Pull open orders khi market/symbol đổi ==========
   const debounceTimer = useRef<number | null>(null);
   useEffect(() => {
     if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
     debounceTimer.current = window.setTimeout(() => {
-      if (selectedSymbol) {
-        binanceWS.getOpenOrders(market, selectedSymbol);
-      } else {
-        binanceWS.getOpenOrders(market);
-      }
+      selectedSymbol ? binanceWS.getOpenOrders(market, selectedSymbol)
+                     : binanceWS.getOpenOrders(market);
     }, 250);
-
     return () => {
-      if (debounceTimer.current) {
-        window.clearTimeout(debounceTimer.current);
-        debounceTimer.current = null;
-      }
+      if (debounceTimer.current) { window.clearTimeout(debounceTimer.current); debounceTimer.current = null; }
     };
   }, [market, selectedSymbol]);
 
-  // huỷ 1 lệnh
-  const cancelOrder = (order: Order) => {
-    binanceWS.cancelOrder(order.symbol, order.orderId, market);
-  };
-
-  // huỷ theo filter
+  // ========== Cancel ==========
+  const cancelOrder = (order: Order) => binanceWS.cancelOrder(order.symbol, Number(order.orderId), market);
   const cancelFilteredOrders = (filterFn: (o: Order) => boolean) => {
-    const filtered = openOrders.filter(filterFn);
-    filtered.forEach(cancelOrder);
+    openOrders.filter(filterFn).forEach(cancelOrder);
   };
 
   return (
@@ -156,8 +147,6 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
               <th className="px-4 py-2">Đã khớp</th>
               <th className="px-4 py-2">TP/SL</th>
               <th className="px-4 py-2">Giảm chi</th>
-
-              {/* Dropdown Huỷ tất cả */}
               <th className="px-4 py-2 text-right relative">
                 <button
                   type="button"
@@ -173,20 +162,14 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
                     <button
                       type="button"
                       className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
-                      onClick={() => {
-                        cancelFilteredOrders((o) => o.symbol === selectedSymbol);
-                        setShowCancelMenu(false);
-                      }}
+                      onClick={() => { cancelFilteredOrders((o) => o.symbol === selectedSymbol); setShowCancelMenu(false); }}
                     >
                       Tất cả ({selectedSymbol})
                     </button>
                     <button
                       type="button"
                       className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
-                      onClick={() => {
-                        cancelFilteredOrders((o) => o.symbol === selectedSymbol && o.type === 'LIMIT');
-                        setShowCancelMenu(false);
-                      }}
+                      onClick={() => { cancelFilteredOrders((o) => o.symbol === selectedSymbol && o.type === 'LIMIT'); setShowCancelMenu(false); }}
                     >
                       LIMIT
                     </button>
@@ -195,8 +178,7 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
                       className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
                       onClick={() => {
                         cancelFilteredOrders(
-                          (o) =>
-                            o.symbol === selectedSymbol &&
+                          (o) => o.symbol === selectedSymbol &&
                             ['STOP', 'TAKE_PROFIT', 'STOP_MARKET', 'TAKE_PROFIT_MARKET'].includes(o.type)
                         );
                         setShowCancelMenu(false);
@@ -212,8 +194,9 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
 
           <tbody>
             {openOrders.map((order) => {
-              const limitPrice =
-                isTriggerMarket(order.type) ? dash : toNumber(order.price) > 0 ? String(toNumber(order.price)) : dash;
+              const limitPrice = isTriggerMarket(order.type)
+                ? dash
+                : toNumber(order.price) > 0 ? String(toNumber(order.price)) : dash;
 
               const triggerPrice =
                 (isTriggerMarket(order.type) || isStopOrTpLimit(order.type)) && toNumber(order.stopPrice) > 0
@@ -226,12 +209,10 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
               const timeStr = when ? new Date(when).toLocaleTimeString() : '--';
 
               return (
-                <tr className="border-b border-dark-700" key={order.orderId}>
+                <tr className="border-b border-dark-700" key={String(order.orderId)}>
                   <td className="px-4 py-3 text-white">{timeStr}</td>
                   <td className="px-4 py-3 text-white">{order.symbol}</td>
-                  <td className="px-4 py-3 text-green-500 font-medium">
-                    {order.side === 'BUY' ? 'Mua' : 'Bán'}
-                  </td>
+                  <td className="px-4 py-3 text-green-500 font-medium">{order.side === 'BUY' ? 'Mua' : 'Bán'}</td>
                   <td className="px-4 py-3 text-white">{order.type}</td>
                   <td className="px-4 py-3 text-white">{limitPrice}</td>
                   <td className="px-4 py-3 text-white">{triggerPrice}</td>
@@ -257,7 +238,7 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
             {openOrders.length === 0 && (
               <tr>
                 <td className="px-4 py-6 text-gray-400" colSpan={12}>
-                Không có lệnh mở.
+                  Không có lệnh mở.
                 </td>
               </tr>
             )}

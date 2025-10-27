@@ -1,5 +1,7 @@
 import React from "react";
 import { X } from "lucide-react";
+import { binanceWS, OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../../binancewebsocket/BinanceWebSocketService";
+// ^^^ nhớ export OPEN_ORDERS_LS_KEY/OPEN_ORDERS_EVENT ở BinanceWebSocketService.ts như đã trao đổi
 
 type TriggerType = "MARK" | "LAST";
 type InputMode = "price" | "pnl_abs" | "roi_pct";
@@ -15,8 +17,8 @@ export interface PositionTpSlModalProps {
 
   getPriceTick?: (symbol: string) => number;
 
-  leverage?: number;                 // dùng để tính ROI%
-  market?: "spot" | "futures";       // chỉ để hiển thị nếu muốn
+  leverage?: number;
+  market?: "spot" | "futures";
 
   onSubmit?: (payload: {
     tpPrice?: number;
@@ -26,15 +28,26 @@ export interface PositionTpSlModalProps {
 }
 
 const fmt = (n?: number, maxFrac = 8) =>
-  n == null || Number.isNaN(n)
-    ? "--"
-    : n.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
+  n == null || Number.isNaN(n) ? "--" : n.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
 
 const clampStep = (val: number, step: number) => {
   if (!step || step <= 0) return val;
   const p = (step.toString().split(".")[1] || "").length;
   return Number((Math.round(val / step) * step).toFixed(p));
 };
+
+// ---------- helpers LS/event cho optimistic ----------
+function readOpenOrdersLS(): any[] {
+  try { return JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || "[]"); } catch { return []; }
+}
+function writeOpenOrdersLS(list: any[]) {
+  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list } }));
+}
+function optimisticAddOpenOrder(row: any) {
+  const list = readOpenOrdersLS();
+  writeOpenOrdersLS([row, ...list]);
+}
 
 const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   isOpen,
@@ -59,57 +72,30 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   const safeQty = Math.max(qty, 1e-12); // tránh chia 0
   const tick = getPriceTick?.(symbol) ?? 0.0001;
   const lev = leverage && leverage > 0 ? leverage : 1;
+  const positionSide = (isLong ? "LONG" : "SHORT") as "LONG" | "SHORT";
 
   const initialMargin = (entryPrice * safeQty) / lev;
 
-  // ---- converters (KHÔNG dùng biến rời tên "pnl") ----
-  const priceFromPnLAbs = (pnlAbs: number) => {
-    // pnlAbs luôn dương; quyết định chiều theo positionSide & mục TP/SL sẽ làm ở toPrice
-    const pnlSignedForLong = pnlAbs;      // LONG: TP = +, SL = -
-    const pnlSignedForShort = -pnlAbs;    // SHORT: TP = -, SL = +
-    // chọn chiều lời cho TP
-    const pnlForTP = isLong ? pnlSignedForLong : pnlSignedForShort;
-    return entryPrice + pnlForTP / safeQty;
-  };
-
-  const priceFromPnLSigned = (pnlSigned: number) => {
-    // chuyển trực tiếp PnL có dấu -> target
-    return isLong ? entryPrice + pnlSigned / safeQty : entryPrice + pnlSigned / safeQty;
-  };
-
-  const priceFromRoiAbs = (roiAbsPct: number) => {
-    const pnlAbs = (roiAbsPct / 100) * initialMargin;
-    return priceFromPnLAbs(pnlAbs);
-  };
-// ngay trong component, sau khi có isLong, entryPrice, safeQty...
-const targetForSignedPnL = (pnlSigned: number) => {
-  // LONG: entry + pnl/qty ; SHORT: entry - pnl/qty
-  return isLong ? entryPrice + pnlSigned / safeQty : entryPrice - pnlSigned / safeQty;
-};
+  // ---- converters
+  const targetForSignedPnL = (pnlSigned: number) =>
+    isLong ? entryPrice + pnlSigned / safeQty : entryPrice - pnlSigned / safeQty;
 
   const toPrice = (raw: string, kind: "tp" | "sl"): number | undefined => {
-  const v = parseFloat(raw);
-  if (!Number.isFinite(v)) return undefined;
+    const v = parseFloat(raw);
+    if (!Number.isFinite(v)) return undefined;
 
-  if (mode === "price") {
-    return clampStep(v, tick);
-  }
+    if (mode === "price") return clampStep(v, tick);
 
-  if (mode === "pnl_abs") {
-    // người dùng nhập PnL tuyệt đối (USDT)
-    const pnlAbs = Math.abs(v);
-    // TP = lời (+), SL = lỗ (-)
+    if (mode === "pnl_abs") {
+      const pnlSigned = kind === "tp" ? +Math.abs(v) : -Math.abs(v);
+      return clampStep(targetForSignedPnL(pnlSigned), tick);
+    }
+
+    // roi_pct
+    const pnlAbs = (Math.abs(v) / 100) * initialMargin;
     const pnlSigned = kind === "tp" ? +pnlAbs : -pnlAbs;
     return clampStep(targetForSignedPnL(pnlSigned), tick);
-  }
-
-  // mode === "roi_pct": người dùng nhập ROI%
-  const roiAbs = Math.abs(v);
-  const pnlAbs = (roiAbs / 100) * initialMargin;
-  // TP = lời (+), SL = lỗ (-)
-  const pnlSigned = kind === "tp" ? +pnlAbs : -pnlAbs;
-  return clampStep(targetForSignedPnL(pnlSigned), tick);
-};
+  };
 
   // tính PnL & ROI% từ target price
   const calcPnLAndROI = (target?: number) => {
@@ -124,12 +110,76 @@ const targetForSignedPnL = (pnlSigned: number) => {
   const tpEst = calcPnLAndROI(tpPrice);
   const slEst = calcPnLAndROI(slPrice);
 
+  // ---------- đặt lệnh + optimistic ----------
   const handleConfirm = () => {
+    // gọi callback cũ nếu bạn vẫn dùng
     onSubmit?.({ tpPrice, slPrice, trigger });
+
+    const base = {
+      market: "futures" as const,
+      symbol,
+      quantity: safeQty, // server làm tròn bước qty; nếu cần bạn có stepSize thì round ở đây
+      workingType: trigger,
+      reduceOnly: true as const,
+      positionSide,
+    };
+
+    const sideForClose = isLong ? "SELL" : "BUY";
+
+    // OPTIMISTIC + WS: TP
+    if (Number.isFinite(tpPrice as number)) {
+      const optimisticRow = {
+        orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        symbol,
+        side: sideForClose,
+        type: "TAKE_PROFIT_MARKET",
+        status: "NEW",
+        price: 0,
+        stopPrice: tpPrice,
+        workingType: trigger,
+        origQty: String(safeQty),
+        executedQty: "0",
+        time: Date.now(),
+        _optimistic: true,
+      };
+      optimisticAddOpenOrder(optimisticRow);
+
+      binanceWS.placeOrder({
+        ...base,
+        side: sideForClose as "BUY" | "SELL",
+        type: "TAKE_PROFIT_MARKET",
+        stopPrice: tpPrice!,
+      });
+    }
+
+    // OPTIMISTIC + WS: SL
+    if (Number.isFinite(slPrice as number)) {
+      const optimisticRow = {
+        orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        symbol,
+        side: sideForClose,
+        type: "STOP_MARKET",
+        status: "NEW",
+        price: 0,
+        stopPrice: slPrice,
+        workingType: trigger,
+        origQty: String(safeQty),
+        executedQty: "0",
+        time: Date.now(),
+        _optimistic: true,
+      };
+      optimisticAddOpenOrder(optimisticRow);
+
+      binanceWS.placeOrder({
+        ...base,
+        side: sideForClose as "BUY" | "SELL",
+        type: "STOP_MARKET",
+        stopPrice: slPrice!,
+      });
+    }
+
     onClose();
   };
-
-  
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center">
@@ -268,7 +318,7 @@ const targetForSignedPnL = (pnlSigned: number) => {
 
           <div className="pt-1 text-[12px] text-gray-400">
             Lệnh TP dùng <span className="text-white">TAKE_PROFIT_MARKET</span>, SL dùng{" "}
-            <span className="text-white">STOP_MARKET</span> 
+            <span className="text-white">STOP_MARKET</span>
           </div>
         </div>
 
