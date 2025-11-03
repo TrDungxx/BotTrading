@@ -8,17 +8,36 @@ export const OPEN_ORDERS_LS_KEY = 'openOrders';
 export const OPEN_ORDERS_EVENT  = 'tw:open-orders-changed';
 // ==== Types for placing orders ====
 export type WorkingType = 'MARK' | 'LAST';
+export const POSITIONS_LS_KEY = 'positions';
+export const POSITIONS_EVENT  = 'tw:positions-changed';
+
+function readPositionsLS(): any[] {
+  try { return JSON.parse(localStorage.getItem(POSITIONS_LS_KEY) || '[]'); }
+  catch { return []; }
+}
+function writePositionsLS(list: any[]) {
+  localStorage.setItem(POSITIONS_LS_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(POSITIONS_EVENT, { detail: { list } }));
+}
+// ✅ THÊM MỚI:
+export type PlaceOrderType =
+  | 'MARKET'
+  | 'LIMIT'
+  | 'STOP_MARKET'         // futures
+  | 'TAKE_PROFIT_MARKET'  // futures
+  | 'STOP_LOSS_LIMIT'     // spot
+  | 'TAKE_PROFIT_LIMIT';  // spot (để dành, nếu cần)
 
 export interface PlaceOrderPayload {
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
+  type: PlaceOrderType;                 // ⬅️ đổi từ union cũ sang type mới
   market: 'futures' | 'spot';
 
   // qty/price
   quantity?: number;
-  price?: number;     // LIMIT
-  stopPrice?: number; // *_MARKET (TP/SL)
+  price?: number;     // LIMIT, *_LIMIT (Spot)
+  stopPrice?: number; // *_MARKET (Futures), *_LIMIT (Spot)
 
   // futures-only (optional)
   reduceOnly?: boolean;
@@ -351,6 +370,7 @@ class BinanceWebSocketService {
         if (Array.isArray(data) && data.length && data[0] && typeof data[0].symbol === 'string' && data[0].positionAmt !== undefined) {
           console.log('📥 WS positions[] snapshot:', data);
           this.lastPositions = data;
+           writePositionsLS(data);
           this.positionUpdateHandler?.(data);
           this.onPositions?.(data);
           return;
@@ -359,8 +379,11 @@ class BinanceWebSocketService {
           const rows = (data as any).positions;
           console.log('📥 WS positions snapshot (wrapped):', rows);
           this.lastPositions = rows;
+          writePositionsLS(rows); 
           this.positionUpdateHandler?.(rows);
           this.onPositions?.(rows);
+          // ➕ emit snapshot event cho UI (Map store sẽ applySnapshot)
+  this.messageHandlers.forEach(h => h({ type: 'positionsSnapshot', data: rows }));
           return;
         }
         if ((data?.type === 'getPositions' || data?.type === 'positions' || data?.type === 'futuresPositions') &&
@@ -368,8 +391,11 @@ class BinanceWebSocketService {
           const rows = (data as any).data;
           console.log('📥 WS positions snapshot (data):', rows);
           this.lastPositions = rows;
+           writePositionsLS(rows); 
           this.positionUpdateHandler?.(rows);
           this.onPositions?.(rows);
+           // ➕ emit snapshot event cho UI (Map store sẽ applySnapshot)
+  this.messageHandlers.forEach(h => h({ type: 'positionsSnapshot', data: rows }));
           return;
         }
 
@@ -519,7 +545,8 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
 
   console.log('📦 Final openOrders:', currentOrders);
   writeOpenOrdersLS(currentOrders);            // <— phát sự kiện cho UI
-  this.orderUpdateHandler?.(currentOrders);    // giữ callback cũ
+  this.orderUpdateHandler?.(currentOrders); 
+  setTimeout(() => this.getPositions(), 300);   // giữ callback cũ
   // (tiếp tục forward nếu bạn muốn)
 }
 
@@ -568,7 +595,10 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
 
             console.log('ACCOUNT_UPDATE ENRICH', positions.map(p => ({ s: p.symbol, lev: p.leverage })));
             this.positionUpdateHandler(positions);
-
+  // gửi delta event để UI merge từng phần
+  this.messageHandlers.forEach(h => h({ type: 'positionsDelta', data: positions }));
+const merged = positions; // (tuỳ bạn merge với lastPositions; tạm thời replace)
+writePositionsLS(merged);
             try {
               const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
               if (needBackfill) this.getFuturesAccount();
@@ -594,7 +624,7 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
         if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
           console.log('📥 [WS] Nhận multiAssetsMode:', data);
           if (data.positions) {
-            localStorage.setItem('positions', JSON.stringify(data.positions));
+            if (data.positions) writePositionsLS(data.positions);
           }
           if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
             localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
@@ -787,8 +817,9 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
 
   // ========= Orders =========
   public placeOrder(payload: PlaceOrderPayload) {
-    this.sendAuthed({ action: 'placeOrder', ...payload });
-  }
+  this.sendAuthed({ action: 'placeOrder', ...payload });
+  setTimeout(() => this.getPositions(), 400);   // ⬅️ ép kéo snapshot nhẹ
+}
 
   /** Lấy danh sách lệnh mở theo market (và optional symbol) */
   public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {

@@ -15,6 +15,10 @@ import MASettings from './popupchart/MASetting';
 import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import ToolMini from './popupchart/ToolMini';
+import { copyPrice } from '../clickchart/CopyPrice';
+import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
+import AlertModal from '../clickchart/AlertModal';
+import NewOrderModal from '../clickchart/NewOrderModal';
 
 type Candle = CandlestickData<UTCTimestamp>;
 type VolumeBar = HistogramData<UTCTimestamp>;
@@ -34,13 +38,14 @@ interface Props {
   market: 'spot' | 'futures';
   floating?: { pnl: number; roi: number; price: number; positionAmt: number } | null;
   showPositionTag?: boolean;
-
-  // callback đổi symbol từ Tool khác
   onRequestSymbolChange?: (symbol: string) => void;
 }
 
 const toTs = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 
+/* ============================
+   MAs
+   ============================ */
 function calculateMA(data: CandlestickData<Time>[], period: number): LineData<Time>[] {
   const out: LineData<Time>[] = [];
   for (let i = period - 1; i < data.length; i++) {
@@ -56,11 +61,10 @@ function calculateMA(data: CandlestickData<Time>[], period: number): LineData<Ti
    AUTO TICK-SIZE / PRECISION
    ============================ */
 type SymbolMeta = {
-  tickSize: number;          // PRICE_FILTER.tickSize
-  stepSize?: number;         // LOT_SIZE / MARKET_LOT_SIZE.stepSize (nếu cần)
-  precision: number;         // số chữ số thập phân của tickSize
+  tickSize: number;
+  stepSize?: number;
+  precision: number;
 };
-
 const symbolMetaCache = new Map<string, SymbolMeta>();
 
 const countDecimals = (n: number) => {
@@ -86,7 +90,7 @@ async function getSymbolMeta(symbol: string, market: 'spot' | 'futures'): Promis
 
   const PRICE_FILTER = (info.filters || []).find((f: any) => f.filterType === 'PRICE_FILTER');
   const LOT_FILTER = (info.filters || []).find((f: any) =>
-    ['MARKET_LOT_SIZE', 'LOT_SIZE'].includes(f.filterType)
+    ['MARKET_LOT_SIZE', 'LOT_SIZE'].includes(f.filterType),
   );
 
   const tickSize = Number(PRICE_FILTER?.tickSize ?? '0.01') || 0.01;
@@ -98,7 +102,7 @@ async function getSymbolMeta(symbol: string, market: 'spot' | 'futures'): Promis
   return meta;
 }
 
-// Fallback khi không lấy được exchangeInfo (mạng lỗi, v.v.)
+// Fallback khi không lấy được exchangeInfo
 function heuristicMetaFromPrice(lastPrice?: number): SymbolMeta {
   const p = lastPrice ?? 1;
   let tick = 0.01;
@@ -109,7 +113,9 @@ function heuristicMetaFromPrice(lastPrice?: number): SymbolMeta {
   else tick = 0.00001;
   return { tickSize: tick, precision: countDecimals(tick) };
 }
-/* ============================ */
+
+const hlineKey = (symbol: string, market: 'spot' | 'futures') =>
+  `tw_hlines_${market}_${symbol.toUpperCase()}`;
 
 const TradingBinance: React.FC<Props> = ({
   selectedSymbol,
@@ -139,6 +145,36 @@ const TradingBinance: React.FC<Props> = ({
   const [showMASettings, setShowMASettings] = useState(false);
   const [maVisible, setMaVisible] = useState({ ma7: true, ma25: true, ma99: true });
 
+  // Context menu
+  const [ctxOpen, setCtxOpen] = useState(false);
+  const [ctxPos, setCtxPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [ctxSubOpen, setCtxSubOpen] = useState(false);
+  const [hoverPrice, setHoverPrice] = useState<number | null>(null);
+  const [hoverTime, setHoverTime] = useState<UTCTimestamp | null>(null);
+  const ctxOpenRef = useRef(false);
+  const ctxClickYRef = useRef<number | null>(null);
+  const ctxClickPriceRef = useRef<number | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+type PresetType = 'LIMIT' | 'STOP';
+  const [orderOpen, setOrderOpen] = useState(false);
+const [orderSeedPrice, setOrderSeedPrice] = useState<number | null>(null);
+const [orderPresetType, setOrderPresetType] = useState<PresetType>('LIMIT'); // ✨
+const snapToTick = (price: number) => {
+  const cacheKey = `${market}:${selectedSymbol.toUpperCase()}`;
+  const meta = symbolMetaCache.get(cacheKey) ?? heuristicMetaFromPrice(price);
+  let tick = meta.tickSize ?? heuristicMetaFromPrice(price).tickSize;
+
+  if (price < 10 && tick >= 0.05) tick = heuristicMetaFromPrice(price).tickSize;
+
+  const precision =
+    Math.max(
+      (String(tick).split('.')[1]?.length ?? 0),
+      meta.precision ?? 0
+    );
+  return Number((Math.round(price / tick) * tick).toFixed(precision));
+};
+  const [alertOpen, setAlertOpen] = useState(false);
+
   // tool tp/sl
   const lastCandleTime = (candles.at(-1)?.time ?? null) as UTCTimestamp | null;
 
@@ -153,9 +189,16 @@ const TradingBinance: React.FC<Props> = ({
     const el = containerRef.current;
     if (!el) return;
 
+    // 1) Chart
     const chart = createChart(el, {
-      layout: { background: { type: ColorType.Solid, color: '#181a20' }, textColor: '#d1d4dc' },
-      grid: { vertLines: { color: '#2b2b43' }, horzLines: { color: '#2b2b43' } },
+      layout: {
+        background: { type: ColorType.Solid, color: '#181a20' },
+        textColor: '#d1d4dc',
+      },
+      grid: {
+        vertLines: { color: '#2b2b43' },
+        horzLines: { color: '#2b2b43' },
+      },
       width: el.clientWidth,
       height: el.clientHeight,
       timeScale: { borderVisible: false },
@@ -164,12 +207,24 @@ const TradingBinance: React.FC<Props> = ({
     });
     chartRef.current = chart;
 
+    // 2) Series
     candleSeries.current = chart.addCandlestickSeries({
       upColor: '#26a69a',
       downColor: '#ef5350',
       borderVisible: false,
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+    });
+    candleSeries.current.applyOptions({
+      priceScaleId: 'right',
+      lastValueVisible: true,
+      priceLineVisible: true,
+    });
+    chart.priceScale('right').applyOptions({
+      visible: true,
+      autoScale: true,
+      borderVisible: true,
+      scaleMargins: { top: 0.06, bottom: 0.06 },
     });
 
     ma7Ref.current = chart.addLineSeries({
@@ -199,8 +254,11 @@ const TradingBinance: React.FC<Props> = ({
       priceFormat: { type: 'volume' },
       priceScaleId: '',
     });
-    volumeSeries.current.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    volumeSeries.current.priceScale().applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
 
+    // 3) Resize
     const ro = new ResizeObserver(() => {
       const { clientWidth: w, clientHeight: h } = el;
       const { w: lw, h: lh } = lastSizeRef.current;
@@ -213,9 +271,36 @@ const TradingBinance: React.FC<Props> = ({
     resizeObsRef.current = ro;
     lastSizeRef.current = { w: el.clientWidth, h: el.clientHeight };
 
+    // 4) Crosshair → hover price/time
+    const handleCrosshair = (param: any) => {
+      if (ctxOpenRef.current) return;
+      if (!param?.time || !candleSeries.current) {
+        setHoverPrice(null);
+        setHoverTime(null);
+        return;
+      }
+      const series = candleSeries.current;
+      const sp: any = (param as any).seriesPrices ?? (param as any).seriesData;
+      if (!sp || typeof sp.get !== 'function') {
+        setHoverPrice(null);
+        setHoverTime(param.time as UTCTimestamp);
+        return;
+      }
+      const p = sp.get(series) as number | undefined;
+      setHoverPrice(Number.isFinite(p as number) ? (p as number) : null);
+      setHoverTime(param.time as UTCTimestamp);
+    };
+    chart.subscribeCrosshairMove(handleCrosshair);
+
+    // 5) Cleanup
     return () => {
-      try { resizeObsRef.current?.disconnect(); } catch {}
-      try { wsRef.current?.close(); } catch {}
+      chart.unsubscribeCrosshairMove(handleCrosshair);
+      try {
+        resizeObsRef.current?.disconnect();
+      } catch {}
+      try {
+        wsRef.current?.close();
+      } catch {}
       chart.remove();
       chartRef.current = null;
       candleSeries.current = null;
@@ -226,6 +311,82 @@ const TradingBinance: React.FC<Props> = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount once
+
+  function openCtxMenu(e: React.MouseEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const host = containerRef.current;
+    const chart = chartRef.current;
+    const series = candleSeries.current;
+    if (!host) return;
+
+    const rect = host.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    // Lưu tọa độ Y + chụp giá tại lúc mở menu (tránh lệch do autoscale)
+    ctxClickYRef.current = clickY;
+    if (series) {
+      const pAtOpen = series.coordinateToPrice(clickY);
+      ctxClickPriceRef.current =
+        pAtOpen != null && Number.isFinite(pAtOpen as number) ? (pAtOpen as number) : null;
+    } else {
+      ctxClickPriceRef.current = null;
+    }
+
+    // Fallback hoverPrice/time nếu thiếu
+    if (chart && series) {
+      if (hoverPrice == null) {
+        const priceAtY = series.coordinateToPrice(clickY);
+        setHoverPrice(
+          priceAtY != null && Number.isFinite(priceAtY as number) ? (priceAtY as number) : null,
+        );
+      }
+      const timeAtX = chart.timeScale().coordinateToTime(clickX) as UTCTimestamp | null;
+      setHoverTime(timeAtX ?? null);
+    }
+
+    // Clamp vị trí menu
+    const MENU_W = 280;
+    const MENU_H = 380;
+    let x = clickX,
+      y = clickY;
+    if (x + MENU_W > rect.width) x = Math.max(8, rect.width - MENU_W - 8);
+    if (y + MENU_H > rect.height) y = Math.max(8, rect.height - MENU_H - 8);
+
+    setCtxPos({ x, y });
+    setCtxSubOpen(false);
+    ctxOpenRef.current = true;
+    setCtxOpen(true);
+  }
+
+  // Global close (bubbling, không capture)
+  useEffect(() => {
+    const onGlobalClose = (ev: Event) => {
+      const path = (ev as any).composedPath?.() ?? [];
+      if (menuRef.current && path.includes(menuRef.current)) return;
+      ctxOpenRef.current = false;
+      setCtxOpen(false);
+    };
+
+    if (ctxOpen) {
+      window.addEventListener('click', onGlobalClose);
+      window.addEventListener('contextmenu', onGlobalClose);
+      window.addEventListener('resize', onGlobalClose);
+      window.addEventListener('scroll', onGlobalClose, true);
+    }
+    return () => {
+      window.removeEventListener('click', onGlobalClose);
+      window.removeEventListener('contextmenu', onGlobalClose);
+      window.removeEventListener('resize', onGlobalClose);
+      window.removeEventListener('scroll', onGlobalClose, true);
+    };
+  }, [ctxOpen]);
+
+  useEffect(() => {
+    ctxOpenRef.current = ctxOpen;
+  }, [ctxOpen]);
 
   /* --------------------------------------
      Auto set priceFormat theo symbol/market
@@ -240,14 +401,12 @@ const TradingBinance: React.FC<Props> = ({
       try {
         meta = await getSymbolMeta(selectedSymbol, market);
       } catch {
-        // fallback nếu exchangeInfo lỗi: ước lượng theo giá nến cuối
         const last = candles.at(-1)?.close;
         meta = heuristicMetaFromPrice(last);
       }
 
       const { tickSize, precision } = meta;
 
-      // Áp cho tất cả series giá
       cs.applyOptions({
         priceFormat: { type: 'price', minMove: tickSize, precision },
       });
@@ -255,29 +414,36 @@ const TradingBinance: React.FC<Props> = ({
       ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
       ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
 
-      // Làm trục Y “dày” & đúng số thập phân
       chart.priceScale('right').applyOptions({
-  autoScale: true,
-  alignLabels: true,
-  borderVisible: true,
-  scaleMargins: { top: 0.06, bottom: 0.06 },
-});
-chart.applyOptions({
-  localization: {
-    // ép số chữ số thập phân theo precision của symbol
-    priceFormatter: (p: number) => p.toFixed(Math.max(precision, 4)),
-  },
-});
+        autoScale: true,
+        alignLabels: true,
+        borderVisible: true,
+        scaleMargins: { top: 0.06, bottom: 0.06 },
+      });
+      chart.applyOptions({
+        localization: {
+          locale: 'vi-VN',
+          priceFormatter: (p: number) => {
+            const decimals = precision <= 2 ? 2 : Math.min(precision, 4);
+            return p.toLocaleString('vi-VN', {
+              minimumFractionDigits: decimals,
+              maximumFractionDigits: decimals,
+            });
+          },
+        },
+      });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSymbol, market]); // đổi coin/market → tự format lại
+  }, [selectedSymbol, market]);
 
   /* ----------------------------
      Hiển thị phao theo vị thế
      ---------------------------- */
   const pickPos = (list: any[]) => {
     const pos = list.find(
-      (p) => (p.symbol || p.s) === selectedSymbol && parseFloat((p.positionAmt ?? p.pa) || '0') !== 0,
+      (p) =>
+        (p.symbol || p.s) === selectedSymbol &&
+        parseFloat((p.positionAmt ?? p.pa) || '0') !== 0,
     );
     if (!pos) {
       setFloatingPos(undefined);
@@ -320,17 +486,18 @@ chart.applyOptions({
 
   /* ---------------------------------------------------------
      Load lịch sử + subscribe WS khi đổi symbol/interval/market
-     (KHÔNG tái tạo chart)
      --------------------------------------------------------- */
   useEffect(() => {
     if (!candleSeries.current || !volumeSeries.current || !chartRef.current) return;
 
     const mySession = ++sessionRef.current;
-
-    try { wsRef.current?.close(); } catch {}
+    try {
+      wsRef.current?.close();
+    } catch {}
 
     const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://api.binance.com';
-    const wsBase = market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
+    const wsBase =
+      market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
 
     const controller = new AbortController();
 
@@ -359,6 +526,18 @@ chart.applyOptions({
       candleSeries.current!.setData(cs);
       volumeSeries.current!.setData(vs);
       chartRef.current!.timeScale().fitContent();
+
+      
+
+      // Restore HLine đã lưu
+      try {
+        const raw = localStorage.getItem(hlineKey(selectedSymbol, market));
+        const arr = raw ? (JSON.parse(raw) as number[]) : [];
+        if (Array.isArray(arr) && candleSeries.current) {
+          clearAllHLines(candleSeries.current);
+          arr.forEach((p) => addHLine(candleSeries.current!, p));
+        }
+      } catch {}
 
       if (cs.length >= 7 && ma7Ref.current) ma7Ref.current.setData(calculateMA(cs, 7));
       if (cs.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(cs, 25));
@@ -395,17 +574,24 @@ chart.applyOptions({
         });
       };
 
-      ws.onerror = () => {
-        // có thể bổ sung retry/backoff nếu cần
-      };
+      ws.onerror = () => {};
     };
 
     loadHistory().catch(() => {});
 
     return () => {
+      try {
+        if (candleSeries.current) {
+          const prices = getAllLinePrices(candleSeries.current);
+          localStorage.setItem(hlineKey(selectedSymbol, market), JSON.stringify(prices));
+        }
+      } catch {}
+
       controller.abort();
       if (wsRef.current) {
-        try { wsRef.current.close(); } catch {}
+        try {
+          wsRef.current.close();
+        } catch {}
       }
     };
   }, [selectedSymbol, selectedInterval, market]);
@@ -424,7 +610,7 @@ chart.applyOptions({
     maVisible.ma99 && { period: 99, value: candles.at(-1)?.close ?? 0, color: '#b385f8' },
   ].filter(Boolean) as { period: number; value: number; color: string }[];
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handler = (ev: any) => {
       const sym = ev?.detail?.symbol as string | undefined;
       if (!sym) return;
@@ -436,6 +622,8 @@ chart.applyOptions({
     window.addEventListener('chart-symbol-change-request', handler);
     return () => window.removeEventListener('chart-symbol-change-request', handler);
   }, [selectedSymbol, onRequestSymbolChange]);
+
+ 
 
   return (
     <div className="h-full w-full min-w-0 relative">
@@ -468,8 +656,8 @@ chart.applyOptions({
         />
       )}
 
-      {/* Mini header Tool – ngay dưới MAHeader */}
-      <ToolMini
+      {/* Mini header Tool */}
+      {/* <ToolMini
         chartSymbol={selectedSymbol}
         chart={chartRef.current}
         series={candleSeries.current}
@@ -515,10 +703,8 @@ chart.applyOptions({
               quantity: qty,
             });
           }
-
-          console.log('[BRACKET placed]', { side, entry, tp, sl, qty, exitSide, symbol });
         }}
-      />
+      />*/}
 
       {/* Phao PnL */}
       <FloatingPositionTag
@@ -532,7 +718,263 @@ chart.applyOptions({
         offset={12}
       />
 
-      <div ref={containerRef} className="relative w-full h-full min-h-0 min-w-0" />
+      {/* Context Menu */}
+      {ctxOpen && (
+        <div
+          ref={menuRef}
+          className="absolute z-50 rounded-2xl border border-dark-600 bg-dark-800/95 shadow-2xl backdrop-blur-md select-none"
+          style={{ left: ctxPos.x, top: ctxPos.y, width: 280 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="py-2 text-sm text-dark-100">
+            <button
+  className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+  onClick={() => {
+    // lấy giá tại lúc mở menu -> hover -> close
+    const base =
+      ctxClickPriceRef.current ??
+      hoverPrice ??
+      candles.at(-1)?.close ??
+      null;
+
+    const snapped = base != null ? snapToTick(base) : null;
+
+    setCtxOpen(false);
+     setOrderPresetType('LIMIT');
+    setOrderSeedPrice(snapped);
+    setOrderOpen(true);
+  }}
+>
+  Đặt lệnh mới
+</button>
+
+            <button
+              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+              onClick={async () => {
+                const ok = await copyPrice(hoverPrice);
+                setCtxOpen(false);
+                if (!ok) console.warn('[Copy] Không copy được giá');
+              }}
+            >
+              Sao chép giá{' '}
+              {hoverPrice != null
+                ? hoverPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                : '--'}
+            </button>
+
+            <button
+              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const series = candleSeries.current;
+
+                // lấy giá: ưu tiên giá chụp lúc mở menu → hover → close
+                let price: number | null = null;
+                if (ctxClickPriceRef.current != null && Number.isFinite(ctxClickPriceRef.current)) {
+                  price = ctxClickPriceRef.current;
+                }
+                if (price == null && hoverPrice != null && Number.isFinite(hoverPrice)) {
+                  price = hoverPrice;
+                }
+                if (price == null) price = candles.at(-1)?.close ?? null;
+
+                if (!series || price == null || !Number.isFinite(price)) {
+                  console.warn('[HLINE] missing series/price after all fallbacks', {
+                    seriesOk: !!series,
+                    price,
+                  });
+                  setCtxOpen(false);
+                  return;
+                }
+
+                const cacheKey = `${market}:${selectedSymbol.toUpperCase()}`;
+                let tick =
+                  symbolMetaCache.get(cacheKey)?.tickSize ??
+                  heuristicMetaFromPrice(price).tickSize;
+
+                // sanity-check tick cho coin rẻ
+                if (price < 10 && tick >= 0.05) tick = heuristicMetaFromPrice(price).tickSize;
+
+                const snapped = Math.round(price / tick) * tick;
+                console.log('[HLINE] creating from menu', {
+                  priceAtOpen: ctxClickPriceRef.current,
+                  hoverPrice,
+                  finalPrice: price,
+                  tick,
+                  snapped,
+                });
+
+                addHLine(series, snapped);
+
+                try {
+                  const k = hlineKey(selectedSymbol, market);
+                  const raw = localStorage.getItem(k);
+                  const arr: number[] = raw ? JSON.parse(raw) : [];
+                  arr.push(snapped);
+                  localStorage.setItem(k, JSON.stringify(arr));
+                } catch {}
+
+                addHLine(series, snapped);
+setCtxOpen(false);
+              }}
+            >
+              Vẽ đường kẻ ngang trên{' '}
+              {hoverPrice != null
+                ? hoverPrice.toLocaleString('vi-VN', {
+                    minimumFractionDigits: hoverPrice >= 100 ? 2 : 4,
+                    maximumFractionDigits: hoverPrice >= 100 ? 2 : 4,
+                  })
+                : '--'}
+            </button>
+
+            {/* Submenu */}
+            <div
+              className="relative group"
+              onMouseEnter={() => setCtxSubOpen(true)}
+              onMouseLeave={() => setCtxSubOpen(false)}
+            >
+              <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="i-lucide-settings-2 shrink-0" /> Thêm cài đặt
+                </div>
+                <span className="i-lucide-chevron-right opacity-60" />
+              </button>
+
+              {ctxSubOpen && (
+                <div className="absolute left-[calc(100%+6px)] top-0 min-w-[220px] rounded-xl border border-dark-600 bg-dark-800/95 shadow-xl p-1">
+                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                    Ẩn thanh công cụ
+                  </button>
+                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                    Khóa bản vẽ
+                  </button>
+                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                    Hiển thị lưới
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="my-2 h-px bg-dark-600" />
+
+            {/* Xóa bản vẽ */}
+            <button
+              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+              onClick={() => {
+                if (candleSeries.current) {
+                  clearAllHLines(candleSeries.current);
+                  try {
+                    localStorage.removeItem(hlineKey(selectedSymbol, market));
+                  } catch {}
+                }
+                setCtxOpen(false);
+              }}
+            >
+              Xóa bản vẽ
+            </button>
+
+            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+              <span className="i-lucide-sliders-horizontal shrink-0" /> Xóa chỉ báo
+            </button>
+
+            <div className="my-2 h-px bg-dark-600" />
+
+            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+              <span className="i-lucide-clock shrink-0" /> Công cụ thời gian
+            </button>
+            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+              <span className="i-lucide-monitor-cog shrink-0" /> Cài đặt đồ thị
+            </button>
+          </div>
+        </div>
+      )}
+<NewOrderModal
+  open={orderOpen}
+  onClose={() => setOrderOpen(false)}
+  defaultPrice={orderSeedPrice ?? undefined}
+  defaultType={orderPresetType} // 'LIMIT' | 'STOP'
+  tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize}
+  pricePrecision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision}
+  symbol={selectedSymbol}
+  onSubmit={(p) => {
+    const meta = symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`);
+    const step = meta?.stepSize ?? 0.00000001;
+    const stepDec = String(step).includes('.') ? String(step).split('.')[1]!.length : 0;
+
+    const roundQty = (q: number) =>
+      Number((Math.floor(q / step) * step).toFixed(stepDec));
+
+    const qty = roundQty(p.qty);
+    const isFutures = market === 'futures';
+
+    // nếu bạn dùng hedge mode, positionSide theo chiều BUY/LONG, SELL/SHORT
+    const positionSide = isFutures
+      ? (p.side === 'BUY' ? 'LONG' : 'SHORT')
+      : 'BOTH';
+
+    if (p.type === 'LIMIT') {
+      if (!p.price) return;
+      binanceWS.placeOrder({
+        market,                         // 'spot' | 'futures'
+        symbol: selectedSymbol,
+        side: p.side,                   // 'BUY' | 'SELL'
+        type: 'LIMIT',
+        quantity: qty,
+        price: p.price,
+        timeInForce: 'GTC',
+        ...(isFutures ? { positionSide } : {})
+      });
+    } else { // STOP
+      if (isFutures) {
+        if (!('stopPrice' in p) || !p.stopPrice) return;
+        binanceWS.placeOrder({
+          market: 'futures',
+          symbol: selectedSymbol,
+          side: p.side,
+          type: 'STOP_MARKET',
+          stopPrice: p.stopPrice,
+          quantity: qty,
+          positionSide,
+          workingType: 'MARK' // hoặc 'LAST' tùy bạn
+        });
+      } else {
+        // Spot: dùng STOP_LOSS_LIMIT (giá = stopPrice)
+        if (!('stopPrice' in p) || !p.stopPrice) return;
+        binanceWS.placeOrder({
+          market: 'spot',
+          symbol: selectedSymbol,
+          side: p.side,
+          type: 'STOP_LOSS_LIMIT',
+          stopPrice: p.stopPrice,
+          price: p.stopPrice,
+          quantity: qty,
+          timeInForce: 'GTC'
+        });
+      }
+    }
+  }}
+/>
+
+
+      <AlertModal
+        open={alertOpen}
+        onClose={() => setAlertOpen(false)}
+        defaultPrice={hoverPrice}
+        symbol={selectedSymbol}
+        onCreate={(a) => {
+          console.log('[CREATE ALERT]', a);
+        }}
+      />
+
+      
+
+      <div
+        ref={containerRef}
+        className="relative w-full h-full min-h-0 min-w-0 outline outline-1 outline-red-500"
+        onContextMenu={openCtxMenu}
+      />
     </div>
   );
 };

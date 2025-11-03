@@ -236,3 +236,27 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
   transform: translateY(-1px);
   background-color: rgba(255, 255, 255, 0.05);
 }
+
+/* Dark scrollbar – đẹp, mảnh, bo tròn */
+.tw-scroll { 
+  scrollbar-width: thin;                 /* Firefox */
+  scrollbar-color: #4b5563 #0b1220;      /* thumb | track */
+}
+
+/* Chrome / Edge / Safari */
+.tw-scroll::-webkit-scrollbar { width: 10px; }
+.tw-scroll::-webkit-scrollbar-track {
+  background: #0b1220;                   /* gần bg-dark-900 */
+  border-radius: 12px;
+}
+.tw-scroll::-webkit-scrollbar-thumb {
+  background: #4b5563;                   /* slate-600 */
+  border-radius: 12px;
+  border: 2px solid #0b1220;             /* tạo rãnh đẹp */
+}
+.tw-scroll::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* slate-500 */
+
+/* Tuỳ chọn: hiện đậm khi hover cả khung dropdown */
+.symbol-dropdown:hover .tw-scroll::-webkit-scrollbar-thumb {
+  background: #9ca3af;                   /* slate-400 */
+}

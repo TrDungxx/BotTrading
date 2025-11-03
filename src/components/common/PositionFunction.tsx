@@ -4,7 +4,35 @@ import OpenOrder from '../tabposition/OpenOrder';
 import OrderHistoryPosition from '../tabposition/OrderHistoryPosition';
 import TradeHistory from '../tabposition/TradeHistory';
 import PositionRealizedProfitHistory from '../tabposition/PositionRealizedProfitHistory';
-import { OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from '../binancewebsocket/BinanceWebSocketService';
+import {  OPEN_ORDERS_LS_KEY,
+  OPEN_ORDERS_EVENT,
+  POSITIONS_LS_KEY,
+  POSITIONS_EVENT, } from '../binancewebsocket/BinanceWebSocketService';
+
+
+
+
+function readPositionsLS(): any[] {
+  try { return JSON.parse(localStorage.getItem(POSITIONS_LS_KEY) || '[]'); }
+  catch { return []; }
+}
+function writePositionsLS(list: any[]) {
+  localStorage.setItem(POSITIONS_LS_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(POSITIONS_EVENT, { detail: { list } }));
+}
+
+const norm = (s?: string) => (s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+function countPositions(symbol?: string) {
+  try {
+    const want = norm(symbol);
+    const list = JSON.parse(localStorage.getItem(POSITIONS_LS_KEY) || '[]') as Array<{symbol:string; positionAmt:string}>;
+    return list.filter(p => {
+      const amt = parseFloat(p.positionAmt ?? '0');
+      return amt !== 0 && (!symbol || norm(p.symbol) === want);
+    }).length;
+  } catch { return 0; }
+}
 
 function countPending(symbol?: string) {
   try {
@@ -53,6 +81,35 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
   const [activeTab, setActiveTab] = useState<'position'|'openOrder'|'orderHistory'|'tradeHistory'|'pnlHistory'>('position');
   const [openOrderCount, setOpenOrderCount] = useState(0);
   const [positionCount, setPositionCount] = useState(0);
+
+  useEffect(() => {
+  // init ngay khi render hoặc khi đổi symbol
+  setPositionCount(countPositions(selectedSymbol));
+
+  const onBus = (e: any) => {
+    const list = (e?.detail?.list ?? null) as Array<{symbol:string; positionAmt:string}> | null;
+    if (Array.isArray(list)) {
+      const n = list.filter(p => {
+        const amt = parseFloat(p.positionAmt ?? '0');
+        return amt !== 0 && (!selectedSymbol || p.symbol === selectedSymbol);
+      }).length;
+      setPositionCount(n);
+    } else {
+      setPositionCount(countPositions(selectedSymbol));
+    }
+  };
+  const onStorage = (ev: StorageEvent) => {
+    if (ev.key === POSITIONS_LS_KEY) setPositionCount(countPositions(selectedSymbol));
+  };
+
+  window.addEventListener(POSITIONS_EVENT, onBus as any);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(POSITIONS_EVENT, onBus as any);
+    window.removeEventListener('storage', onStorage);
+  };
+}, [selectedSymbol]);
+
 
   // (tuỳ chọn) lấy số từ localStorage nếu bạn đã lưu openOrders
   useEffect(() => {

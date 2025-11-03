@@ -39,24 +39,24 @@ import { BinanceAccount } from "../utils/types";
 import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
 import { useAuth } from "../context/AuthContext";
 import { User } from "../utils/types";
-import { PositionData,FloatingInfo } from "../utils/types";
+import { PositionData, FloatingInfo } from "../utils/types";
 import PositionFunction from "../components/common/PositionFunction";
 // Trạng thái kết nối WS
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 // Loại thị trường
-type MarketType = "spot" | "futures" ;
+type MarketType = "spot" | "futures";
 
 export type ChartSettings = {
-  quickOrder: boolean;      // Lệnh nhanh
-  pendingOrders: boolean;   // Lệnh chờ
-  positionTag: boolean;     // Vị thế (Floating)
-  orderHistory: boolean;    // Lịch sử đặt lệnh
-  breakEven: boolean;       // Giá hòa vốn
-  liquidation: boolean;     // Giá thanh lý
-  alerts: boolean;          // Cảnh báo giá
-  priceLine: boolean;       // Đường giá
-  scale: boolean;           // Thang đo
+  quickOrder: boolean; // Lệnh nhanh
+  pendingOrders: boolean; // Lệnh chờ
+  positionTag: boolean; // Vị thế (Floating)
+  orderHistory: boolean; // Lịch sử đặt lệnh
+  breakEven: boolean; // Giá hòa vốn
+  liquidation: boolean; // Giá thanh lý
+  alerts: boolean; // Cảnh báo giá
+  priceLine: boolean; // Đường giá
+  scale: boolean; // Thang đo
 };
 
 // Dữ liệu thị trường
@@ -201,7 +201,7 @@ interface Order {
   orderId: number;
   symbol: string;
   status: string;
-  positionSide: 'LONG' | 'SHORT' | 'BOTH';
+  positionSide: "LONG" | "SHORT" | "BOTH";
 }
 
 // WS public tuỳ chỉnh cho bảng phụ (kline/ticker/depth/trade/miniTicker)
@@ -832,7 +832,7 @@ class CustomWebSocketService {
 const DEFAULT_SETTINGS: ChartSettings = {
   quickOrder: false,
   pendingOrders: false,
-  positionTag: true,   // đang dùng
+  positionTag: true, // đang dùng
   orderHistory: false,
   breakEven: false,
   liquidation: false,
@@ -842,39 +842,47 @@ const DEFAULT_SETTINGS: ChartSettings = {
 };
 
 export default function TradingTerminal() {
-const hasConnectedRef = React.useRef(false);
-  
+  const hasConnectedRef = React.useRef(false);
+
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
+  const [livePrice, setLivePrice] = useState<number>(0);
   const [positions, setPositions] = useState<PositionData[]>([]);
   const [currentOrders, setCurrentOrders] = useState<Order[]>(() => {
-    const stored = localStorage.getItem('openOrders');
+    const stored = localStorage.getItem("openOrders");
     return stored ? JSON.parse(stored) : [];
   });
   const [showSettings, setShowSettings] = useState(false);
   const settingRef = useRef<HTMLDivElement>(null);
   const [orderHistory, setOrderHistory] = useState<Order[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
+    null
+  );
   const [candles, setCandles] = useState<ExtendedCandle[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
-  const miniTickerCallbacks = useRef<Map<string, (data: MiniTickerData) => void>>(new Map());
+  const miniTickerCallbacks = useRef<
+    Map<string, (data: MiniTickerData) => void>
+  >(new Map());
   const [searchTerm, setSearchTerm] = useState("");
   const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
     const stored = localStorage.getItem("favoriteSymbols");
     return stored ? JSON.parse(stored) : [];
   });
-  const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">("all");
+  const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">(
+    "all"
+  );
   const [availableBalance, setAvailableBalance] = useState<number>(0);
   const token = localStorage.getItem("token") || "";
   const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
 
   // State chính
   const [selectedSymbol, setSelectedSymbol] = useState(() => {
-    return localStorage.getItem('selectedSymbol') || 'BTCUSDT';
+    return localStorage.getItem("selectedSymbol") || "BTCUSDT";
   });
-  const [selectedMarket, setSelectedMarket] = useState<MarketType>('futures');
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
   const [selectedInterval, setSelectedInterval] = useState("1m");
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
   const [wsService] = useState(() => new CustomWebSocketService());
   const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
   const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
@@ -892,7 +900,9 @@ const hasConnectedRef = React.useRef(false);
   const [orderUpdates, setOrderUpdates] = useState<OrderUpdate[]>([]);
 
   // UI
-  const [activeOrderTab, setActiveOrderTab] = useState<"limit" | "market" | "stop">("limit");
+  const [activeOrderTab, setActiveOrderTab] = useState<
+    "limit" | "market" | "stop"
+  >("limit");
   const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
@@ -907,24 +917,28 @@ const hasConnectedRef = React.useRef(false);
   const [floatingInfo, setFloatingInfo] = useState<FloatingInfo | null>(null);
 
   // Toggle control setting
-  const [chartSettings, setChartSettings] = React.useState<ChartSettings>(() => {
-    try {
-      const saved = localStorage.getItem('chartSettings');
-      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-    } catch { return DEFAULT_SETTINGS; }
-  });
+  const [chartSettings, setChartSettings] = React.useState<ChartSettings>(
+    () => {
+      try {
+        const saved = localStorage.getItem("chartSettings");
+        return saved
+          ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+          : DEFAULT_SETTINGS;
+      } catch {
+        return DEFAULT_SETTINGS;
+      }
+    }
+  );
   const setSetting = React.useCallback(
     (key: keyof ChartSettings, value: boolean) => {
-      setChartSettings(prev => {
+      setChartSettings((prev) => {
         const next = { ...prev, [key]: value };
-        localStorage.setItem('chartSettings', JSON.stringify(next));
+        localStorage.setItem("chartSettings", JSON.stringify(next));
         return next;
       });
     },
     []
   );
-
-  
 
   // đóng panel setting khi click ngoài
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -934,31 +948,37 @@ const hasConnectedRef = React.useRef(false);
       if (!panelRef.current) return;
       if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
     };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, [showSettings]);
-
+  // Reset khi đổi symbol
+  useEffect(() => {
+    setLivePrice(0); // reset khi đổi symbol
+  }, [selectedSymbol]);
   // lưu local symbol
   useEffect(() => {
     if (selectedSymbol) {
-      localStorage.setItem('selectedSymbol', selectedSymbol);
+      localStorage.setItem("selectedSymbol", selectedSymbol);
     }
   }, [selectedSymbol]);
 
   const updateCurrentOrders = (orders: Order[]) => {
     setOpenOrders(orders);
-    localStorage.setItem('openOrders', JSON.stringify(orders));
+    localStorage.setItem("openOrders", JSON.stringify(orders));
   };
 
   // đóng menu setting khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (settingRef.current && !settingRef.current.contains(e.target as Node)) {
+      if (
+        settingRef.current &&
+        !settingRef.current.contains(e.target as Node)
+      ) {
         setShowSettings(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // ✅ Dùng một handler duy nhất cho openOrders (tránh ghi đè)
@@ -1014,13 +1034,13 @@ const hasConnectedRef = React.useRef(false);
   }, []);
 
   // 3) useEffect connect (đặt SAU handler)
-React.useEffect(() => {
-  if (!token) return;
-  if (hasConnectedRef.current) return;
-  hasConnectedRef.current = true;
+  React.useEffect(() => {
+    if (!token) return;
+    if (hasConnectedRef.current) return;
+    hasConnectedRef.current = true;
 
-  binanceWS.connect(token, globalWsHandler);
-}, [token, globalWsHandler]);
+    binanceWS.connect(token, globalWsHandler);
+  }, [token, globalWsHandler]);
 
   // Kết nối WS trading (service chính) 1 lần
   useEffect(() => {
@@ -1072,6 +1092,8 @@ React.useEffect(() => {
       (data) => {
         if (data.symbol !== selectedSymbol) return;
         setTickerData(data);
+        const p = Number(data.lastPrice);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
       }
     );
     if (tickerId) subscriptionIds.push(tickerId);
@@ -1120,6 +1142,10 @@ React.useEffect(() => {
       (data) => {
         if (data.symbol !== selectedSymbol) return;
         setBookTicker(data);
+        const bid = Number(data.bidPrice);
+        const ask = Number(data.askPrice);
+        const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
+        if (mid > 0) setLivePrice(mid); // ✅ thêm dòng này
       }
     );
     if (bookTickerId) subscriptionIds.push(bookTickerId);
@@ -1130,7 +1156,9 @@ React.useEffect(() => {
       selectedMarket,
       (data) => {
         if (data.symbol !== selectedSymbol) return;
-        setPrice(parseFloat(data.close));
+        setMiniTicker(data); // (tuỳ bạn có dùng)
+        const p = Number(data.close ?? data.c ?? 0);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
       }
     );
     if (miniId) subscriptionIds.push(miniId);
@@ -1247,16 +1275,22 @@ React.useEffect(() => {
     binanceWS.selectAccount(id);
 
     // 2) subscribe realtime (balance/positions/orders)
-    binanceWS.subscribeAccountUpdates(setOpenOrders, ['balance','positions','orders']);
+    binanceWS.subscribeAccountUpdates(setOpenOrders, [
+      "balance",
+      "positions",
+      "orders",
+    ]);
 
     // 3) kéo positions trước một nhịp
     binanceWS.getPositions(id);
 
     // 4) cập nhật positions từ snapshot/stream
     binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
-      const active = (rawPositions || []).filter((p: any) => parseFloat(p.positionAmt) !== 0);
+      const active = (rawPositions || []).filter(
+        (p: any) => parseFloat(p.positionAmt) !== 0
+      );
       setPositions(active);
-      localStorage.setItem('positions', JSON.stringify(active));
+      localStorage.setItem("positions", JSON.stringify(active));
     });
 
     return () => {
@@ -1266,7 +1300,7 @@ React.useEffect(() => {
 
   // Khôi phục account đã chọn từ localStorage khi vào trang (chỉ 1 lần)
   useEffect(() => {
-    const savedId = localStorage.getItem('selectedBinanceAccountId');
+    const savedId = localStorage.getItem("selectedBinanceAccountId");
     const parsedId = savedId ? parseInt(savedId, 10) : null;
     if (!parsedId) return;
 
@@ -1308,12 +1342,12 @@ React.useEffect(() => {
 
   const handleMarketChange = (newMarket: MarketType) => {
     setSelectedMarket(newMarket);
-    localStorage.setItem('selectedMarket', newMarket);
+    localStorage.setItem("selectedMarket", newMarket);
     console.log("✅ Market selected:", newMarket);
   };
   useEffect(() => {
-    const savedMarket = localStorage.getItem('selectedMarket');
-    if (savedMarket === 'spot' || savedMarket === 'futures') {
+    const savedMarket = localStorage.getItem("selectedMarket");
+    if (savedMarket === "spot" || savedMarket === "futures") {
       setSelectedMarket(savedMarket as MarketType);
     }
   }, []);
@@ -1381,26 +1415,22 @@ React.useEffect(() => {
 
                 {/* Menu dropdown symbol */}
                 {isDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-[350px] max-h-[500px] bg-dark-800 rounded shadow-lg overflow-y-auto z-[999] border border-dark-700">
+                  <div
+                    className="absolute top-full left-0 mt-2 w-[350px] max-h-[500px]
+               bg-dark-800 border border-dark-700 rounded shadow-lg overflow-hidden z-[9999]"
+                  >
                     <SymbolDropdown
-                      symbols={sortedSymbols}
                       selectedSymbol={selectedSymbol}
-                      favorites={favoriteSymbols}
                       searchTerm={searchTerm}
                       activeTab={activeSymbolTab}
                       onSelect={(s) => {
                         setSelectedSymbol(s);
                         setIsDropdownOpen(false);
                       }}
-                      onToggleFavorite={(symbol) => {
-                        setFavoriteSymbols((prev) =>
-                          prev.includes(symbol)
-                            ? prev.filter((s) => s !== symbol)
-                            : [...prev, symbol]
-                        );
-                      }}
                       onSearchChange={setSearchTerm}
                       onTabChange={setActiveSymbolTab}
+                      market="futures"
+                      quote="USDT"
                     />
                   </div>
                 )}
@@ -1415,7 +1445,7 @@ React.useEffect(() => {
               <select
                 value={selectedMarket}
                 onChange={(e) =>
-                  handleMarketChange(e.target.value as 'spot' | 'futures')
+                  handleMarketChange(e.target.value as "spot" | "futures")
                 }
                 className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
               >
@@ -1566,11 +1596,14 @@ React.useEffect(() => {
                     <button className="btn">Candlesticks</button>
                     <button className="btn">Line</button>
 
-                    <div className="flex items-center gap-2 mb-2 relative" ref={panelRef}>
+                    <div
+                      className="flex items-center gap-2 mb-2 relative"
+                      ref={panelRef}
+                    >
                       <button
                         className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
                         title="Cài đặt biểu đồ"
-                        onClick={() => setShowSettings(v => !v)}
+                        onClick={() => setShowSettings((v) => !v)}
                       >
                         <Settings size={15} />
                       </button>
@@ -1778,7 +1811,7 @@ React.useEffect(() => {
           <div className="flex-1 min-h-0 overflow-y-auto">
             <TradingForm
               selectedSymbol={selectedSymbol}
-              price={price}
+              price={livePrice}
               internalBalance={availableBalance}
               selectedMarket={selectedMarket}
             />
