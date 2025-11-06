@@ -41,6 +41,9 @@ import { useAuth } from "../context/AuthContext";
 import { User } from "../utils/types";
 import { PositionData, FloatingInfo } from "../utils/types";
 import PositionFunction from "../components/common/PositionFunction";
+import ChartTypePanel, { ChartType } from "../components/layoutchart/Charttypepanel";
+// ✅ THÊM
+import TimeframeModalWrapper from "./layout panel/Timeframemodalwrapper";
 // Trạng thái kết nối WS
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -880,12 +883,68 @@ export default function TradingTerminal() {
     return localStorage.getItem("selectedSymbol") || "BTCUSDT";
   });
   const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
-  const [selectedInterval, setSelectedInterval] = useState("1m");
+  // ✅ MỚI:
+const [selectedInterval, setSelectedInterval] = useState(() => {
+  return localStorage.getItem("selectedInterval") || "1m";
+});
+
+useEffect(() => {
+  if (selectedInterval) {
+    localStorage.setItem("selectedInterval", selectedInterval);
+  }
+}, [selectedInterval]);
+
+
+
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
   const [wsService] = useState(() => new CustomWebSocketService());
   const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
   const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
+const [chartType, setChartType] = useState<ChartType>('Candles');
+
+// ✅ NEW: State cho TimeframeSelector
+const [showTimeframeSelector, setShowTimeframeSelector] = useState(false);
+
+const [pinnedTimeframes, setPinnedTimeframes] = useState<string[]>(() => {
+  const stored = localStorage.getItem("pinnedTimeframes");
+  return stored ? JSON.parse(stored) : ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+});
+const handleSaveTimeframes = useCallback((selectedTimeframes: string[]) => {
+  setPinnedTimeframes(selectedTimeframes);
+  localStorage.setItem("pinnedTimeframes", JSON.stringify(selectedTimeframes));
+}, []); // ✅ Empty deps = function reference KHÔNG ĐỔI
+
+const handleCloseTimeframe = useCallback(() => {
+  setShowTimeframeSelector(false);
+}, []);
+
+// Refs
+const symbolButtonRef = useRef<HTMLButtonElement>(null);
+const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+// Handlers
+const handleSymbolButtonEnter = () => {
+  hoverTimeoutRef.current = setTimeout(() => {
+    setIsDropdownOpen(true);
+  }, 150);
+};
+
+const handleSymbolButtonLeave = () => {
+  if (hoverTimeoutRef.current) {
+    clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = null;
+  }
+};
+
+// Cleanup
+useEffect(() => {
+  return () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+  };
+}, []);
 
   // Market data
   const [klineData, setKlineData] = useState<KlineData | null>(null);
@@ -940,17 +999,24 @@ export default function TradingTerminal() {
     []
   );
 
-  // đóng panel setting khi click ngoài
-  const panelRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (!showSettings) return;
-    const onClick = (e: MouseEvent) => {
-      if (!panelRef.current) return;
-      if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [showSettings]);
+
+
+
+ // đóng panel setting khi click ngoài (có guard modal Time)
+const panelRef = React.useRef<HTMLDivElement>(null);
+useEffect(() => {
+  if (!showSettings) return;
+  
+  const onClick = (e: MouseEvent) => {
+    if (showTimeframeSelector) return; // ✅ Check trực tiếp state
+    if (!panelRef.current) return;
+    if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
+  };
+  
+  document.addEventListener("mousedown", onClick, true);
+  return () => document.removeEventListener("mousedown", onClick, true);
+}, [showSettings, showTimeframeSelector]); // ✅ Thêm dependency
+
   // Reset khi đổi symbol
   useEffect(() => {
     setLivePrice(0); // reset khi đổi symbol
@@ -967,19 +1033,9 @@ export default function TradingTerminal() {
     localStorage.setItem("openOrders", JSON.stringify(orders));
   };
 
-  // đóng menu setting khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        settingRef.current &&
-        !settingRef.current.contains(e.target as Node)
-      ) {
-        setShowSettings(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+ // đóng menu setting khi click ra ngoài (có guard modal Time)
+
+
 
   // ✅ Dùng một handler duy nhất cho openOrders (tránh ghi đè)
   useEffect(() => {
@@ -1353,8 +1409,9 @@ export default function TradingTerminal() {
   }, []);
 
   const handleIntervalChange = (newInterval: string) => {
-    setSelectedInterval(newInterval);
-  };
+  setSelectedInterval(newInterval);
+  localStorage.setItem("selectedInterval", newInterval); // ✅ Thêm dòng này
+};
 
   const calculateTotal = (price: string, amount: string) => {
     if (price && amount) {
@@ -1400,44 +1457,46 @@ export default function TradingTerminal() {
             <div className="flex items-center">
               <div className="relative z-50">
                 {/* Nút chọn symbol */}
-                <button
-                  className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded"
-                  onClick={() => setIsDropdownOpen((prev) => !prev)}
-                >
-                  <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
-                    <span className="text-xs font-bold text-dark-900">
-                      {selectedSymbol[0]}
-                    </span>
-                  </div>
-                  <span className="font-bold text-lg">{selectedSymbol}</span>
-                  <ChevronDown className="h-4 w-4 text-dark-400" />
-                </button>
-
-                {/* Menu dropdown symbol */}
-                {isDropdownOpen && (
-                  <div
-                    className="absolute top-full left-0 mt-2 w-[350px] max-h-[500px]
-               bg-dark-800 border border-dark-700 rounded shadow-lg overflow-hidden z-[9999]"
-                  >
-                    <SymbolDropdown
-                      selectedSymbol={selectedSymbol}
-                      searchTerm={searchTerm}
-                      activeTab={activeSymbolTab}
-                      onSelect={(s) => {
-                        setSelectedSymbol(s);
-                        setIsDropdownOpen(false);
-                      }}
-                      onSearchChange={setSearchTerm}
-                      onTabChange={setActiveSymbolTab}
-                      market="futures"
-                      quote="USDT"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
+                <div
+  ref={symbolButtonRef}
+  className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded transition-colors cursor-default"
+  onMouseEnter={handleSymbolButtonEnter}
+  onMouseLeave={handleSymbolButtonLeave}
+>
+            <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
+              <span className="text-xs font-bold text-dark-900">
+                {selectedSymbol[0]}
+              </span>
             </div>
+            <span className="font-bold text-lg">{selectedSymbol}</span>
+            <ChevronDown className="h-4 w-4 text-dark-400" />
+          </div>
+          {/* ✅ UPDATED: Dropdown với props mới */}
+          {isDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 z-[9999]">
+              <SymbolDropdown
+                selectedSymbol={selectedSymbol}
+                searchTerm={searchTerm}
+                activeTab={activeSymbolTab}
+                onSelect={(s) => {
+                  setSelectedSymbol(s);
+                  setIsDropdownOpen(false);
+                }}
+                onSearchChange={setSearchTerm}
+                onTabChange={setActiveSymbolTab}
+                market="futures"
+                quote="USDT"
+                // ✅ NEW: 3 props mới
+                isOpen={isDropdownOpen}
+                onOpen={() => setIsDropdownOpen(true)}
+                onClose={() => setIsDropdownOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+
+        <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
+      </div>
 
             {/* Chọn market */}
             <div className="flex items-center space-x-2">
@@ -1534,37 +1593,62 @@ export default function TradingTerminal() {
           </div>
         </div>
 
-        {/* Dải stats 24h */}
-        {tickerData && (
-          <div className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700">
-            <div className="flex flex-col">
-              <span className="text-dark-400">24h High</span>
-              <span className="font-medium">
-                {parseFloat(tickerData.highPrice).toFixed(4)}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-dark-400">24h Low</span>
-              <span className="font-medium">
-                {parseFloat(tickerData.lowPrice).toFixed(4)}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-dark-400">
-                24h Volume ({selectedSymbol.replace("USDT", "")})
-              </span>
-              <span className="font-medium">
-                {parseFloat(tickerData.volume).toLocaleString()}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-dark-400">24h Volume (USDT)</span>
-              <span className="font-medium">
-                {parseFloat(tickerData.quoteVolume).toLocaleString()}
-              </span>
-            </div>
-          </div>
-        )}
+       {/* Dải stats 24h - ✅ LUÔN render với min-height cố định */}
+<div 
+  className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700"
+  style={{ minHeight: '52px' }} // ✅ Thêm dòng này
+>
+  {tickerData ? (
+    <>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h High</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.highPrice).toFixed(4)}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h Low</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.lowPrice).toFixed(4)}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">
+          24h Volume ({selectedSymbol.replace("USDT", "")})
+        </span>
+        <span className="font-medium">
+          {parseFloat(tickerData.volume).toLocaleString()}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h Volume (USDT)</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.quoteVolume).toLocaleString()}
+        </span>
+      </div>
+    </>
+  ) : (
+    // ✅ Skeleton placeholder khi đang load
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h High</span>
+        <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Low</span>
+        <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Volume (BTC)</span>
+        <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Volume (USDT)</span>
+        <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+      </div>
+    </>
+  )}
+</div>
       </div>
 
       {/* Thân chính: Chart trái, Order book giữa, Form phải */}
@@ -1573,64 +1657,79 @@ export default function TradingTerminal() {
         <div className="flex-1 min-w-0 bg-dark-800 border-r border-dark-700 overflow-hidden">
           <div className="h-full flex flex-col">
             {/* Controls chart */}
-            <div className="flex items-center justify-between p-3 border-b border-dark-700">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  {["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"].map(
-                    (interval) => (
-                      <button
-                        key={interval}
-                        onClick={() => handleIntervalChange(interval)}
-                        className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
-                          selectedInterval === interval ? "bg-dark-700" : ""
-                        }`}
-                      >
-                        {interval}
-                      </button>
-                    )
-                  )}
-                </div>
+<div className="flex items-center justify-between p-3 border-b border-dark-700">
+  <div className="flex items-center space-x-4">
+    {/* 1. Timeframe selector */}
+    <div className="flex items-center space-x-2">
+  {pinnedTimeframes.map((interval) => (
+    <button
+      key={interval}
+      onClick={() => handleIntervalChange(interval)}
+      className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
+        selectedInterval === interval ? "bg-dark-700" : ""
+      }`}
+    >
+      {interval}
+    </button>
+  ))}
+  
+  {/* ✅ NEW: Edit timeframes button */}
+  <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setTimeout(() => {
+      setShowTimeframeSelector(true);
+    }, 0);
+  }}
+  className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
+  title="Edit timeframes"
+>
+  <ChevronDown className="h-3 w-3" />
+</button>
+</div>
 
-                <div className="relative" ref={settingRef}>
-                  <div className="flex items-center gap-2">
-                    <button className="btn">Candlesticks</button>
-                    <button className="btn">Line</button>
+    {/* 2. ✅ ChartTypePanel - Đặt TRƯỚC Settings */}
+    <ChartTypePanel 
+      currentType={chartType} 
+      onTypeChange={(newType) => {
+        setChartType(newType);
+        console.log('[ChartType] Changed to:', newType);
+      }}
+    />
 
-                    <div
-                      className="flex items-center gap-2 mb-2 relative"
-                      ref={panelRef}
-                    >
-                      <button
-                        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
-                        title="Cài đặt biểu đồ"
-                        onClick={() => setShowSettings((v) => !v)}
-                      >
-                        <Settings size={15} />
-                      </button>
+    {/* 3. Settings button */}
+    <div className="flex items-center gap-2 relative" ref={panelRef}>
+      <button
+        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+        title="Cài đặt biểu đồ"
+        onClick={() => setShowSettings((v) => !v)}
+      >
+        <Settings size={15} />
+      </button>
 
-                      {showSettings && (
-                        <div className="absolute top-full left-0 mt-2 z-50">
-                          <SettingControl
-                            settings={chartSettings}
-                            onToggle={setSetting}
-                            onClose={() => setShowSettings(false)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+      {showSettings && (
+        <div className="absolute top-full left-0 mt-2 z-50">
+          <SettingControl
+            settings={chartSettings}
+            onToggle={setSetting}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
+      )}
+    </div>
+  </div>
 
-              <div className="flex items-center space-x-2">
-                <button className="p-1 hover:bg-dark-700 rounded">
-                  <TrendingUp className="h-4 w-4 text-dark-400" />
-                </button>
-                <button className="p-1 hover:bg-dark-700 rounded">
-                  <Maximize2 className="h-4 w-4 text-dark-400" />
-                </button>
-              </div>
-            </div>
+  {/* Right side controls */}
+  <div className="flex items-center space-x-2">
+    <button className="p-1 hover:bg-dark-700 rounded">
+      <TrendingUp className="h-4 w-4 text-dark-400" />
+    </button>
+    <button className="p-1 hover:bg-dark-700 rounded">
+      <Maximize2 className="h-4 w-4 text-dark-400" />
+    </button>
+  </div>
+</div>
+
 
             {/* Khu vực biểu đồ */}
             <div className="flex-1 relative min-h-0">
@@ -1638,6 +1737,8 @@ export default function TradingTerminal() {
                 <div className="h-full min-h-0">
                   <TradingBinance
                     selectedSymbol={selectedSymbol}
+                    chartType={chartType}
+                    onChartTypeChange={setChartType}
                     selectedInterval={selectedInterval}
                     market={selectedMarket}
                     floating={floatingInfo}
@@ -1648,7 +1749,7 @@ export default function TradingTerminal() {
               </section>
 
               {/* Overlay OHLCV */}
-              <div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
+               {/*<div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
                 {klineData && (
                   <div className="space-y-1">
                     <div>
@@ -1683,7 +1784,7 @@ export default function TradingTerminal() {
                     </div>
                   </div>
                 )}
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
@@ -1831,6 +1932,13 @@ export default function TradingTerminal() {
           />
         </div>
       </div>
+       {/* ✅ THÊM MODAL Ở ĐÂY */}
+      <TimeframeModalWrapper
+  isOpen={showTimeframeSelector}
+  pinnedTimeframes={pinnedTimeframes}
+  onClose={handleCloseTimeframe}
+  onSave={handleSaveTimeframes}
+/>
     </div>
   );
 }
