@@ -11,8 +11,7 @@ import {
   ISeriesApi,
   
 } from 'lightweight-charts';
-import MAHeader from './popupchart/MAHeader';
-import MASettings from './popupchart/MASetting';
+
 import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import ToolMini from './popupchart/ToolMini';
@@ -20,9 +19,12 @@ import { copyPrice } from '../clickchart/CopyPrice';
 import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
 import AlertModal from '../clickchart/AlertModal';
 import NewOrderModal from '../clickchart/NewOrderModal';
-import VOLSettings from './popupchart/VolSettings';
-import VOLHeader from './popupchart/VolHeader';
+
 import '../../style/Hidetradingviewlogo.css';
+import LineIndicatorHeader from './popupchart/LineIndicatorHeader';
+import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
+import { IndicatorValue } from './popupchart/LineIndicatorHeader';
+import { MainIndicatorConfig,VolumeIndicatorConfig,IndicatorPeriods,IndicatorColors } from './popupchart/LineIndicatorSettings';
 
 
 export type ChartType = 
@@ -74,6 +76,28 @@ function calculateMA(data: CandlestickData<Time>[], period: number): LineData<Ti
     const avg = sum / period;
     if (!Number.isNaN(avg)) out.push({ time: data[i].time, value: +avg.toFixed(5) });
   }
+  return out;
+}
+
+// ✅ ADD EMA calculation
+function calculateEMA(data: CandlestickData[], period: number): LineData[] {
+  const out: LineData[] = [];
+  const multiplier = 2 / (period + 1);
+  
+  // First EMA = SMA
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += data[i].close || 0;
+  }
+  let ema = sum / period;
+  out.push({ time: data[period - 1].time, value: +ema.toFixed(5) });
+  
+  // Calculate EMA for remaining data
+  for (let i = period; i < data.length; i++) {
+    ema = (data[i].close - ema) * multiplier + ema;
+    out.push({ time: data[i].time, value: +ema.toFixed(5) });
+  }
+  
   return out;
 }
 
@@ -176,14 +200,43 @@ const setChartType = (t: ChartType) => {
   };
   
 
-  // VOL states
-const [volHeaderVisible, setVolHeaderVisible] = useState(true);
-const [showVOLSettings, setShowVOLSettings] = useState(false);
-const [volVisible, setVolVisible] = useState({ mavol1: true, mavol2: true });
-const [volPeriods, setVolPeriods] = useState({ mavol1: 7, mavol2: 14 });
-const [volColors, setVolColors] = useState({ 
-  mavol1: '#0ECB81', 
-  mavol2: '#EB40B5' 
+  const [mainIndicatorVisible, setMainIndicatorVisible] = useState(true);
+const [showMainSettings, setShowMainSettings] = useState(false);
+const [mainVisible, setMainVisible] = useState({
+  ma7: true,
+  ma25: true,
+  ma99: true,
+  ema12: false,
+  ema26: false,
+});
+
+// Volume Chart Indicators
+const [volumeIndicatorVisible, setVolumeIndicatorVisible] = useState(true);
+const [showVolumeSettings, setShowVolumeSettings] = useState(false);
+const [volumeVisible, setVolumeVisible] = useState({
+  mavol1: true,
+  mavol2: true,
+});
+
+// Shared Periods & Colors
+const [indicatorPeriods, setIndicatorPeriods] = useState({
+  ma7: 7,
+  ma25: 25,
+  ma99: 99,
+  ema12: 12,
+  ema26: 26,
+  mavol1: 7,
+  mavol2: 14,
+});
+
+const [indicatorColors, setIndicatorColors] = useState({
+  ma7: '#F0B90B',
+  ma25: '#EB40B5',
+  ma99: '#B385F8',
+  ema12: '#2962FF',
+  ema26: '#FF6D00',
+  mavol1: '#0ECB81',
+  mavol2: '#EB40B5',
 });
 
 // VOL MA series refs
@@ -196,6 +249,10 @@ const [volumeData, setVolumeData] = useState<VolumeBar[]>([]);
   const ma25Ref = useRef<ISeriesApi<'Line'> | null>(null);
   const ma99Ref = useRef<ISeriesApi<'Line'> | null>(null);
 
+  // ✅ ADD new EMA refs
+const ema12Ref = useRef<ISeriesApi<'Line'> | null>(null);
+const ema26Ref = useRef<ISeriesApi<'Line'> | null>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const sessionRef = useRef(0);
   const resizeObsRef = useRef<ResizeObserver | null>(null);
@@ -203,9 +260,8 @@ const [volumeData, setVolumeData] = useState<VolumeBar[]>([]);
 
   const [floatingPos, setFloatingPos] = useState<PositionForTag | undefined>(undefined);
   const [candles, setCandles] = useState<Candle[]>([]);
-  const [maHeaderVisible, setMaHeaderVisible] = useState(true);
-  const [showMASettings, setShowMASettings] = useState(false);
-  const [maVisible, setMaVisible] = useState({ ma7: true, ma25: true, ma99: true });
+  
+  
 
   const [ctxOpen, setCtxOpen] = useState(false);
   const [ctxPos, setCtxPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -807,8 +863,27 @@ const handleVolumeChartChange = (logicalRange: any) => {
       priceLineVisible: false,
     });
 
+    // ✅ ADD EMA series
+ema12Ref.current = mainChart.addLineSeries({
+  color: indicatorColors.ema12,
+  lineWidth: 1,
+  lastValueVisible: false,
+  priceLineVisible: false,
+  visible: mainVisible.ema12,
+  lineStyle: 0, // Solid line (different from MA if needed)
+});
+
+ema26Ref.current = mainChart.addLineSeries({
+  color: indicatorColors.ema26,
+  lineWidth: 1,
+  lastValueVisible: false,
+  priceLineVisible: false,
+  visible: mainVisible.ema26,
+  lineStyle: 0,
+});
+
 mavol1Ref.current = volumeChart.addLineSeries({
-  color: volColors.mavol1,
+  color: indicatorColors.mavol1,
   lineWidth: 1,
   lastValueVisible: false,
   priceLineVisible: false,
@@ -816,7 +891,7 @@ mavol1Ref.current = volumeChart.addLineSeries({
 });
 
 mavol2Ref.current = volumeChart.addLineSeries({
-  color: volColors.mavol2,
+  color: indicatorColors.mavol2,
   lineWidth: 1,
   lastValueVisible: false,
   priceLineVisible: false,
@@ -1093,11 +1168,11 @@ useEffect(() => {
       candleSeries.current!.setData(cs);
       volumeSeries.current!.setData(vs);
 setVolumeData(vs);
-if (vs.length >= volPeriods.mavol1 && mavol1Ref.current) {
-  mavol1Ref.current.setData(calculateVolumeMA(vs, volPeriods.mavol1));
+if (vs.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
+  mavol1Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol1));
 }
-if (vs.length >= volPeriods.mavol2 && mavol2Ref.current) {
-  mavol2Ref.current.setData(calculateVolumeMA(vs, volPeriods.mavol2));
+if (vs.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
+  mavol2Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol2));
 }
       await updatePriceFormat(cs);
 
@@ -1150,7 +1225,13 @@ if (vs.length >= volPeriods.mavol2 && mavol2Ref.current) {
       if (cs.length >= 7 && ma7Ref.current) ma7Ref.current.setData(calculateMA(cs, 7));
       if (cs.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(cs, 25));
       if (cs.length >= 99 && ma99Ref.current) ma99Ref.current.setData(calculateMA(cs, 99));
-
+// ✅ ADD EMA calculations
+if (cs.length >= 12 && ema12Ref.current && mainVisible.ema12) {
+  ema12Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema12 || 12));
+}
+if (cs.length >= 26 && ema26Ref.current && mainVisible.ema26) {
+  ema26Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema26 || 26));
+}
       setCandles(cs);
 
       const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
@@ -1189,12 +1270,12 @@ setVolumeData((prev) => {
   
   if (next.length > 500) next.shift();
 
-  if (next.length >= volPeriods.mavol1 && mavol1Ref.current) {
-    mavol1Ref.current.setData(calculateVolumeMA(next, volPeriods.mavol1));
-  }
-  if (next.length >= volPeriods.mavol2 && mavol2Ref.current) {
-    mavol2Ref.current.setData(calculateVolumeMA(next, volPeriods.mavol2));
-  }
+  if (next.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
+  mavol1Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol1));
+}
+if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
+  mavol2Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol2));
+} 
 
   return next;
 });
@@ -1257,38 +1338,96 @@ setVolumeData((prev) => {
   };
 }, [selectedSymbol, selectedInterval, market]);
 
-const toggleAllMAVOL = () => {
-  const next = !(volVisible.mavol1 || volVisible.mavol2);
-  setVolVisible({ mavol1: next, mavol2: next });
-  mavol1Ref.current?.applyOptions({ visible: next });
-  mavol2Ref.current?.applyOptions({ visible: next });
+
+
+  
+// ✅ THÊM logic mới
+const toggleAllMainIndicators = () => {
+  const hasAnyVisible = Object.values(mainVisible).some(v => v);
+  const newState: MainIndicatorConfig = {
+    ma7: !hasAnyVisible,
+    ma25: !hasAnyVisible,
+    ma99: !hasAnyVisible,
+    ema12: !hasAnyVisible,
+    ema26: !hasAnyVisible,
+  };
+  setMainVisible(newState);
+  
+  ma7Ref.current?.applyOptions({ visible: newState.ma7 });
+  ma25Ref.current?.applyOptions({ visible: newState.ma25 });
+  ma99Ref.current?.applyOptions({ visible: newState.ma99 });
+  ema12Ref.current?.applyOptions({ visible: newState.ema12 });
+  ema26Ref.current?.applyOptions({ visible: newState.ema26 });
 };
 
-  const toggleAllMA = () => {
-    const next = !(maVisible.ma7 || maVisible.ma25 || maVisible.ma99);
-    setMaVisible({ ma7: next, ma25: next, ma99: next });
-    ma7Ref.current?.applyOptions({ visible: next });
-    ma25Ref.current?.applyOptions({ visible: next });
-    ma99Ref.current?.applyOptions({ visible: next });
-  };
+const mainIndicatorValues: IndicatorValue[] = [
+  mainVisible.ma7 && {
+    name: 'MA',
+    period: indicatorPeriods.ma7,
+    value: candles.at(-1)?.close ?? 0,
+    color: indicatorColors.ma7!,
+    visible: mainVisible.ma7,
+  },
+  mainVisible.ma25 && {
+    name: 'MA',
+    period: indicatorPeriods.ma25,
+    value: candles.at(-1)?.close ?? 0,
+    color: indicatorColors.ma25!,
+    visible: mainVisible.ma25,
+  },
+  mainVisible.ma99 && {
+    name: 'MA',
+    period: indicatorPeriods.ma99,
+    value: candles.at(-1)?.close ?? 0,
+    color: indicatorColors.ma99!,
+    visible: mainVisible.ma99,
+  },
+  mainVisible.ema12 && {
+    name: 'EMA',
+    period: indicatorPeriods.ema12,
+    value: candles.at(-1)?.close ?? 0,
+    color: indicatorColors.ema12!,
+    visible: mainVisible.ema12,
+  },
+  mainVisible.ema26 && {
+    name: 'EMA',
+    period: indicatorPeriods.ema26,
+    value: candles.at(-1)?.close ?? 0,
+    color: indicatorColors.ema26!,
+    visible: mainVisible.ema26,
+  },
+].filter(Boolean) as IndicatorValue[];
 
-  const maValues = [
-    maVisible.ma7 && { period: 7, value: candles.at(-1)?.close ?? 0, color: '#f0b90b' },
-    maVisible.ma25 && { period: 25, value: candles.at(-1)?.close ?? 0, color: '#eb40b5' },
-    maVisible.ma99 && { period: 99, value: candles.at(-1)?.close ?? 0, color: '#b385f8' },
-  ].filter(Boolean) as { period: number; value: number; color: string }[];
-const maVolValues = [
-  volVisible.mavol1 && { 
-    period: volPeriods.mavol1, 
-    value: volumeData.at(-1)?.value ?? 0, 
-    color: volColors.mavol1
+const toggleAllVolumeIndicators = () => {
+  const hasAnyVisible = volumeVisible.mavol1 || volumeVisible.mavol2;
+  const newState: VolumeIndicatorConfig = {
+    mavol1: !hasAnyVisible,
+    mavol2: !hasAnyVisible,
+  };
+  setVolumeVisible(newState);
+  
+  mavol1Ref.current?.applyOptions({ visible: newState.mavol1 });
+  mavol2Ref.current?.applyOptions({ visible: newState.mavol2 });
+};
+
+const volumeIndicatorValues: IndicatorValue[] = [
+  volumeVisible.mavol1 && {
+    name: 'MAVOL',
+    period: indicatorPeriods.mavol1,
+    value: volumeData.at(-1)?.value ?? 0,
+    color: indicatorColors.mavol1!,
+    visible: volumeVisible.mavol1,
   },
-  volVisible.mavol2 && { 
-    period: volPeriods.mavol2, 
-    value: volumeData.at(-1)?.value ?? 0, 
-    color: volColors.mavol2
+  volumeVisible.mavol2 && {
+    name: 'MAVOL',
+    period: indicatorPeriods.mavol2,
+    value: volumeData.at(-1)?.value ?? 0,
+    color: indicatorColors.mavol2!,
+    visible: volumeVisible.mavol2,
   },
-].filter(Boolean) as { period: number; value: number; color: string }[];
+].filter(Boolean) as IndicatorValue[];
+  
+
   useEffect(() => {
     const handler = (ev: any) => {
       const sym = ev?.detail?.symbol as string | undefined;
@@ -1363,34 +1502,80 @@ const maVolValues = [
   return (
     <div className="h-full w-full min-w-0 relative">
 
-      {maHeaderVisible && (
-        <MAHeader
-          maValues={maValues}
-          visible={maVisible.ma7 || maVisible.ma25 || maVisible.ma99}
-          onToggleVisible={toggleAllMA}
-          onOpenSetting={() => setShowMASettings(true)}
-          onClose={() => {
-            setMaHeaderVisible(false);
-            setMaVisible({ ma7: false, ma25: false, ma99: false });
-            ma7Ref.current?.applyOptions({ visible: false });
-            ma25Ref.current?.applyOptions({ visible: false });
-            ma99Ref.current?.applyOptions({ visible: false });
-          }}
-        />
-      )}
+      
+{mainIndicatorVisible && (
+  <LineIndicatorHeader
+    type="main"
+    indicators={mainIndicatorValues}
+    visible={Object.values(mainVisible).some(v => v)}
+    onToggleVisible={toggleAllMainIndicators}
+    onOpenSetting={() => setShowMainSettings(true)}
+    onClose={() => {
+      setMainIndicatorVisible(false);
+      const allOff: MainIndicatorConfig = {
+        ma7: false,
+        ma25: false,
+        ma99: false,
+        ema12: false,
+        ema26: false,
+      };
+      setMainVisible(allOff);
+      ma7Ref.current?.applyOptions({ visible: false });
+      ma25Ref.current?.applyOptions({ visible: false });
+      ma99Ref.current?.applyOptions({ visible: false });
+      ema12Ref.current?.applyOptions({ visible: false });
+      ema26Ref.current?.applyOptions({ visible: false });
+    }}
+  />
+)}
 
-      {showMASettings && (
-        <MASettings
-          visibleSettings={maVisible}
-          onChange={(v) => {
-            setMaVisible(v);
-            ma7Ref.current?.applyOptions({ visible: v.ma7 });
-            ma25Ref.current?.applyOptions({ visible: v.ma25 });
-            ma99Ref.current?.applyOptions({ visible: v.ma99 });
-          }}
-          onClose={() => setShowMASettings(false)}
-        />
-      )}
+{showMainSettings && (
+  <LineIndicatorSettings
+    type="main"
+    mainVisible={mainVisible}
+    periods={indicatorPeriods}
+    colors={indicatorColors}
+    onChange={(mainVis, _, __, per, col) => {
+      if (mainVis) {
+        setMainVisible(mainVis);
+        ma7Ref.current?.applyOptions({ visible: mainVis.ma7 });
+        ma25Ref.current?.applyOptions({ visible: mainVis.ma25 });
+        ma99Ref.current?.applyOptions({ visible: mainVis.ma99 });
+        ema12Ref.current?.applyOptions({ visible: mainVis.ema12 });
+        ema26Ref.current?.applyOptions({ visible: mainVis.ema26 });
+      }
+      if (per) setIndicatorPeriods(per);
+      if (col) {
+        setIndicatorColors(col);
+        ma7Ref.current?.applyOptions({ color: col.ma7 });
+        ma25Ref.current?.applyOptions({ color: col.ma25 });
+        ma99Ref.current?.applyOptions({ color: col.ma99 });
+        ema12Ref.current?.applyOptions({ color: col.ema12 });
+        ema26Ref.current?.applyOptions({ color: col.ema26 });
+      }
+      
+      // Recalculate if periods changed
+      if (per && candles.length > 0) {
+        if (candles.length >= (per.ma7 || 7) && ma7Ref.current && mainVis?.ma7) {
+          ma7Ref.current.setData(calculateMA(candles, per.ma7 || 7));
+        }
+        if (candles.length >= (per.ma25 || 25) && ma25Ref.current && mainVis?.ma25) {
+          ma25Ref.current.setData(calculateMA(candles, per.ma25 || 25));
+        }
+        if (candles.length >= (per.ma99 || 99) && ma99Ref.current && mainVis?.ma99) {
+          ma99Ref.current.setData(calculateMA(candles, per.ma99 || 99));
+        }
+        if (candles.length >= (per.ema12 || 12) && ema12Ref.current && mainVis?.ema12) {
+          ema12Ref.current.setData(calculateEMA(candles, per.ema12 || 12));
+        }
+        if (candles.length >= (per.ema26 || 26) && ema26Ref.current && mainVis?.ema26) {
+          ema26Ref.current.setData(calculateEMA(candles, per.ema26 || 26));
+        }
+      }
+    }}
+    onClose={() => setShowMainSettings(false)}
+  />
+)}
 
       <FloatingPositionTag
         visible={!!floating && showPositionTag}
@@ -1645,35 +1830,7 @@ const maVolValues = [
         }}
       />
 
-      {showVOLSettings && (
-  <VOLSettings
-    visibleSettings={volVisible}
-    periods={volPeriods}
-    colors={volColors}
-    onChange={(vis, per, cols) => {
-      setVolVisible(vis);
-      setVolPeriods(per);
-      setVolColors(cols);
       
-      mavol1Ref.current?.applyOptions({ 
-        visible: vis.mavol1,
-        color: cols.mavol1
-      });
-      mavol2Ref.current?.applyOptions({ 
-        visible: vis.mavol2,
-        color: cols.mavol2
-      });
-
-      if (volumeData.length >= per.mavol1 && mavol1Ref.current) {
-        mavol1Ref.current.setData(calculateVolumeMA(volumeData, per.mavol1));
-      }
-      if (volumeData.length >= per.mavol2 && mavol2Ref.current) {
-        mavol2Ref.current.setData(calculateVolumeMA(volumeData, per.mavol2));
-      }
-    }}
-    onClose={() => setShowVOLSettings(false)}
-  />
-)}
 
       <div className="relative w-full h-full flex flex-col">
         <div 
@@ -1691,20 +1848,57 @@ const maVolValues = [
           ref={volumeChartContainerRef}
           className="relative w-full flex-1"
         >
-          {volHeaderVisible && (
-            <VOLHeader
-              maValues={maVolValues}
-              visible={volVisible.mavol1 || volVisible.mavol2}
-              onToggleVisible={toggleAllMAVOL}
-              onOpenSetting={() => setShowVOLSettings(true)}
-              onClose={() => {
-                setVolHeaderVisible(false);
-                setVolVisible({ mavol1: false, mavol2: false });
-                mavol1Ref.current?.applyOptions({ visible: false });
-                mavol2Ref.current?.applyOptions({ visible: false });
-              }}
-            />
-          )}
+         {volumeIndicatorVisible && (
+  <LineIndicatorHeader
+    type="volume"
+    indicators={volumeIndicatorValues}
+    visible={volumeVisible.mavol1 || volumeVisible.mavol2}
+    onToggleVisible={toggleAllVolumeIndicators}
+    onOpenSetting={() => setShowVolumeSettings(true)}
+    onClose={() => {
+      setVolumeIndicatorVisible(false);
+      const allOff: VolumeIndicatorConfig = {
+        mavol1: false,
+        mavol2: false,
+      };
+      setVolumeVisible(allOff);
+      mavol1Ref.current?.applyOptions({ visible: false });
+      mavol2Ref.current?.applyOptions({ visible: false });
+    }}
+  />
+)}
+{showVolumeSettings && (
+  <LineIndicatorSettings
+    type="volume"
+    volumeVisible={volumeVisible}
+    periods={indicatorPeriods}
+    colors={indicatorColors}
+    onChange={(_, volumeVis, __, per, col) => {
+      if (volumeVis) {
+        setVolumeVisible(volumeVis);
+        mavol1Ref.current?.applyOptions({ visible: volumeVis.mavol1 });
+        mavol2Ref.current?.applyOptions({ visible: volumeVis.mavol2 });
+      }
+      if (per) setIndicatorPeriods(per);
+      if (col) {
+        setIndicatorColors(col);
+        mavol1Ref.current?.applyOptions({ color: col.mavol1 });
+        mavol2Ref.current?.applyOptions({ color: col.mavol2 });
+      }
+      
+      // Recalculate if periods changed
+      if (per && volumeData.length > 0) {
+        if (volumeData.length >= (per.mavol1 || 7) && mavol1Ref.current && volumeVis?.mavol1) {
+          mavol1Ref.current.setData(calculateVolumeMA(volumeData, per.mavol1 || 7));
+        }
+        if (volumeData.length >= (per.mavol2 || 14) && mavol2Ref.current && volumeVis?.mavol2) {
+          mavol2Ref.current.setData(calculateVolumeMA(volumeData, per.mavol2 || 14));
+        }
+      }
+    }}
+    onClose={() => setShowVolumeSettings(false)}
+  />
+)}
         </div>
       </div>
     </div>

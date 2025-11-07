@@ -66,10 +66,11 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
       <div className="bg-[#1e2329] rounded-lg shadow-2xl w-[580px] max-h-[90vh] overflow-hidden border border-[#2b3139]">
         {/* Header tabs */}
         <div className="flex items-center border-b border-[#2b3139] bg-[#181a20]">
-          <button className="px-6 py-3 text-sm font-medium text-white border-b-2 border-[#fcd535] bg-[#1e2329]">
+          
+          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
             Chỉ báo chính
           </button>
-          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
+          <button className="px-6 py-3 text-sm font-medium text-white border-b-2 border-[#fcd535] bg-[#1e2329]">
             Chỉ báo phụ
           </button>
           <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">

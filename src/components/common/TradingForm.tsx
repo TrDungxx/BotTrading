@@ -8,11 +8,12 @@ import MultiAssetsModeModal from "../formtrading/MultiAssetsModeModal";
 import TpSlModal from "../formtrading/TpSlModal";
 import { ExternalLink } from "lucide-react";
 import ConfirmPlaceOrderModal from "./formtrading/ConfirmPlaceOrderModal";
+
 // ===== Types =====
 interface Props {
   selectedSymbol: string;
   price: number;
-  internalBalance?: number; // optional in props; we also compute via WS
+  internalBalance?: number;
   selectedMarket?: "spot" | "futures";
 }
 
@@ -23,13 +24,12 @@ interface BinanceAccount {
   description?: string;
 }
 
-// ===== Helpers =====
-
 type OrderTypeBin = "limit" | "market" | "stop-limit";
 type Side = "buy" | "sell";
-
 type BalanceSource = "ws-live" | "snapshot" | "database-cache" | "none";
+type OrderAction = "open" | "close";
 
+// ===== Helpers =====
 const roundStep = (v: number, step: number) => Math.floor(v / step) * step;
 const roundTick = (v: number, tick: number) => Math.round(v / tick) * tick;
 const decimalsFromTick = (tick: number) => {
@@ -39,24 +39,16 @@ const decimalsFromTick = (tick: number) => {
   return i === -1 ? 0 : s.length - i - 1;
 };
 
-// Fallback tick/step if no exchangeInfo mapping yet
 const DEFAULT_TICK = 0.0001;
 const DEFAULT_STEP = 0.01;
-
-// Fee (rough)
-const DEFAULT_TAKER = 0.0005; // 0.05%
-const DEFAULT_MAKER = 0.0002; // 0.02%
+const DEFAULT_TAKER = 0.0005;
+const DEFAULT_MAKER = 0.0002;
 const getFeeRate = (orderType: OrderTypeBin) =>
   orderType === "market" ? DEFAULT_TAKER : DEFAULT_MAKER;
+const DEFAULT_MMR = 0.004;
 
-// Maintenance Margin Rate approx for liqPrice demo
-const DEFAULT_MMR = 0.004; // 0.4%
-
-// Optional symbol meta (should be replaced by real exchangeInfo)
 const SYMBOL_META: Record<string, { tick: number; step: number }> = {
   "1000PEPEUSDT": { tick: 0.000001, step: 1 },
-  // 'BTCUSDT': { tick: 0.1, step: 0.001 },
-  // 'ETHUSDT': { tick: 0.01, step: 0.001 },
 };
 
 function estimate({
@@ -118,45 +110,10 @@ function estimate({
   return { notional, fee, initMargin, maxQty, liqPrice };
 }
 
-// ===== Component =====
-const TradingForm: React.FC<Props> = ({
-  selectedSymbol,
-  price,
-  internalBalance: propInternal = 0,
-  selectedMarket: propMarket = "futures",
-}) => {
-  // Accounts
-  const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
-    null
-  );
+const roundStepUp = (v: number, step: number) =>
+  Math.ceil((v + 1e-12) / step) * step;
 
-  // Modes
-  const [isMultiAssetsOpen, setIsMultiAssetsOpen] = useState(false);
-  const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
-  const [dualSide, setDualSide] = useState<boolean>(true); // true=Hedge, false=One-way
-  
-
-  // UI/Order state
-  const [isPriceOverridden, setIsPriceOverridden] = useState(false);
-  const [tradeSide, setTradeSide] = useState<Side>("buy");
-  const [orderType, setOrderType] = useState<OrderTypeBin>("limit");
-  const [priceValue, setPriceValue] = useState("");
-  const [amount, setAmount] = useState("");
-  const [percent, setPercent] = useState(0);
-  const [reduceOnly, setReduceOnly] = useState(false);
-  const [tif, setTif] = useState<"GTC" | "IOC" | "FOK">("GTC");
-  const [isMarginOpen, setIsMarginOpen] = useState(false);
-  const [isLeverageOpen, setIsLeverageOpen] = useState(false);
-  const [marginMode, setMarginMode] = useState<"cross" | "isolated">("cross");
-  const [leverage, setLeverage] = useState(2);
-  const [selectedMarket, setSelectedMarket] = useState<"spot" | "futures">(
-    propMarket
-  );
-  const roundStepUp = (v: number, step: number) =>
-  Math.ceil((v + 1e-12) / step) * step; // +epsilon để tránh lỗi float
-
-const qtyDecimals = (step: number) => decimalsFromTick(step); // tái dùng helper có sẵn
+const qtyDecimals = (step: number) => decimalsFromTick(step);
 
 const clampQtyToMax = ({
   qty,
@@ -174,110 +131,182 @@ const clampQtyToMax = ({
   step: number;
 }) => {
   const buyingPower = market === "futures" ? balance * leverage : balance;
-  const rawMax = (buyingPower > 0 && price > 0) ? buyingPower / price : 0;
-  const maxFloor = Math.floor((rawMax + 1e-12) / step) * step; // an toàn: không vượt quá sức mua
+  const rawMax = buyingPower > 0 && price > 0 ? buyingPower / price : 0;
+  const maxFloor = Math.floor((rawMax + 1e-12) / step) * step;
   return Math.min(qty, Math.max(0, maxFloor));
 };
 
+// ===== Component =====
+const TradingForm: React.FC<Props> = ({
+  selectedSymbol,
+  price,
+  internalBalance: propInternal = 0,
+  selectedMarket: propMarket = "futures",
+}) => {
+  const [orderAction, setOrderAction] = useState<OrderAction>("open");
 
-  // ===== Confirm Order (popup) =====
-type ConfirmSide = 'LONG' | 'SHORT';
-type ConfirmOrder = {
-  symbol: string;
-  market: 'spot' | 'futures';
-  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET';
-  side: 'BUY' | 'SELL';
-  quantity: number;
-  price?: number;
-  stopPrice?: number;
-  timeInForce?: 'GTC' | 'IOC' | 'FOK';
-  workingType?: 'MARK' | 'LAST';
-  // futures only
-  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
-  reduceOnly?: boolean;
-};
+  // Accounts
+  const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
+    null
+  );
 
-const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-const [confirmSide, setConfirmSide] = useState<ConfirmSide>('LONG');
-const [confirmOrder, setConfirmOrder] = useState<ConfirmOrder | null>(null);
+  // Modes
+  const [isMultiAssetsOpen, setIsMultiAssetsOpen] = useState(false);
+  const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
+  const [dualSide, setDualSide] = useState<boolean>(true);
 
-// build payload theo UI hiện tại
-const buildOrderPayload = (side: ConfirmSide): ConfirmOrder | null => {
-  const qty = parseFloat(amount || '0');
-  if (!Number.isFinite(qty) || qty <= 0) return null;
+  // UI/Order state
+  const [isPriceOverridden, setIsPriceOverridden] = useState(false);
+  const [tradeSide, setTradeSide] = useState<Side>("buy");
+  const [orderType, setOrderType] = useState<OrderTypeBin>("limit");
+  const [priceValue, setPriceValue] = useState("");
+  const [amount, setAmount] = useState("");
+  const [percent, setPercent] = useState(0);
+  const [reduceOnly, setReduceOnly] = useState(false);
+  const [tif, setTif] = useState<"GTC" | "IOC" | "FOK">("GTC");
+  const [isMarginOpen, setIsMarginOpen] = useState(false);
+  const [isLeverageOpen, setIsLeverageOpen] = useState(false);
+  const [marginMode, setMarginMode] = useState<"cross" | "isolated">("cross");
+  const [leverage, setLeverage] = useState(2);
+  const [selectedMarket, setSelectedMarket] = useState<"spot" | "futures">(
+    propMarket
+  );
 
-  const base: ConfirmOrder = {
-    symbol: selectedSymbol,
-    market: selectedMarket,
-    side: side === 'LONG' ? 'BUY' : 'SELL',
-    quantity: qty,
-    type:
-      orderType === 'market'
-        ? 'MARKET'
-        : orderType === 'limit'
-        ? 'LIMIT'
-        : 'STOP_MARKET',
+  // Confirm Order
+  type ConfirmSide = "LONG" | "SHORT";
+  type ConfirmOrder = {
+    symbol: string;
+    market: "spot" | "futures";
+    type: "MARKET" | "LIMIT" | "STOP_MARKET";
+    side: "BUY" | "SELL";
+    quantity: number;
+    price?: number;
+    stopPrice?: number;
+    timeInForce?: "GTC" | "IOC" | "FOK";
+    workingType?: "MARK" | "LAST";
+    positionSide?: "LONG" | "SHORT" | "BOTH";
+    reduceOnly?: boolean;
   };
 
-  if (base.type === 'LIMIT') {
-    const p = parseFloat(priceValue || '0');
-    if (!Number.isFinite(p) || p <= 0) return null;
-    base.price = p;
-    base.timeInForce = tif;
-  }
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmSide, setConfirmSide] = useState<ConfirmSide>("LONG");
+  const [confirmOrder, setConfirmOrder] = useState<ConfirmOrder | null>(null);
 
-  if (base.type === 'STOP_MARKET') {
-    const sp = parseFloat(stopPrice || '0');
-    if (!Number.isFinite(sp) || sp <= 0) return null;
-    base.stopPrice = sp;
-    base.workingType = stopPriceType;
-  }
+  const buildOrderPayload = (side: ConfirmSide): ConfirmOrder | null => {
+    const qty = parseFloat(amount || "0");
+    if (!Number.isFinite(qty) || qty <= 0) return null;
 
-  if (selectedMarket === 'futures') {
-    base.positionSide = dualSide ? side : 'BOTH';
-    // mở vị thế MARKET thì KHÔNG gắn reduceOnly; chỉ tôn trọng checkbox nếu user tick
-    base.reduceOnly = !!reduceOnly;
-  }
-  return base;
-};
+    // ⭐ LOGIC QUAN TRỌNG:
+    // - Tab "MỞ" + LONG → BUY
+    // - Tab "MỞ" + SHORT → SELL
+    // - Tab "ĐÓNG" + LONG → SELL (bán để đóng long)
+    // - Tab "ĐÓNG" + SHORT → BUY (mua lại để đóng short)
+    
+    let orderSide: "BUY" | "SELL";
+    if (orderAction === "open") {
+      // Khi mở vị thế
+      orderSide = side === "LONG" ? "BUY" : "SELL";
+    } else {
+      // Khi đóng vị thế (đảo ngược)
+      orderSide = side === "LONG" ? "SELL" : "BUY";
+    }
 
-const openConfirm = (side: ConfirmSide) => {
-  const payload = buildOrderPayload(side);
-  if (!payload) {
-    alert('Thiếu thông tin: số lượng/giá/stop…');
-    return;
-  }
-  setConfirmSide(side);
-  setConfirmOrder(payload);
-  setIsConfirmOpen(true);
-};
-
-const confirmPlaceOrder = () => {
-  if (!confirmOrder) return;
-  binanceWS.placeOrder(confirmOrder as any);
-  // nếu có TP/SL con
-  tpSlOrders.forEach((o) => {
-    binanceWS.placeOrder({
+    const base: ConfirmOrder = {
       symbol: selectedSymbol,
       market: selectedMarket,
-      side: confirmOrder.side === 'BUY' ? 'SELL' : 'BUY',
-      type: o.type, // 'STOP_MARKET' | 'TAKE_PROFIT_MARKET'
-      stopPrice: o.stopPrice,
-      workingType: o.triggerType || stopPriceType,
-      quantity: confirmOrder.quantity,
-      reduceOnly: true,
-      positionSide:
-        selectedMarket === 'futures'
-          ? (confirmOrder.positionSide as any)
-          : undefined,
-    } as any);
-  });
-  setTpSlOrders([]);
-  setIsConfirmOpen(false);
-};
+      side: orderSide,
+      quantity: qty,
+      type:
+        orderType === "market"
+          ? "MARKET"
+          : orderType === "limit"
+          ? "LIMIT"
+          : "STOP_MARKET",
+    };
 
+    if (base.type === "LIMIT") {
+      const p = parseFloat(priceValue || "0");
+      if (!Number.isFinite(p) || p <= 0) return null;
+      base.price = p;
+      base.timeInForce = tif;
+    }
 
-  // Balance tracking (source-priority)
+    if (base.type === "STOP_MARKET") {
+      const sp = parseFloat(stopPrice || "0");
+      if (!Number.isFinite(sp) || sp <= 0) return null;
+      base.stopPrice = sp;
+      base.workingType = stopPriceType;
+    }
+
+    if (selectedMarket === "futures") {
+      base.positionSide = dualSide ? side : "BOTH";
+      
+      // ⭐ FIX CRITICAL: Logic reduceOnly
+      // - Tab "close": CHỈ gửi reduceOnly=true cho lệnh LIMIT/STOP
+      // - Tab "open": KHÔNG BAO GIỜ gửi reduceOnly (hoặc gửi false)
+      // - MARKET orders: Binance thường tự xử lý, nhưng an toàn nhất là không gửi khi mở vị thế
+      
+      if (orderAction === "close") {
+        // Khi đóng vị thế: CHỈ gửi reduceOnly=true cho LIMIT và STOP
+        if (base.type === "LIMIT" || base.type === "STOP_MARKET") {
+          base.reduceOnly = true;
+        }
+        // MARKET orders khi đóng: không gửi reduceOnly, để Binance tự xử lý
+      } else {
+        // Khi mở vị thế: KHÔNG GỬI reduceOnly
+        // (hoặc gửi false nếu API yêu cầu, nhưng tốt nhất là không gửi)
+        // base.reduceOnly = false; // ← KHÔNG NÊN gửi
+      }
+    }
+    
+    return base;
+  };
+
+  const openConfirm = (side: ConfirmSide) => {
+    const payload = buildOrderPayload(side);
+    if (!payload) {
+      alert("Thiếu thông tin: số lượng/giá/stop…");
+      return;
+    }
+    setConfirmSide(side);
+    setConfirmOrder(payload);
+    setIsConfirmOpen(true);
+  };
+
+  const confirmPlaceOrder = () => {
+    if (!confirmOrder) return;
+    
+    console.log("📤 Placing order:", confirmOrder); // Debug log
+    
+    binanceWS.placeOrder(confirmOrder as any);
+    
+    // TP/SL orders
+    tpSlOrders.forEach((o) => {
+      const childOrder = {
+        symbol: selectedSymbol,
+        market: selectedMarket,
+        side: confirmOrder.side === "BUY" ? "SELL" : "BUY",
+        type: o.type,
+        stopPrice: o.stopPrice,
+        workingType: o.triggerType || stopPriceType,
+        quantity: confirmOrder.quantity,
+        reduceOnly: true, // TP/SL luôn là reduceOnly
+        positionSide:
+          selectedMarket === "futures"
+            ? (confirmOrder.positionSide as any)
+            : undefined,
+      };
+      
+      console.log("📤 Placing TP/SL:", childOrder); // Debug log
+      binanceWS.placeOrder(childOrder as any);
+    });
+    
+    setTpSlOrders([]);
+    setIsConfirmOpen(false);
+  };
+
+  // Balance tracking
   const [internalBalance, setInternalBalance] = useState<number>(propInternal);
   const [balanceSource, setBalanceSource] = useState<BalanceSource>("none");
   const RANK: Record<BalanceSource, number> = {
@@ -410,7 +439,6 @@ const confirmPlaceOrder = () => {
       switch (msg.type) {
         case "authenticated":
           binanceWS.getMyBinanceAccounts();
-          // sync modes
           binanceWS.getMultiAssetsMode((isMulti) =>
             setMultiAssetsMode(isMulti)
           );
@@ -464,7 +492,6 @@ const confirmPlaceOrder = () => {
     binanceWS.getPositionMode((isDual) => setDualSide(isDual));
   }, [selectedAccountId]);
 
-  // Price formatting per tick
   useEffect(() => {
     if (price > 0 && !isPriceOverridden)
       setPriceValue(price.toFixed(priceDecimals));
@@ -475,31 +502,29 @@ const confirmPlaceOrder = () => {
       setPriceValue(price.toFixed(priceDecimals));
   }, [selectedSymbol, priceDecimals, price, isPriceOverridden]);
 
-  // Slider => amount
   useEffect(() => {
-  if (price <= 0 || percent <= 0) return;
+    if (price <= 0 || percent <= 0) return;
 
-  const buyingPower =
-    selectedMarket === "futures" ? internalBalance * leverage : internalBalance;
+    const buyingPower =
+      selectedMarket === "futures"
+        ? internalBalance * leverage
+        : internalBalance;
 
-  const rawQty = (buyingPower * percent) / 100 / price;
+    const rawQty = (buyingPower * percent) / 100 / price;
 
-  // ↳ luôn làm tròn LÊN theo stepSize, rồi kẹp lại để không vượt quá sức mua
-  let qty = roundStepUp(rawQty, stepSize);
-  qty = clampQtyToMax({
-    qty,
-    price,
-    balance: internalBalance,
-    leverage,
-    market: selectedMarket,
-    step: stepSize,
-  });
+    let qty = roundStepUp(rawQty, stepSize);
+    qty = clampQtyToMax({
+      qty,
+      price,
+      balance: internalBalance,
+      leverage,
+      market: selectedMarket,
+      step: stepSize,
+    });
 
-  if (qty > 0) setAmount(Math.ceil(qty).toString());
-}, [percent, price, internalBalance, selectedMarket, leverage, stepSize]);
+    if (qty > 0) setAmount(Math.ceil(qty).toString());
+  }, [percent, price, internalBalance, selectedMarket, leverage, stepSize]);
 
-
-  // Multi-Assets modal handler (also switch position mode accordingly)
   const handleChangeMode = (newMode: boolean) => {
     binanceWS.changeMultiAssetsMode(newMode, () => {
       binanceWS.changePositionMode(newMode, () => {
@@ -514,7 +539,6 @@ const confirmPlaceOrder = () => {
     });
   };
 
-  // WS generic listens for multiAssetsMargin broadcast
   useEffect(() => {
     const handler = (msg: any) => {
       if (typeof msg?.multiAssetsMargin === "boolean") {
@@ -532,7 +556,6 @@ const confirmPlaceOrder = () => {
     };
   }, [selectedAccountId]);
 
-  // Safe wrappers
   const changeMarginTypeWS = (symbol: string, mode: "cross" | "isolated") => {
     const marginType = mode === "isolated" ? "ISOLATED" : "CROSSED";
     if ((binanceWS as any).changeMarginType)
@@ -554,8 +577,6 @@ const confirmPlaceOrder = () => {
         leverage: lev,
       });
   };
-
-  
 
   // ===== Render =====
   return (
@@ -592,7 +613,39 @@ const confirmPlaceOrder = () => {
         />
       </div>
 
-      {/* Tabs */}
+      {/* Tab Mở/Đóng - Binance Style */}
+      <div className="relative flex bg-dark-800/50 rounded-lg p-0.5 border border-dark-700/50">
+        {/* Sliding Background */}
+        <div
+          className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-dark-600 rounded-md shadow-lg transition-all duration-200 ease-out ${
+            orderAction === "close" ? "translate-x-[calc(100%+4px)]" : "translate-x-0"
+          }`}
+        />
+        
+        {/* Buttons */}
+        <button
+          onClick={() => setOrderAction("open")}
+          className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${
+            orderAction === "open"
+              ? "text-white"
+              : "text-dark-400 hover:text-dark-200"
+          }`}
+        >
+          Mở
+        </button>
+        <button
+          onClick={() => setOrderAction("close")}
+          className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${
+            orderAction === "close"
+              ? "text-white"
+              : "text-dark-400 hover:text-dark-200"
+          }`}
+        >
+          Đóng
+        </button>
+      </div>
+
+      {/* Tabs Order Type */}
       <div className="flex space-x-2 text-sm">
         {(["limit", "market", "stop-limit"] as OrderTypeBin[]).map((t) => (
           <button
@@ -701,87 +754,95 @@ const confirmPlaceOrder = () => {
         </div>
       </div>
 
-      <div className="space-y-2 mt-2 text-xs text-white select-none">
-        <div className="flex items-center justify-between text-xs text-white pt-2">
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={tpSl}
-              onChange={() => setTpSl(!tpSl)}
-              className="form-checkbox"
-            />
-            <span className="font-semibold">TP/SL</span>
-          </label>
-          <button
-            type="button"
-            onClick={() => setIsTpSlModalOpen(true)}
-            className="flex items-center text-slate-400 hover:text-white space-x-1"
-            title="Chỉnh sửa nâng cao"
-          >
-            <ExternalLink size={14} />
-            <span>Nâng cao</span>
-          </button>
-        </div>
-
-        {tpSl && (
-          <div className="pl-6 pt-1 space-y-2 border-l border-dark-600 ml-1">
-            <div>
-              <label className="flex items-center justify-between text-xs mb-1 text-slate-400">
-                <span className="font-medium">Take Profit</span>
-                <select className="form-select w-[60px] text-xs">
-                  <option>Mark</option>
-                  <option>Last</option>
-                </select>
-              </label>
+      {/* TP/SL chỉ hiện khi Mở */}
+      {orderAction === "open" && (
+        <div className="space-y-2 mt-2 text-xs text-white select-none">
+          <div className="flex items-center justify-between text-xs text-white pt-2">
+            <label className="flex items-center space-x-2 cursor-pointer">
               <input
-                type="text"
-                className="form-input w-full text-sm"
-                placeholder="Nhập giá TP"
-                value={tpSlValues.takeProfitPrice}
-                onChange={(e) =>
-                  setTpSlValues((prev) => ({
-                    ...prev,
-                    takeProfitPrice: e.target.value,
-                    takeProfitEnabled: true,
-                  }))
-                }
+                type="checkbox"
+                checked={tpSl}
+                onChange={() => setTpSl(!tpSl)}
+                className="form-checkbox"
               />
-            </div>
-            <div>
-              <label className="flex items-center justify-between text-xs mb-1 text-slate-400">
-                <span className="font-medium">Stop Loss</span>
-                <select className="form-select w-[60px] text-xs">
-                  <option>Mark</option>
-                  <option>Last</option>
-                </select>
-              </label>
-              <input
-                type="text"
-                className="form-input w-full text-sm"
-                placeholder="Nhập giá SL"
-                value={tpSlValues.stopLossPrice}
-                onChange={(e) =>
-                  setTpSlValues((prev) => ({
-                    ...prev,
-                    stopLossPrice: e.target.value,
-                    stopLossEnabled: true,
-                  }))
-                }
-              />
-            </div>
+              <span className="font-semibold">TP/SL</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsTpSlModalOpen(true)}
+              className="flex items-center text-slate-400 hover:text-white space-x-1"
+              title="Chỉnh sửa nâng cao"
+            >
+              <ExternalLink size={14} />
+              <span>Nâng cao</span>
+            </button>
           </div>
-        )}
 
+          {tpSl && (
+            <div className="pl-6 pt-1 space-y-2 border-l border-dark-600 ml-1">
+              <div>
+                <label className="flex items-center justify-between text-xs mb-1 text-slate-400">
+                  <span className="font-medium">Take Profit</span>
+                  <select className="form-select w-[60px] text-xs">
+                    <option>Mark</option>
+                    <option>Last</option>
+                  </select>
+                </label>
+                <input
+                  type="text"
+                  className="form-input w-full text-sm"
+                  placeholder="Nhập giá TP"
+                  value={tpSlValues.takeProfitPrice}
+                  onChange={(e) =>
+                    setTpSlValues((prev) => ({
+                      ...prev,
+                      takeProfitPrice: e.target.value,
+                      takeProfitEnabled: true,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="flex items-center justify-between text-xs mb-1 text-slate-400">
+                  <span className="font-medium">Stop Loss</span>
+                  <select className="form-select w-[60px] text-xs">
+                    <option>Mark</option>
+                    <option>Last</option>
+                  </select>
+                </label>
+                <input
+                  type="text"
+                  className="form-input w-full text-sm"
+                  placeholder="Nhập giá SL"
+                  value={tpSlValues.stopLossPrice}
+                  onChange={(e) =>
+                    setTpSlValues((prev) => ({
+                      ...prev,
+                      stopLossPrice: e.target.value,
+                      stopLossEnabled: true,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-2 mt-2 text-xs text-white select-none">
         <div className="flex items-center space-x-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={reduceOnly}
-              onChange={() => setReduceOnly(!reduceOnly)}
-              className="form-checkbox"
-            />
-            <span>Lệnh chỉ giảm</span>
-          </label>
+          {/* Chỉ hiện checkbox khi đóng */}
+          {orderAction === "close" && (
+            <label className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
+              <input
+                type="checkbox"
+                checked={true}
+                disabled
+                className="form-checkbox"
+              />
+              <span>Lệnh chỉ giảm (tự động)</span>
+            </label>
+          )}
           <div className="flex items-center space-x-2 ml-auto">
             <span>TIF</span>
             <select
@@ -797,23 +858,40 @@ const confirmPlaceOrder = () => {
         </div>
       </div>
 
+      {/* Nút hành động */}
       <div className="flex gap-2">
-  <button
-    className="flex-1 btn btn-success"
-    onClick={() => openConfirm('LONG')}
-  >
-    Mở lệnh Long
-  </button>
-  <button
-    className="flex-1 btn btn-danger"
-    onClick={() => openConfirm('SHORT')}
-  >
-    Mở lệnh Short
-  </button>
-</div>
-
-
-      
+        {orderAction === "open" ? (
+          <>
+            <button
+              className="flex-1 btn btn-success"
+              onClick={() => openConfirm("LONG")}
+            >
+              Mở lệnh Long
+            </button>
+            <button
+              className="flex-1 btn btn-danger"
+              onClick={() => openConfirm("SHORT")}
+            >
+              Mở lệnh Short
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="flex-1 btn btn-danger"
+              onClick={() => openConfirm("SHORT")}
+            >
+              Đóng Short
+            </button>
+            <button
+              className="flex-1 btn btn-success"
+              onClick={() => openConfirm("LONG")}
+            >
+              Đóng Long
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Estimate Panel */}
       <div className="mt-3 rounded-xl border border-dark-600 bg-dark-800 p-3">
@@ -907,41 +985,45 @@ const confirmPlaceOrder = () => {
           setTpSl(true);
         }}
       />
-<ConfirmPlaceOrderModal
-  open={isConfirmOpen}
-  onClose={() => setIsConfirmOpen(false)}
-  order={confirmOrder}
-  sideLabel={confirmSide}
-  symbol={selectedSymbol}
-  baseAsset={selectedSymbol.replace("USDT", "")}
-  markPrice={price}
-  estFee={est.fee}
-  estLiqPrice={est.liqPrice}
-  priceDecimals={priceDecimals}
-  onConfirm={(o) => {
-    // Gửi lệnh chính
-    binanceWS.placeOrder(o as any);
 
-    // Nếu có TP/SL con thì gửi tiếp
-    tpSlOrders.forEach((child) => {
-      binanceWS.placeOrder({
-        symbol: selectedSymbol,
-        market: selectedMarket,
-        side: o.side === "BUY" ? "SELL" : "BUY",
-        type: child.type, // 'STOP_MARKET' | 'TAKE_PROFIT_MARKET'
-        stopPrice: child.stopPrice,
-        workingType: child.triggerType || stopPriceType,
-        quantity: o.quantity,
-        reduceOnly: true,
-        positionSide: selectedMarket === "futures" ? (o.positionSide as any) : undefined,
-      } as any);
-    });
-    setTpSlOrders([]);
-    setIsConfirmOpen(false);
-  }}
-/>
-
-      
+      <ConfirmPlaceOrderModal
+        open={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        order={confirmOrder}
+        sideLabel={confirmSide}
+        symbol={selectedSymbol}
+        baseAsset={selectedSymbol.replace("USDT", "")}
+        markPrice={price}
+        estFee={est.fee}
+        estLiqPrice={est.liqPrice}
+        priceDecimals={priceDecimals}
+        onConfirm={(o) => {
+          console.log("📤 Final order from modal:", o); // Debug log
+          binanceWS.placeOrder(o as any);
+          
+          tpSlOrders.forEach((child) => {
+            const tpslOrder = {
+              symbol: selectedSymbol,
+              market: selectedMarket,
+              side: o.side === "BUY" ? "SELL" : "BUY",
+              type: child.type,
+              stopPrice: child.stopPrice,
+              workingType: child.triggerType || stopPriceType,
+              quantity: o.quantity,
+              reduceOnly: true,
+              positionSide:
+                selectedMarket === "futures"
+                  ? (o.positionSide as any)
+                  : undefined,
+            };
+            console.log("📤 Final TP/SL from modal:", tpslOrder); // Debug log
+            binanceWS.placeOrder(tpslOrder as any);
+          });
+          
+          setTpSlOrders([]);
+          setIsConfirmOpen(false);
+        }}
+      />
     </div>
   );
 };
