@@ -123,7 +123,9 @@ const SymbolDropdown: React.FC<Props> = ({
   });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
 
   useEffect(() => {
     localStorage.setItem(favoriteKey, JSON.stringify(favoriteSymbols));
@@ -132,6 +134,28 @@ const SymbolDropdown: React.FC<Props> = ({
   const [fetchedSymbols, setFetchedSymbols] = useState<SymbolItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // ✅ Detect dropdown position when opened
+  useEffect(() => {
+    if (isOpen && dropdownRef.current) {
+      // Use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        if (!dropdownRef.current) return;
+        
+        const rect = dropdownRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.top;
+        const spaceAbove = rect.top;
+        const dropdownHeight = 600; // approximate total height
+        
+        // If not enough space below and more space above, position upward
+        if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+          setDropdownPosition('top');
+        } else {
+          setDropdownPosition('bottom');
+        }
+      }, 0);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (symbols && symbols.length > 0) return;
@@ -240,8 +264,12 @@ const SymbolDropdown: React.FC<Props> = ({
   return (
     <div
       ref={dropdownRef}
-      className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl overflow-hidden"
-      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+      className={`symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl overflow-hidden ${
+        dropdownPosition === 'top' ? 'origin-bottom' : 'origin-top'
+      }`}
+      style={{ 
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

@@ -19,7 +19,7 @@ import { copyPrice } from '../clickchart/CopyPrice';
 import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
 import AlertModal from '../clickchart/AlertModal';
 import NewOrderModal from '../clickchart/NewOrderModal';
-
+import BollingerBandsIndicator from './functionchart/BollingerBandsIndicator';
 import '../../style/Hidetradingviewlogo.css';
 import LineIndicatorHeader from './popupchart/LineIndicatorHeader';
 import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
@@ -74,7 +74,8 @@ function calculateMA(data: CandlestickData<Time>[], period: number): LineData<Ti
     let sum = 0;
     for (let j = i - period + 1; j <= i; j++) sum += data[j].close || 0;
     const avg = sum / period;
-    if (!Number.isNaN(avg)) out.push({ time: data[i].time, value: +avg.toFixed(5) });
+    // ✅ Tăng từ 5 lên 8 chữ số để giữ độ chính xác
+    if (!Number.isNaN(avg)) out.push({ time: data[i].time, value: +avg.toFixed(8) });
   }
   return out;
 }
@@ -90,16 +91,126 @@ function calculateEMA(data: CandlestickData[], period: number): LineData[] {
     sum += data[i].close || 0;
   }
   let ema = sum / period;
-  out.push({ time: data[period - 1].time, value: +ema.toFixed(5) });
+  out.push({ time: data[period - 1].time, value: +ema.toFixed(8) }); // ✅ Tăng lên 8
   
   // Calculate EMA for remaining data
   for (let i = period; i < data.length; i++) {
     ema = (data[i].close - ema) * multiplier + ema;
-    out.push({ time: data[i].time, value: +ema.toFixed(5) });
+    out.push({ time: data[i].time, value: +ema.toFixed(8) }); // ✅ Tăng lên 8
   }
   
   return out;
 }
+
+// ✅ ADD Bollinger Bands calculation
+function calculateBollingerBands(
+  data: CandlestickData[], 
+  period: number, 
+  stdDev: number
+): { upper: LineData[]; middle: LineData[]; lower: LineData[] } {
+  const upper: LineData[] = [];
+  const middle: LineData[] = [];
+  const lower: LineData[] = [];
+  
+  for (let i = period - 1; i < data.length; i++) {
+    // Calculate SMA (middle band)
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      sum += data[j].close || 0;
+    }
+    const sma = sum / period;
+    
+    // Calculate standard deviation
+    let variance = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const diff = (data[j].close || 0) - sma;
+      variance += diff * diff;
+    }
+    const std = Math.sqrt(variance / period);
+    
+    // Calculate bands
+    const upperBand = sma + (stdDev * std);
+    const lowerBand = sma - (stdDev * std);
+    
+    // ✅ Tăng precision lên 8
+    middle.push({ time: data[i].time, value: +sma.toFixed(8) });
+    upper.push({ time: data[i].time, value: +upperBand.toFixed(8) });
+    lower.push({ time: data[i].time, value: +lowerBand.toFixed(8) });
+  }
+  
+  return { upper, middle, lower };
+}
+
+// ✅ Function to draw BOLL filled background on canvas overlay
+function drawBollFill(
+  canvas: HTMLCanvasElement,
+  chart: IChartApi,
+  series: ISeriesApi<"Candlestick">,
+  upperData: LineData[],
+  lowerData: LineData[],
+  color: string = 'rgba(179, 133, 248, 0.1)'
+) {
+  if (!upperData.length || !lowerData.length || !series) return;
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const timeScale = chart.timeScale();
+  
+  // Get visible range
+  const visibleRange = timeScale.getVisibleRange();
+  if (!visibleRange) return;
+  
+  // ✅ FIX: Clip to chart area only (exclude price scale)
+  ctx.save(); // Save context state
+  const priceScale = chart.priceScale('right');
+  const priceScaleWidth = priceScale.width();
+  const chartWidth = canvas.width - priceScaleWidth;
+  
+  // Create clipping region
+  ctx.beginPath();
+  ctx.rect(0, 0, chartWidth, canvas.height);
+  ctx.clip();
+  
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  
+  // Draw upper line (left to right)
+  let started = false;
+  for (let i = 0; i < upperData.length; i++) {
+    const point = upperData[i];
+    const x = timeScale.timeToCoordinate(point.time as UTCTimestamp);
+    const y = series.priceToCoordinate(point.value);
+    
+    if (x === null || y === null) continue;
+    
+    if (!started) {
+      ctx.moveTo(x, y);
+      started = true;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  
+  // Draw lower line (right to left) to close the polygon
+  for (let i = lowerData.length - 1; i >= 0; i--) {
+    const point = lowerData[i];
+    const x = timeScale.timeToCoordinate(point.time as UTCTimestamp);
+    const y = series.priceToCoordinate(point.value);
+    
+    if (x === null || y === null) continue;
+    
+    ctx.lineTo(x, y);
+  }
+  
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore(); // ✅ Restore context state
+}
+
 
 /* ============================
    AUTO TICK-SIZE / PRECISION
@@ -199,27 +310,50 @@ const setChartType = (t: ChartType) => {
     else setInnerChartType(t);
   };
   
+// ✅ LocalStorage keys for indicator settings
+const getIndicatorStorageKey = (symbol: string, market: string) => 
+  `indicator_settings_${market}_${symbol}`;
+
+// ✅ Load indicator settings from localStorage
+const loadIndicatorSettings = () => {
+  try {
+    const key = getIndicatorStorageKey(selectedSymbol, market);
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load indicator settings:', e);
+  }
+  return null;
+};
+
+const savedSettings = loadIndicatorSettings();
 
   const [mainIndicatorVisible, setMainIndicatorVisible] = useState(true);
 const [showMainSettings, setShowMainSettings] = useState(false);
-const [mainVisible, setMainVisible] = useState({
+const [mainVisible, setMainVisible] = useState(savedSettings?.mainVisible ?? {
   ma7: true,
   ma25: true,
   ma99: true,
   ema12: false,
   ema26: false,
+  boll: false,
 });
+
+const [bollFillVisible, setBollFillVisible] = useState(savedSettings?.bollFillVisible ?? false); // For BOLL fill background
+const bollFillVisibleRef = useRef(false); // ✅ ADD: Ref to track bollFillVisible in closures
 
 // Volume Chart Indicators
 const [volumeIndicatorVisible, setVolumeIndicatorVisible] = useState(true);
 const [showVolumeSettings, setShowVolumeSettings] = useState(false);
-const [volumeVisible, setVolumeVisible] = useState({
+const [volumeVisible, setVolumeVisible] = useState(savedSettings?.volumeVisible ?? {
   mavol1: true,
   mavol2: true,
 });
 
 // Shared Periods & Colors
-const [indicatorPeriods, setIndicatorPeriods] = useState({
+const [indicatorPeriods, setIndicatorPeriods] = useState(savedSettings?.indicatorPeriods ?? {
   ma7: 7,
   ma25: 25,
   ma99: 99,
@@ -227,9 +361,10 @@ const [indicatorPeriods, setIndicatorPeriods] = useState({
   ema26: 26,
   mavol1: 7,
   mavol2: 14,
+  boll: { period: 20, stdDev: 2 },
 });
 
-const [indicatorColors, setIndicatorColors] = useState({
+const [indicatorColors, setIndicatorColors] = useState(savedSettings?.indicatorColors ?? {
   ma7: '#F0B90B',
   ma25: '#EB40B5',
   ma99: '#B385F8',
@@ -237,6 +372,7 @@ const [indicatorColors, setIndicatorColors] = useState({
   ema26: '#FF6D00',
   mavol1: '#0ECB81',
   mavol2: '#EB40B5',
+  boll: { upper: '#B385F8', middle: '#EB40B5', lower: '#B385F8', fill: 'rgba(179, 133, 248, 0.1)' },
 });
 
 // VOL MA series refs
@@ -253,6 +389,19 @@ const [volumeData, setVolumeData] = useState<VolumeBar[]>([]);
 const ema12Ref = useRef<ISeriesApi<'Line'> | null>(null);
 const ema26Ref = useRef<ISeriesApi<'Line'> | null>(null);
 
+// ✅ ADD BOLL refs
+const bollUpperRef = useRef<ISeriesApi<'Line'> | null>(null);
+const bollMiddleRef = useRef<ISeriesApi<'Line'> | null>(null);
+const bollLowerRef = useRef<ISeriesApi<'Line'> | null>(null);
+const bollFillRef = useRef<ISeriesApi<'Area'> | null>(null); // For filled background
+const bollCanvasRef = useRef<HTMLCanvasElement | null>(null); // Canvas overlay for fill
+const [bollData, setBollData] = useState<{ upper: LineData[]; middle: LineData[]; lower: LineData[] } | null>(null);
+const bollDataRef = useRef<{ upper: LineData[]; middle: LineData[]; lower: LineData[] } | null>(null); // ✅ Ref for bollData
+const redrawAnimationFrameRef = useRef<number | null>(null); // ✅ Track animation frame
+const mainVisibleRef = useRef(mainVisible);
+useEffect(() => {
+  mainVisibleRef.current = mainVisible;
+}, [mainVisible]);
   const wsRef = useRef<WebSocket | null>(null);
   const sessionRef = useRef(0);
   const resizeObsRef = useRef<ResizeObserver | null>(null);
@@ -541,47 +690,65 @@ const updatePriceFormat = async (candles: Candle[]) => {
 
   let { tickSize, precision } = meta;
 
-  // ✅ FIX: Điều chỉnh precision dựa trên giá thực tế
+  // ✅ Điều chỉnh displayTickSize cho cột giá (bước nhảy nhỏ = nhiều mốc)
+  let displayTickSize = tickSize;
+  
   if (lastPrice < 1) {
     if (lastPrice >= 0.1 && lastPrice < 1) {
-      // Giá 0.1-1: hiển thị 4 chữ số (VD: 0.5356)
-      precision = Math.max(precision, 4);
+      displayTickSize = 0.0001;
+      precision = 5;
     } else if (lastPrice < 0.1) {
-      // Giá < 0.1: hiển thị 5-6 chữ số
-      precision = Math.max(precision, 5);
+      displayTickSize = 0.00001;
+      precision = 6;
     }
   } else if (lastPrice >= 1 && lastPrice < 10) {
-    // Giá 1-10: hiển thị 3-4 chữ số (VD: 2.3041)
-    precision = Math.max(precision, 3);
+    displayTickSize = 0.001;  // Nhiều mốc: 2.330, 2.331, 2.332...
+    precision = 3;
   } else if (lastPrice >= 10 && lastPrice < 100) {
-    // Giá 10-100: hiển thị 2-3 chữ số (VD: 87.14)
-    precision = Math.max(precision, 2);
-  } else if (lastPrice >= 100 && lastPrice < 1000) {
-    // Giá 100-1000: hiển thị 2 chữ số (VD: 473.18 KHÔNG phải 473.00)
-    precision = Math.max(precision, 2);
-  } else if (lastPrice >= 1000) {
-    // Giá >= 1000: hiển thị 2 chữ số (VD: 102830.0)
-    precision = Math.max(precision, 2);
+    displayTickSize = 0.01;   // Nhiều mốc: 23.30, 23.31...
+    precision = 2;
+  } else if (lastPrice >= 100) {
+    displayTickSize = 0.1;    // Nhiều mốc: 230.0, 230.1...
+    precision = 4;
   }
 
-cs.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
-ma7Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
-ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
-ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: tickSize, precision } });
+  // ✅ Apply displayTickSize cho chart series (cột giá bên phải)
+  cs.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  ma7Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  ema12Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  ema26Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
 
-// ✅ FIX: KHÔNG làm tròn giá, chỉ format với precision
-chart.applyOptions({
-  localization: {
-    locale: 'vi-VN',
-    priceFormatter: (p: number) => {
-      // KHÔNG làm tròn về tickSize, giữ nguyên giá gốc
-      return p.toLocaleString('vi-VN', {
-        minimumFractionDigits: precision,
-        maximumFractionDigits: precision,
-      });
+  // ✅ KHÔNG làm tròn giá live - hiển thị đúng giá gốc
+  chart.applyOptions({
+    localization: {
+      locale: 'vi-VN',
+      priceFormatter: (p: number) => {
+        // KHÔNG có Math.round() - giữ nguyên giá gốc
+        return p.toLocaleString('vi-VN', {
+          minimumFractionDigits: precision,
+          maximumFractionDigits: precision,
+        });
+      },
+      // ✅ FIX: Format time theo timezone Việt Nam (UTC+7) - Hiển thị khi HOVER
+      timeFormatter: (timestamp: number) => {
+        const date = new Date(timestamp * 1000);
+        const time = date.toLocaleTimeString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        });
+        const day = date.toLocaleDateString('vi-VN', {
+          timeZone: 'Asia/Ho_Chi_Minh',
+          day: '2-digit',
+          month: '2-digit',
+        });
+        return `${time} ${day}`; // Format: "16:00 12-11"
+      },
     },
-  },
-});
+  });
 };
 
   const forceSyncCharts = () => {
@@ -614,6 +781,36 @@ chart.applyOptions({
   }
 };
 
+
+  // ✅ Sync refs with state (MUST be before main useEffect to avoid closure issues)
+  useEffect(() => {
+    bollFillVisibleRef.current = bollFillVisible;
+    
+  }, [bollFillVisible]);
+
+  useEffect(() => {
+    bollDataRef.current = bollData;
+    
+  }, [bollData]);
+
+  // ✅ Save indicator settings to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const key = getIndicatorStorageKey(selectedSymbol, market);
+      const settings = {
+        mainVisible,
+        volumeVisible,
+        indicatorPeriods,
+        indicatorColors,
+        bollFillVisible,
+      };
+      localStorage.setItem(key, JSON.stringify(settings));
+    } catch (e) {
+      console.error('Failed to save indicator settings:', e);
+    }
+  }, [mainVisible, volumeVisible, indicatorPeriods, indicatorColors, bollFillVisible, selectedSymbol, market]);
+
+
   useEffect(() => {
     const mainEl = mainChartContainerRef.current;
     const volumeEl = volumeChartContainerRef.current;
@@ -624,7 +821,25 @@ chart.applyOptions({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
-      
+      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
+      localization: {
+        locale: 'vi-VN',
+        timeFormatter: (timestamp: number) => {
+          const date = new Date(timestamp * 1000);
+          const time = date.toLocaleTimeString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          const day = date.toLocaleDateString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            day: '2-digit',
+            month: '2-digit',
+          });
+          return `${time} ${day}`;
+        },
+      },
       grid: {
         vertLines: { color: '#363e49ff', style: 1, visible: true },
         horzLines: { color: '#363e49ff', style: 0, visible: true },
@@ -655,6 +870,16 @@ chart.applyOptions({
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
         visible: false,
+        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục (không có ngày/tháng)
+        tickMarkFormatter: (time: UTCTimestamp) => {
+          const date = new Date(time * 1000);
+          return date.toLocaleTimeString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+        },
       },
       
       crosshair: {
@@ -707,6 +932,25 @@ chart.applyOptions({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
+      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
+      localization: {
+        locale: 'vi-VN',
+        timeFormatter: (timestamp: number) => {
+          const date = new Date(timestamp * 1000);
+          const time = date.toLocaleTimeString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          const day = date.toLocaleDateString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            day: '2-digit',
+            month: '2-digit',
+          });
+          return `${time} ${day}`;
+        },
+      },
       grid: {
         vertLines: { color: '#363e49ff', style: 1, visible: true },
         horzLines: { color: 'transparent', style: 0, visible: false },
@@ -733,6 +977,16 @@ chart.applyOptions({
         lockVisibleTimeRangeOnResize: true,
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
+        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục
+        tickMarkFormatter: (time: UTCTimestamp) => {
+          const date = new Date(time * 1000);
+          return date.toLocaleTimeString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+        },
       },
       crosshair: {
         mode: 0,
@@ -882,6 +1136,149 @@ ema26Ref.current = mainChart.addLineSeries({
   lineStyle: 0,
 });
 
+// ✅ ADD BOLL series
+const bollColors = indicatorColors.boll ?? { upper: '#B385F8', middle: '#EB40B5', lower: '#B385F8' };
+
+// Note: Lightweight Charts doesn't natively support filling between two lines
+// We'll add semi-transparent lines to create a similar visual effect
+bollUpperRef.current = mainChart.addLineSeries({
+  color: bollColors.upper,
+  lineWidth: 1, // ✅ Reduced from 2 to 1 for thinner line
+  lastValueVisible: false,
+  priceLineVisible: false,
+  visible: mainVisible.boll,
+  lineStyle: 0,
+});
+
+bollMiddleRef.current = mainChart.addLineSeries({
+  color: bollColors.middle,
+  lineWidth: 1,
+  lastValueVisible: false,
+  priceLineVisible: false,
+  visible: mainVisible.boll,
+  lineStyle: 2, // Dashed line for middle
+});
+
+bollLowerRef.current = mainChart.addLineSeries({
+  color: bollColors.lower,
+  lineWidth: 1, // ✅ Reduced from 2 to 1 for thinner line
+  lastValueVisible: false,
+  priceLineVisible: false,
+  visible: mainVisible.boll,
+  lineStyle: 0,
+});
+
+// ✅ Create canvas overlay for BOLL fill
+const canvas = document.createElement('canvas');
+canvas.style.position = 'absolute';
+canvas.style.top = '0';
+canvas.style.left = '0';
+canvas.style.pointerEvents = 'none';
+canvas.style.zIndex = '1';
+canvas.width = mainEl.clientWidth;
+canvas.height = mainEl.clientHeight;
+mainEl.style.position = 'relative';
+mainEl.appendChild(canvas);
+bollCanvasRef.current = canvas;
+
+
+// Function to redraw BOLL fill when chart updates
+const redrawBollFill = () => {
+  
+  
+  if (redrawAnimationFrameRef.current !== null) {
+    cancelAnimationFrame(redrawAnimationFrameRef.current);
+    redrawAnimationFrameRef.current = null;
+  }
+  
+  // ✅ TẤT CẢ giá trị từ refs - không có vấn đề closure
+  const currentBollData = bollDataRef.current;
+  const currentBollFillVisible = bollFillVisibleRef.current;
+  const currentMainVisible = mainVisibleRef.current.boll;
+  
+ 
+  
+  if (!bollCanvasRef.current || !chartRef.current || !candleSeries.current) {
+    
+    return;
+  }
+  
+  // Schedule redraw on next animation frame
+  redrawAnimationFrameRef.current = requestAnimationFrame(() => {
+    if (!bollCanvasRef.current) return;
+    
+    const ctx = bollCanvasRef.current.getContext('2d');
+    if (!ctx) return;
+    
+    // ✅ FIX: Always clear canvas first
+    ctx.clearRect(0, 0, bollCanvasRef.current.width, bollCanvasRef.current.height);
+    
+    // ✅ Only proceed to redraw if we should be showing the fill
+    if (!currentBollData || !currentMainVisible || !currentBollFillVisible || !chartRef.current || !candleSeries.current) {
+      return; // Exit after clearing
+    }
+    
+    
+    const timeScale = chartRef.current.timeScale();
+    const visibleRange = timeScale.getVisibleRange();
+    if (!visibleRange) {
+      
+      return;
+    }
+    
+    // ✅ FIX: Clip to chart area only (exclude price scale)
+    ctx.save(); // Save context state
+    const priceScale = chartRef.current.priceScale('right');
+    const priceScaleWidth = priceScale.width();
+    const chartWidth = bollCanvasRef.current.width - priceScaleWidth;
+    
+    // Create clipping region
+    ctx.beginPath();
+    ctx.rect(0, 0, chartWidth, bollCanvasRef.current.height);
+    ctx.clip();
+    
+    ctx.fillStyle = indicatorColors.boll?.fill || 'rgba(179, 133, 248, 0.1)';
+    ctx.beginPath();
+    
+    // Draw upper line (left to right)
+    let started = false;
+    for (let i = 0; i < currentBollData.upper.length; i++) {
+      const point = currentBollData.upper[i];
+      const x = timeScale.timeToCoordinate(point.time as UTCTimestamp);
+      const y = candleSeries.current!.priceToCoordinate(point.value);
+      
+      if (x === null || y === null) continue;
+      
+      if (!started) {
+        ctx.moveTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    
+    // Draw lower line (right to left) to close the polygon
+    for (let i = currentBollData.lower.length - 1; i >= 0; i--) {
+      const point = currentBollData.lower[i];
+      const x = timeScale.timeToCoordinate(point.time as UTCTimestamp);
+      const y = candleSeries.current!.priceToCoordinate(point.value);
+      
+      if (x === null || y === null) continue;
+      
+      ctx.lineTo(x, y);
+    }
+    
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore(); // ✅ Restore context state
+    
+    redrawAnimationFrameRef.current = null;
+  });
+};
+
+// Subscribe to chart changes to redraw fill
+mainChart.timeScale().subscribeVisibleTimeRangeChange(redrawBollFill);
+
 mavol1Ref.current = volumeChart.addLineSeries({
   color: indicatorColors.mavol1,
   lineWidth: 1,
@@ -901,6 +1298,21 @@ mavol2Ref.current = volumeChart.addLineSeries({
     const ro = new ResizeObserver(() => {
       mainChart.applyOptions({ width: mainEl.clientWidth, height: mainEl.clientHeight });
       volumeChart.applyOptions({ width: volumeEl.clientWidth, height: volumeEl.clientHeight });
+      
+      // Resize canvas overlay
+      if (bollCanvasRef.current) {
+        bollCanvasRef.current.width = mainEl.clientWidth;
+        bollCanvasRef.current.height = mainEl.clientHeight;
+        
+        // Redraw BOLL fill after resize
+        if (bollData && mainVisible.boll && chartRef.current) {
+          setTimeout(() => {
+            if (bollCanvasRef.current && chartRef.current) {
+              drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, bollData.upper, bollData.lower);
+            }
+          }, 100);
+        }
+      }
       
       setTimeout(() => forceSyncCharts(), 50);
     });
@@ -923,6 +1335,7 @@ mainEl.addEventListener('wheel', handleInteractionStart);
 mainEl.addEventListener('mouseup', handleInteractionEnd);
 mainEl.addEventListener('touchend', handleInteractionEnd);
 mainEl.addEventListener('mouseleave', handleInteractionEnd);
+
     const handleCrosshair = (param: any) => {
       if (ctxOpenRef.current) return;
       if (!param?.time || !candleSeries.current) {
@@ -978,6 +1391,8 @@ mainEl.addEventListener('mouseleave', handleInteractionEnd);
 mavol2Ref.current = null;
     };
   }, []);
+
+  
 
   function openCtxMenu(e: React.MouseEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -1232,6 +1647,28 @@ if (cs.length >= 12 && ema12Ref.current && mainVisible.ema12) {
 if (cs.length >= 26 && ema26Ref.current && mainVisible.ema26) {
   ema26Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema26 || 26));
 }
+
+// ✅ ADD BOLL calculations
+if (cs.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
+  const calculated = calculateBollingerBands(
+    cs, 
+    indicatorPeriods.boll?.period || 20, 
+    indicatorPeriods.boll?.stdDev || 2
+  );
+  if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
+  if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
+  if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
+  
+  // Save BOLL data to state for canvas rendering
+  setBollData(calculated);
+  
+  // Trigger canvas redraw
+  setTimeout(() => {
+    if (bollCanvasRef.current && chartRef.current) {
+      drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, calculated.upper, calculated.lower);
+    }
+  }, 100);
+}
       setCandles(cs);
 
       const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
@@ -1309,6 +1746,38 @@ if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
     if (next.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(next, 25));
     if (next.length >= 99 && ma99Ref.current) ma99Ref.current.setData(calculateMA(next, 99));
 
+    // ✅ ADD: Update EMA
+    if (next.length >= (indicatorPeriods.ema12 || 12) && ema12Ref.current && mainVisible.ema12) {
+      ema12Ref.current.setData(calculateEMA(next, indicatorPeriods.ema12 || 12));
+    }
+    if (next.length >= (indicatorPeriods.ema26 || 26) && ema26Ref.current && mainVisible.ema26) {
+      ema26Ref.current.setData(calculateEMA(next, indicatorPeriods.ema26 || 26));
+    }
+
+    // ✅ ADD: Update BOLL and redraw canvas
+    if (next.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
+      const calculated = calculateBollingerBands(
+        next, 
+        indicatorPeriods.boll?.period || 20, 
+        indicatorPeriods.boll?.stdDev || 2
+      );
+      if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
+      if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
+      if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
+      
+      // Update BOLL data state
+      setBollData(calculated);
+      
+      // Redraw canvas if fill is visible
+      if (bollFillVisible && bollCanvasRef.current && chartRef.current && candleSeries.current) {
+        requestAnimationFrame(() => {
+          if (bollCanvasRef.current && chartRef.current && candleSeries.current) {
+            drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current, calculated.upper, calculated.lower, indicatorColors.boll?.fill);
+          }
+        });
+      }
+    }
+
     return next;
   });
 };
@@ -1329,6 +1798,12 @@ if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
       }
     } catch {}
 
+    // Cleanup canvas overlay
+    if (bollCanvasRef.current && bollCanvasRef.current.parentElement) {
+      bollCanvasRef.current.parentElement.removeChild(bollCanvasRef.current);
+      bollCanvasRef.current = null;
+    }
+
     controller.abort();
     if (wsRef.current) {
       try {
@@ -1341,15 +1816,19 @@ if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
 
 
   
-// ✅ THÊM logic mới
+// ✅ Toggle MA/EMA only (BOLL has separate header)
 const toggleAllMainIndicators = () => {
-  const hasAnyVisible = Object.values(mainVisible).some(v => v);
+  // Check if any MA/EMA is visible (exclude BOLL)
+  const hasAnyVisible = mainVisible.ma7 || mainVisible.ma25 || mainVisible.ma99 || 
+                        mainVisible.ema12 || mainVisible.ema26;
+  
   const newState: MainIndicatorConfig = {
     ma7: !hasAnyVisible,
     ma25: !hasAnyVisible,
     ma99: !hasAnyVisible,
     ema12: !hasAnyVisible,
     ema26: !hasAnyVisible,
+    boll: mainVisible.boll, // ✅ Keep BOLL state unchanged
   };
   setMainVisible(newState);
   
@@ -1358,6 +1837,7 @@ const toggleAllMainIndicators = () => {
   ma99Ref.current?.applyOptions({ visible: newState.ma99 });
   ema12Ref.current?.applyOptions({ visible: newState.ema12 });
   ema26Ref.current?.applyOptions({ visible: newState.ema26 });
+  // ✅ Don't toggle BOLL here - it has its own toggle
 };
 
 const mainIndicatorValues: IndicatorValue[] = [
@@ -1395,6 +1875,31 @@ const mainIndicatorValues: IndicatorValue[] = [
     value: candles.at(-1)?.close ?? 0,
     color: indicatorColors.ema26!,
     visible: mainVisible.ema26,
+  },
+].filter(Boolean) as IndicatorValue[];
+
+// ✅ SEPARATE: BOLL indicator values (render in its own header)
+const bollIndicatorValues: IndicatorValue[] = [
+  mainVisible.boll && bollData && {
+    name: 'BOLL',
+    period: indicatorPeriods.boll?.period ?? 20,
+    stdDev: indicatorPeriods.boll?.stdDev ?? 2,
+    value: bollData.upper.at(-1)?.value ?? 0,
+    label: 'UP',
+    color: indicatorColors.boll?.upper ?? '#B385F8',
+    visible: mainVisible.boll,
+    extraValues: [
+      {
+        label: 'MB',
+        value: bollData.middle.at(-1)?.value ?? 0,
+        color: indicatorColors.boll?.middle ?? '#EB40B5',
+      },
+      {
+        label: 'DN',
+        value: bollData.lower.at(-1)?.value ?? 0,
+        color: indicatorColors.boll?.lower ?? '#B385F8',
+      },
+    ],
   },
 ].filter(Boolean) as IndicatorValue[];
 
@@ -1499,6 +2004,82 @@ const volumeIndicatorValues: IndicatorValue[] = [
   };
 }, []);
 
+  // ✅ ADD: Redraw canvas when bollFillVisible changes
+  useEffect(() => {
+    if (!bollCanvasRef.current || !chartRef.current || !candleSeries.current || !bollData) return;
+    
+    if (bollFillVisible && mainVisible.boll) {
+      // Draw fill
+      drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current, bollData.upper, bollData.lower, indicatorColors.boll?.fill);
+    } else {
+      // Clear fill
+      const ctx = bollCanvasRef.current.getContext('2d');
+      ctx?.clearRect(0, 0, bollCanvasRef.current.width, bollCanvasRef.current.height);
+    }
+  }, [bollFillVisible, bollData, mainVisible.boll]);
+
+useEffect(() => {
+  // ✅ Đổi từ chartContainerRef thành mainChartContainerRef
+  if (!mainChartContainerRef.current || !chartRef.current) return;
+
+  let animationFrameId: number | null = null;
+
+  const handleResize = () => {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
+
+    animationFrameId = requestAnimationFrame(() => {
+      // ✅ Đổi ở đây nữa
+      if (!mainChartContainerRef.current || !chartRef.current) return;
+
+      try {
+        // ✅ Và đây
+        const container = mainChartContainerRef.current;
+        const { clientWidth, clientHeight } = container;
+
+        if (clientWidth > 0 && clientHeight > 0) {
+          chartRef.current.applyOptions({
+            width: Math.floor(clientWidth),
+            height: Math.floor(clientHeight),
+          });
+
+          console.log(`[Chart Auto Resize] ${clientWidth}x${clientHeight}`);
+        }
+      } catch (error) {
+        console.error('[Chart Resize Error]', error);
+      }
+    });
+  };
+
+  // ResizeObserver to detect container size changes
+  const resizeObserver = new ResizeObserver((entries) => {
+    if (entries.length > 0) {
+      handleResize();
+    }
+  });
+
+  // ✅ Đổi ở đây
+  if (mainChartContainerRef.current) {
+    resizeObserver.observe(mainChartContainerRef.current);
+  }
+
+  // Window resize listener as backup
+  window.addEventListener('resize', handleResize);
+
+  // Trigger initial resize
+  const initialTimer = setTimeout(handleResize, 100);
+
+  return () => {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
+    resizeObserver.disconnect();
+    window.removeEventListener('resize', handleResize);
+    clearTimeout(initialTimer);
+  };
+}, []); // Run once after mount
+
   return (
     <div className="h-full w-full min-w-0 relative">
 
@@ -1507,7 +2088,7 @@ const volumeIndicatorValues: IndicatorValue[] = [
   <LineIndicatorHeader
     type="main"
     indicators={mainIndicatorValues}
-    visible={Object.values(mainVisible).some(v => v)}
+    visible={mainVisible.ma7 || mainVisible.ma25 || mainVisible.ma99 || mainVisible.ema12 || mainVisible.ema26}
     onToggleVisible={toggleAllMainIndicators}
     onOpenSetting={() => setShowMainSettings(true)}
     onClose={() => {
@@ -1518,6 +2099,7 @@ const volumeIndicatorValues: IndicatorValue[] = [
         ma99: false,
         ema12: false,
         ema26: false,
+        boll: mainVisible.boll, // ✅ Keep BOLL state when closing main header
       };
       setMainVisible(allOff);
       ma7Ref.current?.applyOptions({ visible: false });
@@ -1529,13 +2111,49 @@ const volumeIndicatorValues: IndicatorValue[] = [
   />
 )}
 
+{/* ✅ SEPARATE BOLL Header - appears below main header */}
+{mainVisible.boll && bollData && (
+  <div className="absolute top-8 left-2 z-10">
+    <LineIndicatorHeader
+      type="main"
+      noPosition={true}
+      indicators={bollIndicatorValues}
+      visible={mainVisible.boll}
+      onToggleVisible={() => {
+        const newState = { ...mainVisible, boll: !mainVisible.boll };
+        setMainVisible(newState);
+        bollUpperRef.current?.applyOptions({ visible: newState.boll });
+        bollMiddleRef.current?.applyOptions({ visible: newState.boll });
+        bollLowerRef.current?.applyOptions({ visible: newState.boll });
+      }}
+      onOpenSetting={() => setShowMainSettings(true)}
+      onClose={() => {
+        // ✅ Close BOLL by clicking X
+        setMainVisible({ ...mainVisible, boll: false });
+        bollUpperRef.current?.applyOptions({ visible: false });
+        bollMiddleRef.current?.applyOptions({ visible: false });
+        bollLowerRef.current?.applyOptions({ visible: false });
+        
+        // Clear canvas
+        if (bollCanvasRef.current) {
+          const ctx = bollCanvasRef.current.getContext('2d');
+          ctx?.clearRect(0, 0, bollCanvasRef.current.width, bollCanvasRef.current.height);
+        }
+      }}
+    />
+  </div>
+)}
+
 {showMainSettings && (
   <LineIndicatorSettings
     type="main"
+    defaultTab={1}
     mainVisible={mainVisible}
+    volumeVisible={volumeVisible}
     periods={indicatorPeriods}
     colors={indicatorColors}
-    onChange={(mainVis, _, __, per, col) => {
+    bollFillVisible={bollFillVisible}
+    onChange={(mainVis, volumeVis, _, per, col, bollFillVis) => {
       if (mainVis) {
         setMainVisible(mainVis);
         ma7Ref.current?.applyOptions({ visible: mainVis.ma7 });
@@ -1543,6 +2161,31 @@ const volumeIndicatorValues: IndicatorValue[] = [
         ma99Ref.current?.applyOptions({ visible: mainVis.ma99 });
         ema12Ref.current?.applyOptions({ visible: mainVis.ema12 });
         ema26Ref.current?.applyOptions({ visible: mainVis.ema26 });
+        bollUpperRef.current?.applyOptions({ visible: mainVis.boll });
+        bollMiddleRef.current?.applyOptions({ visible: mainVis.boll });
+        bollLowerRef.current?.applyOptions({ visible: mainVis.boll });
+        
+        // Update fill visibility
+        if (bollFillVis !== undefined) {
+          setBollFillVisible(bollFillVis);
+        }
+        
+        // Clear or redraw canvas based on visibility
+        if (!mainVis.boll && bollCanvasRef.current) {
+          const ctx = bollCanvasRef.current.getContext('2d');
+          ctx?.clearRect(0, 0, bollCanvasRef.current.width, bollCanvasRef.current.height);
+        } else if (mainVis.boll && bollData && bollCanvasRef.current && chartRef.current) {
+          setTimeout(() => {
+            if (bollCanvasRef.current && chartRef.current) {
+              drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, bollData.upper, bollData.lower);
+            }
+          }, 50);
+        }
+      }
+      if (volumeVis) {
+        setVolumeVisible(volumeVis);
+        mavol1Ref.current?.applyOptions({ visible: volumeVis.mavol1 });
+        mavol2Ref.current?.applyOptions({ visible: volumeVis.mavol2 });
       }
       if (per) setIndicatorPeriods(per);
       if (col) {
@@ -1552,6 +2195,13 @@ const volumeIndicatorValues: IndicatorValue[] = [
         ma99Ref.current?.applyOptions({ color: col.ma99 });
         ema12Ref.current?.applyOptions({ color: col.ema12 });
         ema26Ref.current?.applyOptions({ color: col.ema26 });
+        mavol1Ref.current?.applyOptions({ color: col.mavol1 });
+        mavol2Ref.current?.applyOptions({ color: col.mavol2 });
+        if (col.boll) {
+          bollUpperRef.current?.applyOptions({ color: col.boll.upper });
+          bollMiddleRef.current?.applyOptions({ color: col.boll.middle });
+          bollLowerRef.current?.applyOptions({ color: col.boll.lower });
+        }
       }
       
       // Recalculate if periods changed
@@ -1570,6 +2220,34 @@ const volumeIndicatorValues: IndicatorValue[] = [
         }
         if (candles.length >= (per.ema26 || 26) && ema26Ref.current && mainVis?.ema26) {
           ema26Ref.current.setData(calculateEMA(candles, per.ema26 || 26));
+        }
+        if (candles.length >= (per.boll?.period || 20) && mainVis?.boll) {
+          const calculated = calculateBollingerBands(
+            candles, 
+            per.boll?.period || 20, 
+            per.boll?.stdDev || 2
+          );
+          bollUpperRef.current?.setData(calculated.upper);
+          bollMiddleRef.current?.setData(calculated.middle);
+          bollLowerRef.current?.setData(calculated.lower);
+          
+          // Update canvas
+          setBollData(calculated);
+          setTimeout(() => {
+            if (bollCanvasRef.current && chartRef.current) {
+              drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, calculated.upper, calculated.lower);
+            }
+          }, 50);
+        }
+      }
+      
+      // Recalculate volume MAs if periods changed
+      if (per && volumeData.length > 0) {
+        if (volumeData.length >= (per.mavol1 || 7) && mavol1Ref.current && volumeVis?.mavol1) {
+          mavol1Ref.current.setData(calculateVolumeMA(volumeData, per.mavol1 || 7));
+        }
+        if (volumeData.length >= (per.mavol2 || 14) && mavol2Ref.current && volumeVis?.mavol2) {
+          mavol2Ref.current.setData(calculateVolumeMA(volumeData, per.mavol2 || 14));
         }
       }
     }}
@@ -1870,10 +2548,26 @@ const volumeIndicatorValues: IndicatorValue[] = [
 {showVolumeSettings && (
   <LineIndicatorSettings
     type="volume"
+    defaultTab={2}
+    mainVisible={mainVisible}
     volumeVisible={volumeVisible}
     periods={indicatorPeriods}
     colors={indicatorColors}
-    onChange={(_, volumeVis, __, per, col) => {
+    bollFillVisible={bollFillVisible}
+    onChange={(mainVis, volumeVis, _, per, col, bollFillVis) => {
+      if (mainVis) {
+        setMainVisible(mainVis);
+        ma7Ref.current?.applyOptions({ visible: mainVis.ma7 });
+        ma25Ref.current?.applyOptions({ visible: mainVis.ma25 });
+        ma99Ref.current?.applyOptions({ visible: mainVis.ma99 });
+        ema12Ref.current?.applyOptions({ visible: mainVis.ema12 });
+        ema26Ref.current?.applyOptions({ visible: mainVis.ema26 });
+      }
+      // Handle bollFillVis
+      if (bollFillVis !== undefined) {
+        setBollFillVisible(bollFillVis);
+      }
+      
       if (volumeVis) {
         setVolumeVisible(volumeVis);
         mavol1Ref.current?.applyOptions({ visible: volumeVis.mavol1 });
@@ -1882,11 +2576,35 @@ const volumeIndicatorValues: IndicatorValue[] = [
       if (per) setIndicatorPeriods(per);
       if (col) {
         setIndicatorColors(col);
+        ma7Ref.current?.applyOptions({ color: col.ma7 });
+        ma25Ref.current?.applyOptions({ color: col.ma25 });
+        ma99Ref.current?.applyOptions({ color: col.ma99 });
+        ema12Ref.current?.applyOptions({ color: col.ema12 });
+        ema26Ref.current?.applyOptions({ color: col.ema26 });
         mavol1Ref.current?.applyOptions({ color: col.mavol1 });
         mavol2Ref.current?.applyOptions({ color: col.mavol2 });
       }
       
-      // Recalculate if periods changed
+      // Recalculate main chart MAs if periods changed
+      if (per && candles.length > 0) {
+        if (candles.length >= (per.ma7 || 7) && ma7Ref.current && mainVis?.ma7) {
+          ma7Ref.current.setData(calculateMA(candles, per.ma7 || 7));
+        }
+        if (candles.length >= (per.ma25 || 25) && ma25Ref.current && mainVis?.ma25) {
+          ma25Ref.current.setData(calculateMA(candles, per.ma25 || 25));
+        }
+        if (candles.length >= (per.ma99 || 99) && ma99Ref.current && mainVis?.ma99) {
+          ma99Ref.current.setData(calculateMA(candles, per.ma99 || 99));
+        }
+        if (candles.length >= (per.ema12 || 12) && ema12Ref.current && mainVis?.ema12) {
+          ema12Ref.current.setData(calculateEMA(candles, per.ema12 || 12));
+        }
+        if (candles.length >= (per.ema26 || 26) && ema26Ref.current && mainVis?.ema26) {
+          ema26Ref.current.setData(calculateEMA(candles, per.ema26 || 26));
+        }
+      }
+      
+      // Recalculate volume MAs if periods changed
       if (per && volumeData.length > 0) {
         if (volumeData.length >= (per.mavol1 || 7) && mavol1Ref.current && volumeVis?.mavol1) {
           mavol1Ref.current.setData(calculateVolumeMA(volumeData, per.mavol1 || 7));

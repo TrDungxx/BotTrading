@@ -6,7 +6,7 @@ import { PositionData } from "../../utils/types";
 import PositionTpSlModal from "./function/PositionTpSlModal";
 import { Edit3 } from "lucide-react";
 import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
-
+import { createPortal } from 'react-dom';
 // ===== Helpers =====
 function loadLeverageLS(
   accountId?: number | null,
@@ -837,111 +837,112 @@ useEffect(() => {
     null;
 
   return (
-    <div className="card">
-      <div className="card-header text-[15px] font-semibold text-white">
-        Positions
-      </div>
+  <div className="w-full max-w-full overflow-hidden">
+    {/* ✅ THÊM WRAPPER CHO TABLE */}
+    <div className="position-table-container w-full max-w-full overflow-x-auto">
+      <table className="position-table w-full min-w-[800px] text-sm">
+        <thead>
+          <tr className="border-b border-dark-700 text-left text-xs uppercase tracking-wider text-dark-300">
+            <th className="px-4 py-2">Symbol</th>
+            <th className="px-4 py-2">Size</th>
+            <th className="px-4 py-2">Entry</th>
+            <th className="px-4 py-2">Mark Price</th>
+            <th className="px-4 py-2">PNL(ROI%)</th>
+            
+            {/* ✅ FIX: closePosition header - loại bỏ fixed width */}
+            <th className="closePosition px-2">
+              <div className="flex items-center justify-start space-x-2 min-w-[200px]">
+                {/* ✅ Button 1: Close All Market - rút gọn text */}
+                <button
+                  onClick={handleCloseAllMarket}
+                  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
+                  title="Đóng tất cả Market Order"
+                >
+                  Close All
+                </button>
+                
+                {/* Divider */}
+                <div className="w-[1px] h-[16px] bg-gray-600"></div>
+                
+                {/* ✅ Button 2: Close by PnL - rút gọn text */}
+                <button
+                  onClick={() => setShowPopup(true)}
+                  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
+                  title="Đóng tất cả theo PnL"
+                >
+                  Close by PnL
+                </button>
+              </div>
+            </th>
+          </tr>
+        </thead>
 
-      <div className="card-body overflow-x-auto">
-        <table className="min-w-full text-left text-[13px] leading-[16px] font-sans">
-          <thead>
-            <tr className="text-gray-400 border-b border-dark-700">
-              <th className="px-4 py-2">Symbol</th>
-              <th className="px-4 py-2">Size</th>
-              <th className="px-4 py-2">Entry</th>
-              <th className="px-4 py-2">Mark Price</th>
-              <th className="px-4 py-2">PNL(ROI%)</th>
-              <th
-                className="closePosition flex items-center px-[8px] first:pl-0 last:pr-0 z-[9] h-full"
-                style={{ width: "280px", flex: "1 0 280px" }}
-              >
-                <div className="flex items-center space-x-[8px]">
-                  <div>
-                    <button
-                      onClick={handleCloseAllMarket}
-                      className="text-[#fcd535] text-[12px] hover:underline relative top-[-1px]"
-                    >
-                      Đóng tất cả MKT
-                    </button>
-                  </div>
-                  <div className="w-[1px]  h-[16px] bg-gray-600"></div>
-                  <button
-                    onClick={() => setShowPopup(true)}
-                    className="text-[#fcd535] text-[12px] hover:underline relative top-[-1px]"
-                  >
-                    Đóng tất cả dựa trên PnL
-                  </button>
-                </div>
-              </th>
-            </tr>
-          </thead>
+        <tbody>
+          {positionsView.map((pos) => {
+            const size = parseFloat(pos.positionAmt || "0");
+            const pnl = calculatePnl(pos);
+            const key = rowKey(pos);
+            const step = getStepSize(pos.symbol);
+            const tick = getPriceTick(pos.symbol);
+            const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
+            const mark = Number(pos.markPrice || NaN);
 
-          <tbody>
-            {positionsView.map((pos) => {
-              const size = parseFloat(pos.positionAmt || "0");
-              const pnl = calculatePnl(pos);
-              const key = rowKey(pos);
-              const step = getStepSize(pos.symbol);
-              const tick = getPriceTick(pos.symbol);
-              const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
-              const mark = Number(pos.markPrice || NaN);
+            const pnlClass =
+              pnl == null
+                ? "text-white"
+                : pnl > 0
+                ? "text-[#0ecb81]"
+                : pnl < 0
+                ? "text-[#f6465d]"
+                : "text-white";
 
-              const pnlClass =
-                pnl == null
-                  ? "text-white"
-                  : pnl > 0
-                  ? "text-[#0ecb81]"
-                  : pnl < 0
-                  ? "text-[#f6465d]"
-                  : "text-white";
-
-              const sizeClass =
-                size > 0
-                  ? "text-[#0ecb81]"
-                  : size < 0
-                  ? "text-[#f6465d]"
-                  : "text-white";
+            const sizeClass =
+              size > 0
+                ? "text-[#0ecb81]"
+                : size < 0
+                ? "text-[#f6465d]"
+                : "text-white";
 
               return (
-                <tr
-                  key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
-                  className="border-b border-dark-700"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    {pos.symbol}
-                  </td>
-                  <td className={`px-4 py-3 font-medium ${sizeClass}`}>
-                    {size > 0 ? "" : "-"} {Math.abs(size)}
-                  </td>
-                  <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
+              <tr
+                key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
+                className="border-b border-dark-700"
+              >
+                <td className="px-4 py-3 font-medium text-white">
+                  {pos.symbol}
+                </td>
+                <td className={`px-4 py-3 font-medium ${sizeClass}`}>
+                  {size > 0 ? "" : "-"} {Math.abs(size)}
+                </td>
+                <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
 
-                  <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
+                <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
 
-                  <td className={`px-4 py-3 font-medium ${pnlClass}`}>
-                    {pnl == null
-                      ? "--"
-                      : nearZero(pnl)
-                      ? "0.00"
-                      : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
-                    <br />
-                    <span className="text-xs opacity-80">
-                      {(() => {
-                        const pnlPct = (() => {
-                          const im = getInitialMargin(pos);
-                          if (!im) return undefined;
-                          return (pnl! / im) * 100;
-                        })();
-                        return pnlPct == null
-                          ? "--"
-                          : nearZero(pnlPct)
-                          ? "0.00%"
-                          : `(${pnlPct > 0 ? "+" : "-"}${fmt(
-                              Math.abs(pnlPct),
-                              2
-                            )}%)`;
-                      })()}
-                    </span>
-                  </td>
+                <td className={`px-4 py-3 font-medium ${pnlClass}`}>
+                  {pnl == null
+                    ? "--"
+                    : nearZero(pnl)
+                    ? "0.00"
+                    : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
+                  <br />
+                  <span className="text-xs opacity-80">
+                    {(() => {
+                      const pnlPct = (() => {
+                        const im = getInitialMargin(pos);
+                        if (!im) return undefined;
+                        return (pnl! / im) * 100;
+                      })();
+                      return pnlPct == null
+                        ? "--"
+                        : nearZero(pnlPct)
+                        ? "0.00%"
+                        : `(${pnlPct > 0 ? "+" : "-"}${fmt(
+                            Math.abs(pnlPct),
+                            2
+                          )}%)`;
+                    })()}
+                  </span>
+                </td>
 
                   <td>
                     <div className="flex items-center space-x-2 mt-2">
@@ -1041,75 +1042,80 @@ useEffect(() => {
           </tbody>
         </table>
 
-        <PopupPosition
-          isOpen={showPopup}
-          onClose={() => setShowPopup(false)}
-          pnlNow={currentPnl}
-          takeProfit={targetTP}
-          stopLoss={targetSL}
-          onSubmit={(tp, sl) => {
-            setTargetTP(tp);
-            setTargetSL(sl);
-            setShowPopup(false);
-          }}
-        />
+        {showPopup && createPortal(
+  <PopupPosition
+    isOpen={showPopup}
+    onClose={() => setShowPopup(false)}
+    pnlNow={currentPnl}
+    takeProfit={targetTP}
+    stopLoss={targetSL}
+    onSubmit={(tp, sl) => {
+      setTargetTP(tp);
+      setTargetSL(sl);
+      setShowPopup(false);
+    }}
+  />,
+  document.body
+)}
 
-        {activePos && (
-          <PositionTpSlModal
-            isOpen={showTpSl}
-            onClose={() => setShowTpSl(false)}
-            symbol={activePos.symbol}
-            entryPrice={parseFloat(activePos.entryPrice || "0")}
-            markPrice={getMark(activePos as any) ?? 0}
-            positionAmt={parseFloat(activePos.positionAmt || "0")}
-            getPriceTick={getPriceTick}
-            market={market}
-            leverage={
-              Number((activePos as any)?.leverage) ||
-              loadLeverageLS(
-                (activePos as any)?.internalAccountId ??
-                  (activePos as any)?.accountId ??
-                  null,
-                market,
-                activePos.symbol
-              ) ||
-              1
-            }
-            onSubmit={({ tpPrice, slPrice, trigger }) => {
-              sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
-            }}
-          />
-        )}
+        {activePos && showTpSl && createPortal(
+  <PositionTpSlModal
+    isOpen={showTpSl}
+    onClose={() => setShowTpSl(false)}
+    symbol={activePos.symbol}
+    entryPrice={parseFloat(activePos.entryPrice || "0")}
+    markPrice={getMark(activePos as any) ?? 0}
+    positionAmt={parseFloat(activePos.positionAmt || "0")}
+    getPriceTick={getPriceTick}
+    market={market}
+    leverage={
+      Number((activePos as any)?.leverage) ||
+      loadLeverageLS(
+        (activePos as any)?.internalAccountId ??
+          (activePos as any)?.accountId ??
+          null,
+        market,
+        activePos.symbol
+      ) ||
+      1
+    }
+    onSubmit={({ tpPrice, slPrice, trigger }) => {
+      sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
+    }}
+  />,
+  document.body
+)}
 
-        {closeModal.open && closeModal.pos && (
-          <ClosePositionModal
-            isOpen={closeModal.open}
-            onClose={() => setCloseModal({ open: false, mode: "market" })}
-            mode={closeModal.mode}
-            symbol={closeModal.pos.symbol}
-            side={Number(closeModal.pos.positionAmt || 0) > 0 ? "SELL" : "BUY"}
-            positionSide={
-              Number(closeModal.pos.positionAmt || 0) > 0 ? "LONG" : "SHORT"
-            }
-            markPrice={Number(closeModal.pos.markPrice || NaN)}
-            entryPrice={Number(closeModal.pos.entryPrice || NaN)}
-            maxQty={Math.abs(Number(closeModal.pos.positionAmt || 0))}
-            stepSize={getStepSize(closeModal.pos.symbol)}
-            tickSize={getPriceTick(closeModal.pos.symbol)}
-            price={closeBy[rowKey(closeModal.pos)]?.price}
-            qty={closeBy[rowKey(closeModal.pos)]?.qty}
-            onInputsChange={(next) =>
-              setCloseBy((prev) => ({
-                ...prev,
-                [rowKey(closeModal.pos!)]: {
-                  ...(prev[rowKey(closeModal.pos!)] || {}),
-                  ...next,
-                },
-              }))
-            }
-            onConfirm={handleConfirmClose}
-          />
-        )}
+       {closeModal.open && closeModal.pos && createPortal(
+  <ClosePositionModal
+    isOpen={closeModal.open}
+    onClose={() => setCloseModal({ open: false, mode: "market" })}
+    mode={closeModal.mode}
+    symbol={closeModal.pos.symbol}
+    side={Number(closeModal.pos.positionAmt || 0) > 0 ? "SELL" : "BUY"}
+    positionSide={
+      Number(closeModal.pos.positionAmt || 0) > 0 ? "LONG" : "SHORT"
+    }
+    markPrice={Number(closeModal.pos.markPrice || NaN)}
+    entryPrice={Number(closeModal.pos.entryPrice || NaN)}
+    maxQty={Math.abs(Number(closeModal.pos.positionAmt || 0))}
+    stepSize={getStepSize(closeModal.pos.symbol)}
+    tickSize={getPriceTick(closeModal.pos.symbol)}
+    price={closeBy[rowKey(closeModal.pos)]?.price}
+    qty={closeBy[rowKey(closeModal.pos)]?.qty}
+    onInputsChange={(next) =>
+      setCloseBy((prev) => ({
+        ...prev,
+        [rowKey(closeModal.pos!)]: {
+          ...(prev[rowKey(closeModal.pos!)] || {}),
+          ...next,
+        },
+      }))
+    }
+    onConfirm={handleConfirmClose}
+  />,
+  document.body
+)}
       </div>
     </div>
   );

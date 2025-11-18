@@ -1,0 +1,237 @@
+/* ============================================
+   COMPACT TRADING FORM - UNIVERSAL STYLES
+   Force compact layout for all form elements
+   ============================================ */
+
+/* Main container */
+.trading-form-content {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.75rem !important;
+  padding: 0.75rem !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+/* All direct children - reduce spacing */
+.trading-form-content > * {
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+}
+
+/* All buttons - compact */
+.trading-form-content button {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+}
+
+/* All inputs - compact */
+.trading-form-content input[type="text"],
+.trading-form-content input[type="number"] {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+}
+
+/* All selects - compact */
+.trading-form-content select {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  height: auto !important;
+}
+
+/* All labels - compact */
+.trading-form-content label {
+  font-size: 0.75rem !important;
+  margin-bottom: 0.25rem !important;
+  display: block;
+}
+
+/* Flex containers (button groups) - compact */
+.trading-form-content > div[class*="flex"],
+.trading-form-content > div[style*="display: flex"] {
+  gap: 0.5rem !important;
+}
+
+/* Grid containers - compact */
+.trading-form-content > div[class*="grid"],
+.trading-form-content > div[style*="display: grid"] {
+  gap: 0.5rem !important;
+}
+
+/* Range sliders - compact */
+.trading-form-content input[type="range"] {
+  height: 6px !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Text sizing - reduce everywhere */
+.trading-form-content {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+
+.trading-form-content * {
+  box-sizing: border-box !important;
+}
+
+/* Scrollbar - subtle */
+.trading-form-content::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.trading-form-content::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.trading-form-content::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5) !important;
+  border-radius: 2px !important;
+}
+
+/* ============================================
+   SPECIFIC REDUCTIONS
+   ============================================ */
+
+/* Remove excessive padding from sections */
+.trading-form-content > div > div {
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+
+/* Balance display - single line */
+.trading-form-content [class*="balance"],
+.trading-form-content [class*="available"] {
+  padding: 0.5rem 0.75rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Summary section - compact */
+.trading-form-content [class*="summary"] {
+  padding: 0.5rem !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Last button (submit) - sticky at bottom */
+.trading-form-content > button:last-child,
+.trading-form-content > div:last-child > button {
+  margin-top: auto !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  background: var(--bg-panel) !important;
+  padding: 0.75rem !important;
+  z-index: 10 !important;
+}
+
+/* ============================================
+   RESPONSIVE OVERRIDES
+   ============================================ */
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .trading-form-content {
+    padding: 0.625rem !important;
+    gap: 0.625rem !important;
+  }
+  
+  .trading-form-content button {
+    padding: 0.4rem 0.625rem !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .trading-form-content input,
+  .trading-form-content select {
+    padding: 0.4rem 0.625rem !important;
+    font-size: 0.8125rem !important;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1549px) {
+  .trading-form-content {
+    padding: 0.75rem !important;
+    gap: 0.75rem !important;
+  }
+}
+/* ============================================
+   CRITICAL FIX: Trading Form Full Height
+   ============================================ */
+
+.trading-form-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+.trading-form-content {
+  flex: 1 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  
+  /* Compact spacing */
+  padding: 0.75rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.75rem !important;
+}
+
+/* All children compact */
+.trading-form-content > * {
+  flex-shrink: 0;
+  margin: 0 !important;
+}
+
+/* Buttons compact */
+.trading-form-content button {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.8125rem !important;
+}
+
+/* Inputs compact */
+.trading-form-content input,
+.trading-form-content select {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+/* Labels compact */
+.trading-form-content label {
+  font-size: 0.75rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* Flex/Grid containers */
+.trading-form-content > div[class*="flex"],
+.trading-form-content > div[style*="display: flex"],
+.trading-form-content > div[style*="display:flex"] {
+  gap: 0.5rem !important;
+}
+
+/* Submit button at bottom */
+.trading-form-content > button:last-child,
+.trading-form-content > div:last-child button {
+  margin-top: auto !important;
+}
+
+/* Subtle scrollbar */
+.trading-form-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.trading-form-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.trading-form-content::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-radius: 2px;
+}
+
+.trading-form-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}

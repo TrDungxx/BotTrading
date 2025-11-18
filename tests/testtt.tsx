@@ -1,2507 +1,1944 @@
-import React, { useEffect, useState } from "react";
-import { binancePublicWS } from "../binancewebsocket/binancePublicWS";
-import { binanceWS } from "../binancewebsocket/BinanceWebSocketService";
-import PopupPosition from "../popupposition/PopupPosition";
-import { PositionData } from "../../utils/types";
-import PositionTpSlModal from "./function/PositionTpSlModal";
-import { Edit3 } from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  BarChart,
+  RefreshCw,
+  Share2,
+  Star,
+  Settings,
+  Maximize2,
+  TrendingUp,
+  Volume2,
+  Activity,
+  Wifi,
+  WifiOff,
+  X,
+} from "lucide-react";
+import TradingBinance from "../components/common/TradingBinance";
+import { FormattedMessage, FormattedNumber } from "react-intl";
+import TradingViewChart from "../components/common/TradingViewChart";
+import { CandlestickData } from "lightweight-charts";
+import { fetchHistoricalKlines } from "../utils/fetchKline";
+import { ExtendedCandle } from "../utils/types";
+import { Order } from "../utils/types";
+import SymbolDropdown from "../components/symboldropdown/SymbolDropdown";
+import symbolList from "../utils/symbolList";
+import TradingForm from "../components/common/TradingForm";
+import { useMiniTickerStore } from "../utils/miniTickerStore";
+import { binanceWS } from "../components/binancewebsocket/BinanceWebSocketService";
+import { toast } from "react-toastify";
+import { AlertTriangle } from "lucide-react";
+import OrderOpenHistory from "../components/orderlayout/OrderOpenHistory";
+import SettingControl from "../components/common/controlsetting/SetiingControl";
+import { BinanceAccount } from "../utils/types";
+import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
+import { useAuth } from "../context/AuthContext";
+import { User } from "../utils/types";
+import { PositionData, FloatingInfo } from "../utils/types";
+import PositionFunction from "../components/common/PositionFunction";
+import ChartTypePanel, { ChartType } from "../components/layoutchart/Charttypepanel";
+// ✅ THÊM
+import TimeframeModalWrapper from "./layout panel/Timeframemodalwrapper";
+// Trạng thái kết nối WS
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
-// ngay đầu file Position.tsx hoặc cùng chỗ helpers
-function loadLeverageLS(
-  accountId?: number | null,
-  market?: 'spot' | 'futures',
-  symbol?: string
-) {
-  const key = `tw_leverage_${accountId ?? 'na'}_${market ?? 'futures'}_${symbol ?? ''}`;
-  const raw = localStorage.getItem(key);
-  const v = raw ? Number(raw) : NaN;
-  return Number.isFinite(v) && v > 0 ? v : undefined;
-}
+// Loại thị trường
+type MarketType = "spot" | "futures";
 
-
-// mở rộng cho phần tính toán/hiển thị
-type PositionCalc = PositionData & {
-  breakEvenPrice?: string; // bep
-  unrealizedPnl?: number; // up
-  leverage?: number; // l
-  marginType?: string; // 'cross' | 'isolated'
-  isolatedWallet?: number; // iw
-  positionInitialMargin?: number; // từ positionRisk
-  positionSide?: "LONG" | "SHORT" | "BOTH";
+export type ChartSettings = {
+  quickOrder: boolean; // Lệnh nhanh
+  pendingOrders: boolean; // Lệnh chờ
+  positionTag: boolean; // Vị thế (Floating)
+  orderHistory: boolean; // Lịch sử đặt lệnh
+  breakEven: boolean; // Giá hòa vốn
+  liquidation: boolean; // Giá thanh lý
+  alerts: boolean; // Cảnh báo giá
+  priceLine: boolean; // Đường giá
+  scale: boolean; // Thang đo
 };
 
-interface PositionProps {
-  positions?: PositionData[];
-  market?: "spot" | "futures";
-  onPositionCountChange?: (n: number) => void;
-  onFloatingInfoChange?: (
-    info: {
-      symbol: string;
-      pnl: number;
-      roi: number;
-      price: number;
-      positionAmt: number;
-    } | null
-  ) => void;
+// Dữ liệu thị trường
+interface KlineData {
+  symbol: string;
+  interval: string;
+  openTime: number;
+  closeTime: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  trades: number;
+  baseAssetVolume: string;
+  quoteAssetVolume: string;
 }
 
-const Position: React.FC<PositionProps> = ({
-  positions: externalPositions,
-  market = "futures",
-  onPositionCountChange,
-  onFloatingInfoChange,
-}) => {
-  const [positions, setPositions] = useState<PositionCalc[]>([]);
-  const [orderType, setOrderType] = useState<"market" | "limit">("market");
-  const [closePrice, setClosePrice] = useState("");
-  const [closeQuantity, setCloseQuantity] = useState("");
-  const [showPopup, setShowPopup] = useState(false);
-  const [targetTP, setTargetTP] = useState("");
-  const [targetSL, setTargetSL] = useState("");
-  const [currentPnl, setCurrentPnl] = useState(0);
+interface TickerData {
+  symbol: string;
+  priceChange: string;
+  priceChangePercent: string;
+  weightedAvgPrice: string;
+  prevClosePrice: string;
+  lastPrice: string;
+  lastQty: string;
+  bidPrice: string;
+  askPrice: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  volume: string;
+  quoteVolume: string;
+  openTime: number;
+  closeTime: number;
+  count: number;
+}
 
-  // TP/SL modal
-  const [showTpSl, setShowTpSl] = useState(false);
-  const [activePos, setActivePos] = useState<PositionData | null>(null);
+interface OrderBookEntry {
+  price: string;
+  quantity: string;
+  total?: number;
+}
 
-  // tick size cho giá
-  const symbolTickMap: Record<string, number> = {};
-  const getPriceTick = (symbol: string) => symbolTickMap[symbol] ?? 0.0001;
+interface OrderBookData {
+  symbol: string;
+  lastUpdateId: number;
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+}
 
-  // step size cho khối lượng
-  const symbolStepMap: Record<string, number> = {};
-  const getStepSize = (symbol: string) => symbolStepMap[symbol] ?? 0.001;
-  const roundToStep = (qty: number, step: number) => {
-    if (step <= 0) return qty;
-    const precision = Math.max(0, (step.toString().split(".")[1] || "").length);
-    return Number((Math.floor(qty / step) * step).toFixed(precision));
-  };
+interface TradeData {
+  symbol: string;
+  tradeId: number;
+  price: string;
+  qty: string;
+  time: number;
+  isBuyerMaker: boolean;
+}
 
-  const sendTpSlOrders = (
-    pos: PositionData,
-    tpPrice?: number,
-    slPrice?: number,
-    trigger: "MARK" | "LAST" = "MARK"
-  ) => {
-    const size = parseFloat(pos.positionAmt || "0");
-    if (!size) return;
-    const positionSide = (size > 0 ? "LONG" : "SHORT") as "LONG" | "SHORT";
-    const qty = Math.abs(size);
+interface BookTickerData {
+  symbol: string;
+  bidPrice: string;
+  bidQty: string;
+  askPrice: string;
+  askQty: string;
+  updateId: number;
+}
 
-    if (tpPrice && tpPrice > 0) {
-      binanceWS.placeOrder({
-        symbol: pos.symbol,
-        market: "futures",
-        type: "TAKE_PROFIT_MARKET",
-        side: size > 0 ? "SELL" : "BUY",
-        positionSide,
-        stopPrice: tpPrice,
-        workingType: trigger,
-        quantity: qty,
+interface MiniTickerData {
+  symbol: string;
+  close: string;
+  open: string;
+  high: string;
+  low: string;
+  volume: string;
+  quoteVolume: string;
+  eventTime: number;
+  percentChange: string;
+}
+
+// Account (cho stream private)
+interface AccountInfo {
+  makerCommission: number;
+  takerCommission: number;
+  buyerCommission: number;
+  sellerCommission: number;
+  canTrade: boolean;
+  canWithdraw: boolean;
+  canDeposit: boolean;
+  balances: Array<{
+    asset: string;
+    free: string;
+    locked: string;
+  }>;
+}
+
+interface OrderUpdate {
+  symbol: string;
+  orderId: number;
+  orderListId: number;
+  clientOrderId: string;
+  price: string;
+  origQty: string;
+  executedQty: string;
+  cummulativeQuoteQty: string;
+  status: string;
+  timeInForce: string;
+  type: string;
+  side: string;
+  stopPrice: string;
+  icebergQty: string;
+  time: number;
+  updateTime: number;
+  isWorking: boolean;
+}
+
+interface Subscription {
+  id: string;
+  action: string;
+  symbol?: string;
+  market?: MarketType;
+  interval?: string;
+  levels?: string;
+  speed?: string;
+  connectionId?: string;
+  timestamp: number;
+}
+interface SymbolItem {
+  symbol: string;
+  price: number;
+  percentChange: number;
+  volume: number;
+}
+
+interface Position {
+  symbol: string;
+  positionSide: string;
+  positionAmt: string;
+}
+interface Order {
+  orderId: number;
+  symbol: string;
+  status: string;
+  positionSide: "LONG" | "SHORT" | "BOTH";
+}
+
+// WS public tuỳ chỉnh cho bảng phụ (kline/ticker/depth/trade/miniTicker)
+class CustomWebSocketService {
+  private ws: WebSocket | null = null;
+  private subscriptions: Map<string, Subscription> = new Map();
+  private callbacks: Map<string, (data: any) => void> = new Map();
+  private isAuthenticated = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private authToken: string | null = null;
+  private binanceAccountId: number | null = null;
+  private isConnected = false;
+  public onStatusChange: (status: ConnectionStatus) => void = () => {};
+
+  constructor() {
+    this.connect();
+  }
+
+  private messageQueue: any[] = [];
+
+  private connect() {
+    try {
+      this.onStatusChange("connecting");
+
+      this.ws = new WebSocket(
+        "ws://45.77.33.141/w-binance-socket/signalr/connect"
+      );
+
+      this.ws.onopen = () => {
+        console.log("✅ WebSocket connected");
+        this.onStatusChange("connected");
+        this.isConnected = true;
+
+        // gửi lại các message đã queue
+        this.messageQueue.forEach((msg) => {
+          if (this.ws?.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(msg));
+          }
+        });
+        this.messageQueue = [];
+
+        // đăng ký mặc định tối thiểu
+        const subs = [
+          { action: "subscribePublicTicker", symbol: "BTCUSDT" },
+          { action: "subscribePublicKline", symbol: "BTCUSDT", interval: "1m" },
+          { action: "subscribePublicTrade", symbol: "BTCUSDT" },
+        ];
+        subs.forEach((msg) => this.sendMessage(msg));
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        } catch (error) {
+          console.error("❌ Error parsing message:", error);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("❌ WebSocket error:", error);
+        this.onStatusChange("error");
+        this.isConnected = false;
+      };
+
+      this.ws.onclose = () => {
+        console.warn("🔌 WebSocket closed. Reconnecting...");
+        this.onStatusChange("disconnected");
+        this.isConnected = false;
+        this.attemptReconnect();
+      };
+    } catch (error) {
+      console.error("❌ Failed to connect WebSocket:", error);
+      this.onStatusChange("error");
+    }
+  }
+
+  private handleMessage(data: any) {
+    if (data.action) {
+      switch (data.action) {
+        case "klineUpdate":
+          this.handleKlineData(data);
+          break;
+        case "tickerUpdate":
+          this.handleTickerData(data);
+          break;
+        case "depthUpdate":
+          this.handleDepthData(data);
+          break;
+        case "tradeUpdate":
+          this.handleTradeData(data);
+          break;
+        case "bookTickerUpdate":
+          this.handleBookTickerData(data);
+          break;
+        case "miniTickerUpdate":
+          this.handleMiniTickerData(data);
+          break;
+        case "accountUpdate":
+          this.handleAccountData(data);
+          break;
+        case "orderUpdate":
+          this.handleOrderData(data);
+          break;
+        case "subscriptionList":
+          this.handleSubscriptionList(data);
+          break;
+        default:
+          // không cần cảnh báo
+          break;
+      }
+    } else if (data.type) {
+      switch (data.type) {
+        case "kline":
+          this.handleKlineData(data);
+          break;
+        case "ticker":
+          this.handleTickerData(data);
+          break;
+        case "depth":
+          this.handleDepthData(data);
+          break;
+        case "trade":
+          this.handleTradeData(data);
+          break;
+        case "bookTicker":
+          this.handleBookTickerData(data);
+          break;
+        case "miniTicker":
+          this.handleMiniTickerData(data);
+          break;
+        case "account":
+          this.handleAccountData(data);
+          break;
+        case "order":
+          this.handleOrderData(data);
+          break;
+        case "connection_status":
+          break;
+        case "welcome":
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  private handleKlineData(data: any) {
+    const callback = this.callbacks.get("kline");
+    if (!callback) return;
+
+    const kline = data.data;
+
+    if (
+      kline &&
+      kline.open !== undefined &&
+      kline.high !== undefined &&
+      kline.low !== undefined &&
+      kline.close !== undefined &&
+      kline.volume !== undefined
+    ) {
+      callback({
+        symbol: kline.symbol || "",
+        interval: kline.interval || "",
+        openTime: kline.openTime,
+        closeTime: kline.closeTime,
+        open: kline.open,
+        high: kline.high,
+        low: kline.low,
+        close: kline.close,
+        volume: kline.volume,
+        trades: kline.trades || 0,
+        baseAssetVolume: kline.baseAssetVolume || "",
+        quoteAssetVolume: kline.quoteAssetVolume || "",
       });
+    } else {
+      console.warn("⚠️ Invalid kline data received:", kline);
+    }
+  }
+
+  private handleTickerData(data: any) {
+    const callback = this.callbacks.get("ticker");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleDepthData(data: any) {
+    const callback = this.callbacks.get("depth");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleTradeData(data: any) {
+    const callback = this.callbacks.get("trade");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleBookTickerData(data: any) {
+    const callback = this.callbacks.get("bookTicker");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleMiniTickerData(data: any) {
+    const symbol = data?.data?.symbol;
+    const callback = this.callbacks.get(`miniTicker_${symbol}`);
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleAccountData(data: any) {
+    const callback = this.callbacks.get("account");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleOrderData(data: any) {
+    const callback = this.callbacks.get("orders");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleSubscriptionList(data: any) {
+    console.log("📋 Active subscriptions:", data.subscriptions);
+  }
+
+  private attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = this.reconnectDelay * this.reconnectAttempts;
+      console.log(
+        `🔄 Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`
+      );
+      setTimeout(() => {
+        this.connect();
+      }, delay);
+    } else {
+      console.error("❌ Max reconnection attempts reached");
+      this.onStatusChange("error");
+    }
+  }
+
+  private resubscribeAll() {
+    this.subscriptions.forEach((subscription) => {
+      this.sendMessage(subscription);
+    });
+  }
+
+  private sendMessage(message: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      this.messageQueue.push(message);
+    }
+  }
+
+  public setStatusCallback(callback: (status: ConnectionStatus) => void) {
+    this.onStatusChange = callback;
+  }
+
+  public setAuthToken(token: string, binanceAccountId: number) {
+    this.authToken = token;
+    this.binanceAccountId = binanceAccountId;
+    this.isAuthenticated = true;
+  }
+
+  // PUBLIC STREAMS
+  public subscribeKline(
+    symbol: string,
+    interval: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `kline_${symbol}_${interval}_${market}`;
+    const message = {
+      action: "subscribeKline",
+      market,
+      symbol,
+      interval,
+    };
+
+    if (callback) {
+      this.callbacks.set("kline", callback);
     }
 
-    if (slPrice && slPrice > 0) {
-      binanceWS.placeOrder({
-        symbol: pos.symbol,
-        market: "futures",
-        type: "STOP_MARKET",
-        side: size > 0 ? "SELL" : "BUY",
-        positionSide,
-        stopPrice: slPrice,
-        workingType: trigger,
-        quantity: qty,
-      });
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeKline",
+      symbol,
+      market,
+      interval,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `ticker_${symbol}_${market}`;
+    const message = {
+      action: "subscribeTicker",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("ticker", callback);
     }
-  };
 
-  // ---------- FORMAT HIỂN THỊ (tránh bị 0.00) ----------
-  const fmtUSDT = (x: number) => {
-    const ax = Math.abs(x);
-    if (ax >= 1)   return `${x.toFixed(2)} USDT`;
-    if (ax >= 0.01) return `${x.toFixed(3)} USDT`;
-    if (ax >= 0.001) return `${x.toFixed(4)} USDT`;
-    return `${x.toFixed(6)} USDT`;
-  };
-  const fmtPct = (x: number) => {
-    const ax = Math.abs(x);
-    if (ax >= 1)   return `${x.toFixed(2)}%`;
-    if (ax >= 0.1) return `${x.toFixed(3)}%`;
-    return `${x.toFixed(4)}%`;
-  };
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeTicker",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
 
-  const fmtShort = (x: number) => {
-  if (!Number.isFinite(x)) return "0.00";
-  return x.toFixed(2);
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeDepth(
+    symbol: string,
+    levels: string = "20",
+    speed: string = "1000ms",
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `depth_${symbol}_${levels}_${speed}_${market}`;
+    const message = {
+      action: "subscribePublicDepth",
+      symbol,
+      levels,
+      speed,
+    };
+
+    if (callback) {
+      this.callbacks.set("depth", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicDepth",
+      symbol,
+      market,
+      levels,
+      speed,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTrade(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `trade_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicTrade",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("trade", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicTrade",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeBookTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `bookTicker_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicBookTicker",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("bookTicker", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicBookTicker",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeMiniTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `miniTicker_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicMiniTicker",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set(`miniTicker_${symbol}`, callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicMiniTicker",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // FUTURES
+  public subscribeMarkPrice(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `markPrice_${symbol}_${market}`;
+    const message = {
+      action: "subscribeMarkPrice",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("markPrice", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeMarkPrice",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeFundingRate(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `fundingRate_${symbol}_${market}`;
+    const message = {
+      action: "subscribeFundingRate",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("fundingRate", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeFundingRate",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // PRIVATE STREAMS (auth)
+  public subscribeAccount(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `account_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateAccount",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("account", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateAccount",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeOrders(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `orders_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateOrders",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("orders", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateOrders",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTrades(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `trades_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateTrades",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("trades", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateTrades",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // Điều khiển
+  public getSubscriptions() {
+    const message = {
+      action: "getSubscriptions",
+    };
+    this.sendMessage(message);
+    return Array.from(this.subscriptions.values());
+  }
+
+  public unsubscribe(connectionId?: string) {
+    const message = {
+      action: "unsubscribe",
+      ...(connectionId && { connectionId }),
+    };
+
+    if (connectionId) {
+      this.subscriptions.delete(connectionId);
+      this.callbacks.delete(connectionId);
+    } else {
+      this.subscriptions.clear();
+      this.callbacks.clear();
+    }
+
+    this.sendMessage(message);
+  }
+
+  public disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.subscriptions.clear();
+    this.callbacks.clear();
+    this.onStatusChange("disconnected");
+    console.log("🔌 WebSocket disconnected");
+  }
+}
+
+const DEFAULT_SETTINGS: ChartSettings = {
+  quickOrder: false,
+  pendingOrders: false,
+  positionTag: true, // đang dùng
+  orderHistory: false,
+  breakEven: false,
+  liquidation: false,
+  alerts: false,
+  priceLine: false,
+  scale: false,
 };
-// 🔹 helper tránh hiển thị -0.00
-  const nearZero = (v: number, eps = 1e-6) => Math.abs(v) < eps;
-  // Chuẩn hóa và cập nhật positions (KHÔNG dính localStorage)
-  const applyPositions = React.useCallback((raw: any[]) => {
-    const cleaned: PositionCalc[] = (raw || []).map((p: any) => {
-  const symbol = String(p.symbol ?? p.s);
-  const levFromPkt = Number(p.leverage ?? p.l);
-  const levHydrate = Number.isFinite(levFromPkt) && levFromPkt > 0
-    ? levFromPkt
-    : binanceWS.getLeverage(symbol, 'futures', NaN); // ← lấy từ cache/LS nếu có
 
-  const upNum = Number(p.up ?? p.unrealizedPnl);
-  return {
-    symbol,
-    positionAmt: String(p.positionAmt ?? p.pa ?? "0"),
-    entryPrice: String(p.entryPrice ?? p.ep ?? "0"),
-    breakEvenPrice: String(p.breakEvenPrice ?? p.bep ?? p.ep ?? "0"),
-    markPrice: p.markPrice ?? p.mp,
-    leverage: Number.isFinite(levHydrate) && levHydrate > 0 ? levHydrate : undefined, // ← set
-    marginType: (p.marginType ?? p.mt ?? "").toString().toLowerCase(),
-    isolatedWallet:
-      p.iw !== undefined ? Number(p.iw)
-      : p.isolatedWallet !== undefined ? Number(p.isolatedWallet)
-      : undefined,
-    unrealizedPnl: Number.isFinite(upNum) ? upNum : undefined,
-    positionInitialMargin:
-      p.positionInitialMargin !== undefined ? Number(p.positionInitialMargin) : undefined,
-    positionSide: p.ps || p.positionSide,
-  } as PositionCalc;
-}).filter(p => Math.abs(parseFloat(p.positionAmt)) > 1e-9);
+export default function TradingTerminal() {
+  const hasConnectedRef = React.useRef(false);
+
+  const [openOrders, setOpenOrders] = useState<Order[]>([]);
+  const [livePrice, setLivePrice] = useState<number>(0);
+  const [positions, setPositions] = useState<PositionData[]>([]);
+  const [currentOrders, setCurrentOrders] = useState<Order[]>(() => {
+    const stored = localStorage.getItem("openOrders");
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  const settingRef = useRef<HTMLDivElement>(null);
+  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
+    null
+  );
+  const [candles, setCandles] = useState<ExtendedCandle[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
+  const miniTickerCallbacks = useRef<
+    Map<string, (data: MiniTickerData) => void>
+  >(new Map());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
+    const stored = localStorage.getItem("favoriteSymbols");
+    return stored ? JSON.parse(stored) : [];
+  });
+  const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">(
+    "all"
+  );
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const token = localStorage.getItem("token") || "";
+  const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
+
+  // State chính
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+    return localStorage.getItem("selectedSymbol") || "BTCUSDT";
+  });
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
+  // ✅ MỚI:
+const [selectedInterval, setSelectedInterval] = useState(() => {
+  return localStorage.getItem("selectedInterval") || "1m";
+});
+
+useEffect(() => {
+  if (selectedInterval) {
+    localStorage.setItem("selectedInterval", selectedInterval);
+  }
+}, [selectedInterval]);
 
 
-    setPositions(cleaned);
-    onPositionCountChange?.(cleaned.length);
-    if (!cleaned.length) onFloatingInfoChange?.(null);
-  }, [onPositionCountChange, onFloatingInfoChange]);
 
-  // Kéo snapshot 1 lần khi mount (để có leverage/iw sớm)
-  useEffect(() => { binanceWS.getFuturesAccount(); }, []);
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
+  const [wsService] = useState(() => new CustomWebSocketService());
+  const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
+  const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
+const [chartType, setChartType] = useState<ChartType>('Candles');
 
-  // Có position → yêu cầu backfill (WS sẽ fallback về getFuturesAccount nếu BE không có positionRisk)
-  useEffect(() => {
-    if (!positions.length) return;
-    const symbols = Array.from(new Set(positions.map(p => p.symbol))).filter(Boolean);
-    if (symbols.length) binanceWS.requestPositionRisk(symbols);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions.map(p => p.symbol).join("|")]);
+// ✅ NEW: State cho TimeframeSelector
+const [showTimeframeSelector, setShowTimeframeSelector] = useState(false);
 
-  // Lắng nghe leverage change + snapshot + (nếu có) positionRisk
-  useEffect(() => {
-  const onWs = (m: any) => {
-    // sự kiện đổi đòn bẩy real-time
-    if (m?.e === "ACCOUNT_CONFIG_UPDATE" && m.ac?.s && Number.isFinite(m.ac.l)) {
-      const { s: symbol, l: leverage } = m.ac;
-      setPositions(prev => prev.map(p => p.symbol === symbol ? { ...p, leverage: Number(leverage) } : p));
-    }
+const [pinnedTimeframes, setPinnedTimeframes] = useState<string[]>(() => {
+  const stored = localStorage.getItem("pinnedTimeframes");
+  return stored ? JSON.parse(stored) : ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+});
+const handleSaveTimeframes = useCallback((selectedTimeframes: string[]) => {
+  setPinnedTimeframes(selectedTimeframes);
+  localStorage.setItem("pinnedTimeframes", JSON.stringify(selectedTimeframes));
+}, []); // ✅ Empty deps = function reference KHÔNG ĐỔI
 
-    // payload phẳng leverageUpdate do BE gửi
-    if (m?.type === "leverageUpdate" && m.symbol && Number.isFinite(m.leverage)) {
-      setPositions(prev => prev.map(p => p.symbol === m.symbol ? { ...p, leverage: Number(m.leverage) } : p));
-    }
-
-    // ✅ snapshot futures account → merge leverage/isolatedWallet
-    if ((m?.type === "getFuturesAccount" || m?.type === "futuresAccount") && Array.isArray(m.positions)) {
-      setPositions(prev => prev.map(p => {
-        // 1) khớp đầy đủ (symbol + positionSide)
-        let r = m.positions.find((row: any) =>
-          String(row.symbol ?? row.s) === p.symbol &&
-          String(row.positionSide ?? row.ps ?? "BOTH") === String(p.positionSide ?? "BOTH")
-        );
-        // 2) nếu không có, fallback khớp theo symbol
-        if (!r) r = m.positions.find((row: any) => String(row.symbol ?? row.s) === p.symbol);
-        if (!r) return p;
-
-        const lev = Number(r.leverage ?? r.l);
-        const iw  = Number(r.isolatedWallet ?? r.iw ?? r.isolatedMargin);
-        return {
-          ...p,
-          leverage: (Number.isFinite(lev) && lev > 0) ? lev : p.leverage,
-          isolatedWallet: (Number.isFinite(iw) && iw >= 0) ? iw : p.isolatedWallet,
-        };
-      }));
-    }
-  };
-  binanceWS.onMessage(onWs);
-  return () => binanceWS.removeMessageHandler(onWs);
+const handleCloseTimeframe = useCallback(() => {
+  setShowTimeframeSelector(false);
 }, []);
 
-useEffect(() => {
-  if (!positions.length) return;
-  const needLev = positions.some(p => !(Number(p.leverage) > 0));
-  if (needLev) binanceWS.getFuturesAccount(); // sẽ được merge ở effect trên
-}, [positions.length]); // chỉ khi số lượng position thay đổi
+// Refs
+const symbolButtonRef = useRef<HTMLButtonElement>(null);
+const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // === TÍNH TOÁN CHUẨN THEO BINANCE USDT-M ===
-
-// PnL realtime: luôn tính theo entry & mark (không dùng p.up)
-const calculatePnl = (pos: PositionCalc) => {
-  const entry = parseFloat(pos.entryPrice || "0");
-  const mark  = parseFloat(pos.markPrice  || pos.entryPrice || "0");
-  const qty   = parseFloat(pos.positionAmt || "0"); // có dấu: LONG > 0, SHORT < 0
-  if (!entry || !qty) return 0;
-  return qty * (mark - entry);
+// Handlers
+const handleSymbolButtonEnter = () => {
+  hoverTimeoutRef.current = setTimeout(() => {
+    setIsDropdownOpen(true);
+  }, 150);
 };
 
-// KHÔNG fallback sang pos.unrealizedPnl nữa
-const calcUnrealized = (pos: PositionCalc) => calculatePnl(pos);
-
-// Initial Margin (mẫu số ROE):
-// 1) Ưu tiên positionInitialMargin (từ positionRisk)
-// 2) Nếu chưa có: |qty| * entry / leverage (cho cả cross & isolated)
-// 3) Không dùng isolatedWallet vì biến thiên theo PnL/funding
-const getInitialMargin = (pos: PositionCalc) => {
-  const im = Number(pos.positionInitialMargin);
-  if (Number.isFinite(im) && im > 0) return im;
-
-  const entry = parseFloat(pos.entryPrice || "0");
-  const qty   = Math.abs(parseFloat(pos.positionAmt || "0"));
-  const lev   = Number(pos.leverage);
-
-  if (entry > 0 && qty > 0 && Number.isFinite(lev) && lev > 0) return (qty * entry) / lev;
-  if (entry > 0 && qty > 0) return qty * entry; // fallback cuối
-  return 0;
-};
-
-// ROE% (Binance gọi là ROE, bạn đang hiển thị ROI):
-const calculatePnlPercentage = (pos: PositionCalc) => {
-  const pnl = calcUnrealized(pos);
-  const im  = getInitialMargin(pos);
-  if (!im) return 0;
-  return (pnl / im) * 100;
-};
-
-
-  // Floating info cho UI ngoài
-  useEffect(() => {
-    const selectedSymbol = localStorage.getItem("selectedSymbol") || positions[0]?.symbol;
-    const pos = positions.find(p => p.symbol === selectedSymbol && parseFloat(p.positionAmt) !== 0);
-    if (!pos) {
-      onFloatingInfoChange?.(null);
-      return;
-    }
-    const pnl = calcUnrealized(pos);
-    const im  = getInitialMargin(pos);
-    const roi = im ? (pnl / im) * 100 : 0;
-    onFloatingInfoChange?.({
-      symbol: pos.symbol,
-      pnl,
-      roi,
-      price: parseFloat(pos.markPrice || "0"),
-      positionAmt: parseFloat(pos.positionAmt || "0"),
-    });
-  }, [positions, onFloatingInfoChange]);
-
-  // Load initial snapshot từ backend (không cache)
-useEffect(() => {
-  setPositions([]);
-  if (externalPositions && externalPositions.length) {
-    applyPositions(externalPositions);
+const handleSymbolButtonLeave = () => {
+  if (hoverTimeoutRef.current) {
+    clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = null;
   }
-  // luôn gọi snapshot mới nhất
-  binanceWS.getPositions();
-}, [externalPositions, applyPositions]);
+};
 
-  useEffect(() => {
-  // chỉ gọi backend để lấy snapshot vị thế mới nhất
-  binanceWS.getPositions();
-}, [applyPositions]);
-
-  // Private WS → positions
-  useEffect(() => {
-  binanceWS.setPositionUpdateHandler((raw) => applyPositions(raw || []));
-  binanceWS.getPositions();
-  return () => binanceWS.setPositionUpdateHandler(() => {});
-}, [applyPositions]);
-
-  // ACCOUNT_UPDATE.a.P
-  useEffect(() => {
-    const handler = (msg: any) => {
-      if (msg?.a?.P && Array.isArray(msg.a.P)) applyPositions(msg.a.P);
-    };
-    binanceWS.onMessage(handler);
-    return () => binanceWS.removeMessageHandler(handler);
-  }, [applyPositions]);
-
-  // ======== SUBSCRIBE MARK PRICE THEO SYMBOL-LIST ỔN ĐỊNH ========
-const subscribedRef = React.useRef<Set<string>>(new Set());
-
-// Khóa phụ thuộc CHỈ theo list symbol (không theo markPrice)
-const symbolsKey = React.useMemo(() => {
-  const uniq = Array.from(new Set(positions.map(p => p.symbol))).filter(Boolean).sort();
-  return uniq.join('|');
-}, [positions.map(p => p.symbol).join('|')]);
-
+// Cleanup
 useEffect(() => {
-  if (market !== 'futures') return;
+  return () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+  };
+}, []);
 
-  const want = new Set(
-    symbolsKey ? symbolsKey.split('|').filter(Boolean) : []
+  // Market data
+  const [klineData, setKlineData] = useState<KlineData | null>(null);
+  const [tickerData, setTickerData] = useState<TickerData | null>(null);
+  const [orderBook, setOrderBook] = useState<OrderBookData | null>(null);
+  const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
+  const [bookTicker, setBookTicker] = useState<BookTickerData | null>(null);
+  const [miniTicker, setMiniTicker] = useState<MiniTickerData | null>(null);
+
+  // Account data (private)
+  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [orderUpdates, setOrderUpdates] = useState<OrderUpdate[]>([]);
+
+  // UI
+  const [activeOrderTab, setActiveOrderTab] = useState<
+    "limit" | "market" | "stop"
+  >("limit");
+  const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+
+  // Trading form
+  const [price, setPrice] = useState<number>(0);
+  const [amount, setAmount] = useState("");
+  const [total, setTotal] = useState("");
+
+  const { user } = useAuth() as { user: User };
+  const binanceAccountId = user?.internalAccountId;
+
+  const [floatingInfo, setFloatingInfo] = useState<FloatingInfo | null>(null);
+
+  // Toggle control setting
+  const [chartSettings, setChartSettings] = React.useState<ChartSettings>(
+    () => {
+      try {
+        const saved = localStorage.getItem("chartSettings");
+        return saved
+          ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+          : DEFAULT_SETTINGS;
+      } catch {
+        return DEFAULT_SETTINGS;
+      }
+    }
   );
-  const have = subscribedRef.current;
-
-  // Subscribe các symbol mới
-  want.forEach(symbol => {
-    if (have.has(symbol)) return;
-
-    // ⚠️ binancePublicWS trả về string; convert sang number trước khi set
-    binancePublicWS.subscribeMarkPrice(symbol.toUpperCase(), (raw: string) => {
-      const val = Number(raw);
-      if (!Number.isFinite(val)) return;
-
-      setPositions(prev => {
-        let changed = false;
-        const next = prev.map(p => {
-          if (p.symbol !== symbol) return p;
-          // Tránh setState nếu không đổi
-          const old = Number(p.markPrice ?? NaN);
-          if (Number.isFinite(old) && Math.abs(old - val) < 1e-12) return p;
-          changed = true;
-          return { ...p, markPrice: String(val) };
-        });
-        return changed ? next : prev;
+  const setSetting = React.useCallback(
+    (key: keyof ChartSettings, value: boolean) => {
+      setChartSettings((prev) => {
+        const next = { ...prev, [key]: value };
+        localStorage.setItem("chartSettings", JSON.stringify(next));
+        return next;
       });
-    });
+    },
+    []
+  );
 
-    have.add(symbol);
-  });
 
-  // Unsubscribe các symbol không còn
-  Array.from(have).forEach(symbol => {
-    if (!want.has(symbol)) {
-      binancePublicWS.unsubscribeMarkPrice(symbol);
-      have.delete(symbol);
-    }
-  });
 
-  // Không cleanup toàn bộ ở đây! (giữ kết nối để realtime mượt)
-}, [symbolsKey, market]);
 
-// helper: chờ ACK huỷ lệnh cho 1 symbol (có timeout fallback)
-const waitForCancelAck = (symbol: string, timeoutMs = 800) =>
-  new Promise<void>((resolve) => {
-    const handler = (m: any) => {
-      // server trả: { symbol, canceledOrders, market, executionTime }
-      if (m && m.symbol === symbol && typeof m.canceledOrders === "number") {
-        binanceWS.removeMessageHandler(handler);
-        resolve();
-      }
-    };
-    binanceWS.onMessage(handler);
-    setTimeout(() => {
-      binanceWS.removeMessageHandler(handler);
-      resolve();
-    }, timeoutMs);
-  });
-
-// phiên bản có HUỶ LỆNH CHỜ + ĐÓNG MKT (giữ style cũ)
-const handleCloseAllMarket = async () => {
-  // lấy các vị thế đang mở
-  const actives = positions.filter(p => Number(p.positionAmt || 0) !== 0);
-
-  for (const pos of actives) {
-    const rawSize = Number(pos.positionAmt || 0);
-    if (!Number.isFinite(rawSize) || rawSize === 0) continue;
-
-    const symbol = pos.symbol;
-    const side = rawSize > 0 ? "SELL" : "BUY";
-    const isHedge = true;
-    const positionSide = (isHedge ? (rawSize > 0 ? "LONG" : "SHORT") : "BOTH") as "LONG" | "SHORT" | "BOTH";
-
-    const step = getStepSize(symbol);
-    const qty = roundToStep(Math.abs(rawSize), step);
-    if (qty <= 0) continue;
-
-    // 1) Huỷ TẤT CẢ lệnh chờ của symbol này và đợi ACK
-    try {
-      await binanceWS.cancelAllOrders(symbol, "futures");
-    } catch (e) {
-      console.warn("cancelAllOrders failed", symbol, e);
-    }
-    await waitForCancelAck(symbol, 800);
-
-    // 2) Đóng vị thế bằng MARKET (KHÔNG kèm reduceOnly để tránh lỗi server)
-    try {
-      await binanceWS.placeOrder({
-        symbol,
-        market: "futures",
-        type: "MARKET",
-        side: side as "BUY" | "SELL",
-        positionSide, // bạn đang chạy hedge → giữ nguyên như code cũ
-        quantity: qty,
-      });
-    } catch (e: any) {
-      // hiếm khi risk-engine còn kẹt exposure → chờ một nhịp rồi thử lại
-      const msg = String(e?.message || "").toLowerCase();
-      if (msg.includes("exposure") && msg.includes("exceed") && msg.includes("limit")) {
-        await new Promise(r => setTimeout(r, 400));
-        await binanceWS.placeOrder({
-          symbol,
-          market: "futures",
-          type: "MARKET",
-          side: side as "BUY" | "SELL",
-          positionSide,
-          quantity: qty,
-        });
-      } else if (msg.includes("position side") && msg.includes("not match")) {
-        // phòng trường hợp one-way: bỏ positionSide và thử lại
-        await binanceWS.placeOrder({
-          symbol,
-          market: "futures",
-          type: "MARKET",
-          side: side as "BUY" | "SELL",
-          quantity: qty,
-        });
-      } else {
-        console.error("placeOrder error", symbol, e);
-      }
-    }
-  }
-
-  // refresh lại danh sách
-  setTimeout(() => binanceWS.getPositions(), 300);
-};
-
-const handleCloseAllByPnl = () => {
-  positions.forEach((pos) => {
-    const size = parseFloat(pos.positionAmt || "0");
-    const pnlPercent = calculatePnlPercentage(pos);
-    if (size === 0 || pnlPercent < 5) return;
-
-    const side = size > 0 ? "SELL" : "BUY";
-    const positionSide = size > 0 ? "LONG" : "SHORT";
-
-    binanceWS.placeOrder({
-      symbol: pos.symbol,
-      side: side as "BUY" | "SELL",
-      type: "MARKET",
-      quantity: Math.abs(size),
-      market: "futures",
-      reduceOnly: true,
-      positionSide: positionSide as "LONG" | "SHORT",
-    });
-  });
-
-  setTimeout(() => binanceWS.getPositions(), 400);
-};
-
+ // đóng panel setting khi click ngoài (có guard modal Time)
+const panelRef = React.useRef<HTMLDivElement>(null);
 useEffect(() => {
-  if (!positions.length) return;
-  const missingLev = positions.some(p => !(Number(p.leverage) > 0));
-  if (missingLev) binanceWS.getFuturesAccount();
-}, [positions.map(p => `${p.symbol}:${p.leverage ?? 'na'}`).join('|')]);
+  if (!showSettings) return;
+  
+  const onClick = (e: MouseEvent) => {
+    if (showTimeframeSelector) return; // ✅ Check trực tiếp state
+    if (!panelRef.current) return;
+    if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
+  };
+  
+  document.addEventListener("mousedown", onClick, true);
+  return () => document.removeEventListener("mousedown", onClick, true);
+}, [showSettings, showTimeframeSelector]); // ✅ Thêm dependency
 
+  // Reset khi đổi symbol
+  useEffect(() => {
+    setLivePrice(0); // reset khi đổi symbol
+  }, [selectedSymbol]);
+  // lưu local symbol
+  useEffect(() => {
+    if (selectedSymbol) {
+      localStorage.setItem("selectedSymbol", selectedSymbol);
+    }
+  }, [selectedSymbol]);
 
-
-// 👉 phát đi "active-tool-changed" + set localStorage để ToolMini bắt
-const activateAdvancedTool = (pos: PositionCalc) => {
-  const size = parseFloat(pos.positionAmt || "0");
-  if (!size) return;
-  const side = (size > 0 ? "LONG" : "SHORT") as "LONG" | "SHORT";
-  const payload = {
-    positionId: `${pos.symbol}:${pos.positionSide ?? side}`,
-    symbol: pos.symbol,
-    side,
-    entry: parseFloat(pos.entryPrice || "0"),
+  const updateCurrentOrders = (orders: Order[]) => {
+    setOpenOrders(orders);
+    localStorage.setItem("openOrders", JSON.stringify(orders));
   };
 
-  try {
-    localStorage.setItem("activeTool", JSON.stringify(payload));
-  } catch {}
+ // đóng menu setting khi click ra ngoài (có guard modal Time)
 
-  // 🔥 phát sự kiện đổi chart nếu đang ở symbol khác
-  window.dispatchEvent(new CustomEvent("chart-symbol-change-request", { detail: { symbol: pos.symbol } }));
 
-  // phát sau 300ms cho chắc chart đã đổi
-  setTimeout(() => {
-    window.dispatchEvent(new CustomEvent("active-tool-changed", { detail: payload }));
-  }, 300);
+
+  // ✅ Dùng một handler duy nhất cho openOrders (tránh ghi đè)
+  useEffect(() => {
+    binanceWS.setOrderUpdateHandler((orders: any[]) => {
+      // service đã chuẩn hoá localStorage; ở đây chỉ sync state
+      setOpenOrders(orders || []);
+    });
+    return () => {
+      binanceWS.setOrderUpdateHandler(null);
+    };
+  }, []);
+
+  // Khi đổi thị trường → kéo account info tương ứng
+  useEffect(() => {
+    if (!selectedAccount?.id) return;
+    if (selectedMarket === "futures") {
+      binanceWS.getFuturesAccount(selectedAccount.id);
+    } else {
+      binanceWS.getSpotAccount(selectedAccount.id);
+    }
+  }, [selectedMarket, selectedAccount?.id]);
+
+  // Handler WS tổng (không chọn account ở đây để tránh double-select)
+  const globalWsHandler = useCallback((msg: any) => {
+    console.log("📥 WS Message:", msg);
+
+    switch (msg.type) {
+      case "authenticated": {
+        // service clean sẽ tự flush queue sau authenticated
+        break;
+      }
+      // ❌ BỎ chọn account ở đây để tránh double select
+      // case "myBinanceAccounts": { ... }
+
+      case "cancelAllOrdersSuccess":
+        toast.success("Huỷ tất cả lệnh thành công!");
+        break;
+
+      case "cancelAllOrdersFailed":
+        toast.error("Huỷ tất cả lệnh thất bại!");
+        break;
+
+      case "futuresDataLoaded":
+      case "balances": {
+        const usdt = msg.data?.balances?.find((b: any) => b.asset === "USDT");
+        if (usdt) setAvailableBalance(parseFloat(usdt.availableBalance || "0"));
+        break;
+      }
+      default:
+        break;
+    }
+  }, []);
+
+  // 3) useEffect connect (đặt SAU handler)
+  React.useEffect(() => {
+    if (!token) return;
+    if (hasConnectedRef.current) return;
+    hasConnectedRef.current = true;
+
+    binanceWS.connect(token, globalWsHandler);
+  }, [token, globalWsHandler]);
+
+  // Kết nối WS trading (service chính) 1 lần
+  useEffect(() => {
+    if (!token) return;
+    binanceWS.connect(token, globalWsHandler);
+  }, [token, globalWsHandler]);
+
+  const handleCancelAllOrders = () => {
+    binanceWS.cancelAllOrders(selectedSymbol, selectedMarket);
+    setShowCancelAllConfirm(false);
+  };
+
+  // Tải dữ liệu nến lịch sử ban đầu
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHistoricalKlines = async () => {
+      try {
+        const historicalData = await fetchHistoricalKlines(
+          selectedSymbol,
+          selectedInterval,
+          500
+        );
+        if (isMounted) {
+          setCandles(historicalData);
+        }
+      } catch (error) {
+        console.error("❌ Failed to fetch historical klines:", error);
+      }
+    };
+
+    loadHistoricalKlines();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSymbol, selectedInterval]);
+
+  // Khởi tạo WS phụ (public streams cho panel bên) — đã bỏ Kline ở đây để tránh subscribe trùng
+  useEffect(() => {
+    wsService.setStatusCallback(setConnectionStatus);
+
+    const subscriptionIds: string[] = [];
+
+    // 1) 24h Ticker
+    const tickerId = wsService.subscribeTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setTickerData(data);
+        const p = Number(data.lastPrice);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
+      }
+    );
+    if (tickerId) subscriptionIds.push(tickerId);
+
+    // 2) Order Book Depth
+    const depthId = wsService.subscribeDepth(
+      selectedSymbol,
+      "20",
+      "1000ms",
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setOrderBook(data);
+      }
+    );
+    if (depthId) subscriptionIds.push(depthId);
+
+    // 3) Trade Stream
+    const tradeId = wsService.subscribeTrade(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        const trade: TradeData = {
+          symbol: data.symbol,
+          tradeId: data.tradeId,
+          price: data.price?.toString() ?? "0",
+          qty: data.quantity?.toString() ?? "0",
+          time: data.tradeTime ?? Date.now(),
+          isBuyerMaker: data.isBuyerMaker,
+        };
+
+        setRecentTrades((prev) => {
+          const newTrades = [trade, ...prev.slice(0, 49)];
+          return newTrades.sort((a, b) => b.time - a.time);
+        });
+      }
+    );
+    if (tradeId) subscriptionIds.push(tradeId);
+
+    // 4) Book Ticker
+    const bookTickerId = wsService.subscribeBookTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setBookTicker(data);
+        const bid = Number(data.bidPrice);
+        const ask = Number(data.askPrice);
+        const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
+        if (mid > 0) setLivePrice(mid); // ✅ thêm dòng này
+      }
+    );
+    if (bookTickerId) subscriptionIds.push(bookTickerId);
+
+    // 5) Mini Ticker cho symbol đang chọn (lưu id để cleanup)
+    const miniId = wsService.subscribeMiniTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setMiniTicker(data); // (tuỳ bạn có dùng)
+        const p = Number(data.close ?? data.c ?? 0);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
+      }
+    );
+    if (miniId) subscriptionIds.push(miniId);
+
+    // cập nhật danh sách subscriptions (thông tin hiển thị)
+    setSubscriptions(wsService.getSubscriptions());
+
+    return () => {
+      // cleanup các stream đã đăng ký trong effect này
+      subscriptionIds.forEach((id) => {
+        wsService.unsubscribe(id);
+      });
+    };
+  }, [selectedSymbol, selectedMarket, selectedInterval]);
+
+  // Stream Kline duy nhất → cập nhật candles + (tuỳ chọn) overlay klineData
+  useEffect(() => {
+    const klineId = wsService.subscribeKline(
+      selectedSymbol,
+      selectedInterval,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        // set overlay cho panel thông tin (nếu cần)
+        setKlineData(data);
+
+        const newCandle: ExtendedCandle = {
+          time: Math.floor(data.openTime / 1000),
+          open: parseFloat(data.open),
+          high: parseFloat(data.high),
+          low: parseFloat(data.low),
+          close: parseFloat(data.close),
+          volume: parseFloat(data.volume),
+        };
+
+        setCandles((prev) => {
+          const exists = prev.find((c) => c.time === newCandle.time);
+          let updated = exists
+            ? prev.map((c) => (c.time === newCandle.time ? newCandle : c))
+            : [...prev, newCandle];
+
+          if (updated.length > 500) updated = updated.slice(-500);
+          return updated;
+        });
+      }
+    );
+
+    return () => {
+      wsService.unsubscribe(klineId);
+    };
+  }, [selectedSymbol, selectedInterval, selectedMarket]);
+
+  // Stream miniTicker cho toàn bộ symbolList để render danh sách — cleanup đúng
+  useEffect(() => {
+    const ids: string[] = [];
+
+    symbolList.forEach((sym) => {
+      const callback = (data: MiniTickerData) => {
+        const symbol = data.symbol?.toUpperCase?.();
+        const close = parseFloat(data.close);
+        const open = parseFloat(data.open);
+        const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
+
+        // bỏ qua symbol đang chọn
+        if (symbol === selectedSymbol) return;
+
+        setAllSymbols((prev) => {
+          const updated = prev.filter((s) => s.symbol !== symbol);
+          return [
+            ...updated,
+            {
+              symbol,
+              price: close,
+              percentChange,
+              volume: parseFloat(data.volume),
+            },
+          ];
+        });
+      };
+
+      const id = wsService.subscribeMiniTicker(sym, selectedMarket, callback);
+      ids.push(id);
+    });
+
+    return () => {
+      ids.forEach((id) => wsService.unsubscribe(id));
+    };
+  }, [selectedMarket, selectedSymbol]);
+
+  const sortedSymbols: SymbolItem[] = symbolList.map((symbol) => {
+    const matched = allSymbols.find((s) => s.symbol === symbol);
+    return (
+      matched ?? {
+        symbol,
+        price: 0,
+        percentChange: 0,
+        volume: 0,
+      }
+    );
+  });
+
+  // ✅ Subscribe realtime theo account đã chọn (thêm ref-guard chống duplicate)
+  const subOnceRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = selectedAccount?.id;
+    if (!id) return;
+
+    const now = Date.now();
+    if (subOnceRef.current && now - subOnceRef.current < 1500) return;
+    subOnceRef.current = now;
+
+    // 1) chọn account
+    binanceWS.selectAccount(id);
+
+    // 2) subscribe realtime (balance/positions/orders)
+    binanceWS.subscribeAccountUpdates(setOpenOrders, [
+      "balance",
+      "positions",
+      "orders",
+    ]);
+
+    // 3) kéo positions trước một nhịp
+    binanceWS.getPositions(id);
+
+    // 4) cập nhật positions từ snapshot/stream
+    binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
+      const active = (rawPositions || []).filter(
+        (p: any) => parseFloat(p.positionAmt) !== 0
+      );
+      setPositions(active);
+      localStorage.setItem("positions", JSON.stringify(active));
+    });
+
+    return () => {
+      binanceWS.unsubscribeAccountUpdates();
+    };
+  }, [selectedAccount?.id]);
+
+  // Khôi phục account đã chọn từ localStorage khi vào trang (chỉ 1 lần)
+  useEffect(() => {
+    const savedId = localStorage.getItem("selectedBinanceAccountId");
+    const parsedId = savedId ? parseInt(savedId, 10) : null;
+    if (!parsedId) return;
+
+    const restore = () => {
+      binanceWS.setCurrentAccountId(parsedId);
+      binanceWS.selectAccount(parsedId);
+      binanceWS.getMultiAssetsMode();
+      setSelectedAccount({ id: parsedId } as BinanceAccount);
+    };
+
+    const timer = setTimeout(() => {
+      if (binanceWS.isConnected()) {
+        restore();
+      } else {
+        const waitInterval = setInterval(() => {
+          if (binanceWS.isConnected()) {
+            clearInterval(waitInterval);
+            restore();
+          }
+        }, 200);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleUnsubscribe = (subscriptionId: string) => {
+    wsService.unsubscribe(subscriptionId);
+    setSubscriptions(wsService.getSubscriptions());
+  };
+
+  const handleClickOrderBookPrice = (price: number) => {
+    setPrice(price);
+  };
+
+  const handleSymbolChange = (newSymbol: string) => {
+    setSelectedSymbol(newSymbol);
+  };
+
+  const handleMarketChange = (newMarket: MarketType) => {
+    setSelectedMarket(newMarket);
+    localStorage.setItem("selectedMarket", newMarket);
+    console.log("✅ Market selected:", newMarket);
+  };
+  useEffect(() => {
+    const savedMarket = localStorage.getItem("selectedMarket");
+    if (savedMarket === "spot" || savedMarket === "futures") {
+      setSelectedMarket(savedMarket as MarketType);
+    }
+  }, []);
+
+  const handleIntervalChange = (newInterval: string) => {
+  setSelectedInterval(newInterval);
+  localStorage.setItem("selectedInterval", newInterval); // ✅ Thêm dòng này
 };
 
-const posAccountId =
-  (activePos as any)?.internalAccountId ??
-  (activePos as any)?.accountId ??
-  null;
+  const calculateTotal = (price: string, amount: string) => {
+    if (price && amount) {
+      const calculatedTotal = parseFloat(price) * parseFloat(amount);
+      return calculatedTotal.toFixed(8);
+    }
+    return "";
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAmount = e.target.value;
+    setAmount(newAmount);
+    setTotal(calculateTotal(String(price), newAmount));
+  };
+
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPrice = e.target.value;
+    setPrice(Number(newPrice));
+    setTotal(calculateTotal(newPrice, amount));
+  };
+
+  const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTotal = e.target.value;
+    setTotal(newTotal);
+
+    if (newTotal && price && parseFloat(String(price)) !== 0) {
+      const calculatedAmount = (
+        parseFloat(newTotal) / parseFloat(String(price))
+      ).toFixed(8);
+      setAmount(calculatedAmount);
+    } else {
+      setAmount("");
+    }
+  };
 
   return (
-    <div className="card">
-      <div className="card-header text-[15px] font-semibold text-white">
-        Positions
+    <div className="h-[calc(100dvh-4rem)] bg-dark-900 flex flex-col">
+      {/* Thanh trên cùng: chọn symbol + trạng thái + tài khoản */}
+      <div className="shrink-0 border-b border-dark-700 bg-dark-800">
+        <div className="flex items-center justify-between px-4 py-2">
+          {/* Trái: chọn symbol + stats nhanh */}
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center">
+              <div className="relative z-50">
+                {/* Nút chọn symbol */}
+                <div
+  ref={symbolButtonRef}
+  className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded transition-colors cursor-default"
+  onMouseEnter={handleSymbolButtonEnter}
+  onMouseLeave={handleSymbolButtonLeave}
+>
+            <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
+              <span className="text-xs font-bold text-dark-900">
+                {selectedSymbol[0]}
+              </span>
+            </div>
+            <span className="font-bold text-lg">{selectedSymbol}</span>
+            <ChevronDown className="h-4 w-4 text-dark-400" />
+          </div>
+          {/* ✅ UPDATED: Dropdown với props mới */}
+          {isDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 z-[9999]">
+              <SymbolDropdown
+                selectedSymbol={selectedSymbol}
+                searchTerm={searchTerm}
+                activeTab={activeSymbolTab}
+                onSelect={(s) => {
+                  setSelectedSymbol(s);
+                  setIsDropdownOpen(false);
+                }}
+                onSearchChange={setSearchTerm}
+                onTabChange={setActiveSymbolTab}
+                market="futures"
+                quote="USDT"
+                // ✅ NEW: 3 props mới
+                isOpen={isDropdownOpen}
+                onOpen={() => setIsDropdownOpen(true)}
+                onClose={() => setIsDropdownOpen(false)}
+              />
+            </div>
+          )}
+        </div>
+
+        <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
       </div>
 
-      <div className="card-body overflow-x-auto">
-        <table className="min-w-full text-left text-[13px] leading-[16px] font-sans">
-          <thead>
-            <tr className="text-gray-400 border-b border-dark-700">
-              <th className="px-4 py-2">Symbol</th>
-              <th className="px-4 py-2">Size</th>
-              <th className="px-4 py-2">Entry</th>
-              <th className="px-4 py-2">Mark Price</th>
-              <th className="px-4 py-2">PNL(ROI%)</th>
-              <th
-                className="closePosition flex items-center px-[8px] first:pl-0 last:pr-0 z-[9] h-full"
-                style={{ width: "280px", flex: "1 0 280px" }}
+            {/* Chọn market */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-dark-400">Market:</span>
+              <select
+                value={selectedMarket}
+                onChange={(e) =>
+                  handleMarketChange(e.target.value as "spot" | "futures")
+                }
+                className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
               >
-                <div className="flex items-center space-x-[8px]">
-                  <div>
-                    <button
-                      onClick={handleCloseAllMarket}
-                      className="text-[#fcd535] text-[12px] hover:underline relative top-[-1px]"
-                    >
-                      Đóng tất cả MKT
-                    </button>
-                  </div>
-                  <div className="w-[1px]  h-[16px] bg-gray-600"></div>
-                  <button
-                    onClick={() => setShowPopup(true)}
-                    className="text-[#fcd535] text-[12px] hover:underline relative top-[-1px]"
-                  >
-                    Đóng tất cả dựa trên PnL
-                  </button>
+                <option value="futures">FUTURES</option>
+                <option value="spot">SPOT</option>
+              </select>
+            </div>
+
+            {/* Hiển thị giá + thay đổi 24h */}
+            {tickerData && (
+              <>
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold">
+                    {parseFloat(tickerData.lastPrice).toFixed(4)}
+                  </span>
+                  <span className="text-xs text-dark-400">
+                    ≈ ${parseFloat(tickerData.lastPrice).toFixed(2)}
+                  </span>
                 </div>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {positions.map((pos) => {
-              const size = parseFloat(pos.positionAmt || "0");
-              const pnl = calcUnrealized(pos);
-              // 👉 Log để debug leverage, margin, roi
-    {/* console.log("ROW DEBUG", pos.symbol, {
-  qty: pos.positionAmt,
-  entry: pos.entryPrice,
-  mark: pos.markPrice,
-  lev: pos.leverage,
-  im: getInitialMargin(pos),
-  roi: calculatePnlPercentage(pos),
-});*/}
 
-              const pnlClass =
-                pnl > 0
-                  ? "text-[#0ecb81]"
-                  : pnl < 0
-                  ? "text-[#f6465d]"
-                  : "text-white";
-              const sizeClass =
-                size > 0
-                  ? "text-[#0ecb81]"
-                  : size < 0
-                  ? "text-[#f6465d]"
-                  : "text-white";
+                <div className="flex flex-col">
+                  <span
+                    className={`text-sm font-medium ${
+                      parseFloat(tickerData.priceChange) >= 0
+                        ? "text-success-500"
+                        : "text-danger-500"
+                    }`}
+                  >
+                    {parseFloat(tickerData.priceChange) >= 0 ? "+" : ""}
+                    {parseFloat(tickerData.priceChange).toFixed(4)}
+                  </span>
+                  <span
+                    className={`text-xs ${
+                      parseFloat(tickerData.priceChangePercent) >= 0
+                        ? "text-success-500"
+                        : "text-danger-500"
+                    }`}
+                  >
+                    {parseFloat(tickerData.priceChangePercent) >= 0 ? "+" : ""}
+                    {tickerData.priceChangePercent}%
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
 
-              return (
-                <tr
-                  key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
-                  className="border-b border-dark-700"
-                >
-                  <td className="px-4 py-3 font-medium text-white">
-                    {pos.symbol}
-                  </td>
-                  <td className={`px-4 py-3 font-medium ${sizeClass}`}>
-                    {size > 0 ? "" : "-"} {Math.abs(size)}
-                  </td>
-                  <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
-                  <td className="px-4 py-3 text-white">
-                    {pos.markPrice ?? "--"}
-                  </td>
-                  <td className={`px-4 py-3 font-medium ${pnlClass}`}>
-  {nearZero(pnl)
-    ? "0.00"
-    : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))}`}
-  <br />
-  <span className="text-xs opacity-80">
-    {(() => {
-      const r = calculatePnlPercentage(pos);
-      return nearZero(r)
-        ? "0.00%"
-        : `(${r > 0 ? "+" : "-"}${fmtShort(Math.abs(r))}%)`;
-    })()}
-  </span>
-</td>
+          {/* Phải: trạng thái kết nối + chọn tài khoản + controls */}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              {connectionStatus === "connected" ? (
+                <Wifi className="h-4 w-4 text-success-500" />
+              ) : connectionStatus === "connecting" ? (
+                <div className="h-4 w-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-danger-500" />
+              )}
+              <span className="text-xs text-dark-400 capitalize">
+                {connectionStatus}
+              </span>
+            </div>
 
-                  <td>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <div className="text-[13px] font-normal text-white flex items-center space-x-1">
-                        <span
-                          className={`cursor-pointer ${
-                            orderType === "market"
-                              ? "text-[#fcd535]"
-                              : "text-white"
-                          }`}
-                          onClick={() => setOrderType("market")}
-                        >
-                          Thị trường
-                        </span>
-                        <span className="text-gray-600">|</span>
-                        <span
-                          className={`cursor-pointer ${
-                            orderType === "limit"
-                              ? "text-[#fcd535]"
-                              : "text-white"
-                          }`}
-                          onClick={() => setOrderType("limit")}
-                        >
-                          Giới hạn
-                        </span>
-                      </div>
+            {/* Tài khoản Binance đang chọn */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-dark-400">Tài khoản:</span>
+              <BinanceAccountSelector
+                onSelect={(id) => {
+                  setSelectedAccount({ id });
+                }}
+              />
+            </div>
 
-                      <input
-                        type="text"
-                        value={closePrice}
-                        onChange={(e) => setClosePrice(e.target.value)}
-                        className="bg-dark-600 text-white text-[13px] px-2 py-[4px] rounded border border-dark-500 focus:outline-none w-[80px]"
-                        placeholder="Giá"
-                      />
+            <div className="text-xs text-dark-400">
+              Subscriptions: {subscriptions.length}
+            </div>
 
-                      <input
-                        type="text"
-                        value={closeQuantity}
-                        onChange={(e) => setCloseQuantity(e.target.value)}
-                        className="bg-dark-600 text-white text-[13px] px-2 py-[4px] rounded border border-dark-500 focus:outline-none w-[60px]"
-                        placeholder="Số lượng"
-                      />
-                    </div>
-                  </td>
-                  <td className="pr-4">
-  <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => wsService.getSubscriptions()}
+              className="p-1 hover:bg-dark-700 rounded"
+            >
+              <RefreshCw className="h-4 w-4 text-dark-400" />
+            </button>
+
+            <button className="p-1 hover:bg-dark-700 rounded">
+              <Settings className="h-4 w-4 text-dark-400" />
+            </button>
+          </div>
+        </div>
+
+       {/* Dải stats 24h - ✅ LUÔN render với min-height cố định */}
+<div 
+  className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700"
+  style={{ minHeight: '52px' }} // ✅ Thêm dòng này
+>
+  {tickerData ? (
+    <>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h High</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.highPrice).toFixed(4)}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h Low</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.lowPrice).toFixed(4)}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">
+          24h Volume ({selectedSymbol.replace("USDT", "")})
+        </span>
+        <span className="font-medium">
+          {parseFloat(tickerData.volume).toLocaleString()}
+        </span>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-dark-400">24h Volume (USDT)</span>
+        <span className="font-medium">
+          {parseFloat(tickerData.quoteVolume).toLocaleString()}
+        </span>
+      </div>
+    </>
+  ) : (
+    // ✅ Skeleton placeholder khi đang load
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h High</span>
+        <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Low</span>
+        <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Volume (BTC)</span>
+        <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="text-dark-400">24h Volume (USDT)</span>
+        <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+      </div>
+    </>
+  )}
+</div>
+      </div>
+
+      {/* Thân chính: Chart trái, Order book giữa, Form phải */}
+      <div className="flex gap-1 flex-1 min-h-0 overflow-hidden">
+        {/* Trái: Biểu đồ */}
+        <div className="flex-1 min-w-0 bg-dark-800 border-r border-dark-700 overflow-hidden">
+          <div className="h-full flex flex-col">
+            {/* Controls chart */}
+<div className="flex items-center justify-between p-3 border-b border-dark-700">
+  <div className="flex items-center space-x-4">
+    {/* 1. Timeframe selector */}
+    <div className="flex items-center space-x-2">
+  {pinnedTimeframes.map((interval) => (
     <button
-      onClick={() => {
-        setActivePos(pos);
-        setShowTpSl(true);
-      }}
-      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
-      title="TP/SL cho vị thế (modal)"
+      key={interval}
+      onClick={() => handleIntervalChange(interval)}
+      className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
+        selectedInterval === interval ? "bg-dark-700" : ""
+      }`}
     >
-      <Edit3 size={14} /> TP/SL
+      {interval}
     </button>
+  ))}
+  
+  {/* ✅ NEW: Edit timeframes button */}
+  <button
+  onClick={(e) => {
+    e.stopPropagation();
+    setTimeout(() => {
+      setShowTimeframeSelector(true);
+    }, 0);
+  }}
+  className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
+  title="Edit timeframes"
+>
+  <ChevronDown className="h-3 w-3" />
+</button>
+</div>
 
-    {/* 🔥 Nút Nâng cao: bật tool kéo trên chart */}
-    <button
-      onClick={() => activateAdvancedTool(pos)}
-      className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-primary/60 text-primary hover:bg-dark-700"
-      title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
-    >
-      Nâng cao
+    {/* 2. ✅ ChartTypePanel - Đặt TRƯỚC Settings */}
+    <ChartTypePanel 
+      currentType={chartType} 
+      onTypeChange={(newType) => {
+        setChartType(newType);
+        console.log('[ChartType] Changed to:', newType);
+      }}
+    />
+
+    {/* 3. Settings button */}
+    <div className="flex items-center gap-2 relative" ref={panelRef}>
+      <button
+        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+        title="Cài đặt biểu đồ"
+        onClick={() => setShowSettings((v) => !v)}
+      >
+        <Settings size={15} />
+      </button>
+
+      {showSettings && (
+        <div className="absolute top-full left-0 mt-2 z-50">
+          <SettingControl
+            settings={chartSettings}
+            onToggle={setSetting}
+            onClose={() => setShowSettings(false)}
+          />
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Right side controls */}
+  <div className="flex items-center space-x-2">
+    <button className="p-1 hover:bg-dark-700 rounded">
+      <TrendingUp className="h-4 w-4 text-dark-400" />
+    </button>
+    <button className="p-1 hover:bg-dark-700 rounded">
+      <Maximize2 className="h-4 w-4 text-dark-400" />
     </button>
   </div>
-</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        
+</div>
 
-        <PopupPosition
-          isOpen={showPopup}
-          onClose={() => setShowPopup(false)}
-          pnlNow={currentPnl}
-          takeProfit={targetTP}
-          stopLoss={targetSL}
-          onSubmit={(tp, sl) => {
-            setTargetTP(tp);
-            setTargetSL(sl);
-            setShowPopup(false);
-          }}
-        />
 
-        {activePos && (
-  <PositionTpSlModal
-    isOpen={showTpSl}
-    onClose={() => setShowTpSl(false)}
-    symbol={activePos.symbol}
-    entryPrice={parseFloat(activePos.entryPrice || "0")}
-    markPrice={parseFloat(activePos.markPrice || "0")}
-    positionAmt={parseFloat(activePos.positionAmt || "0")}
-    getPriceTick={getPriceTick}
-    market={market}
-    leverage={
-      Number((activePos as any)?.leverage) ||
-      loadLeverageLS(posAccountId, market, activePos.symbol) ||
-      1
-    }
-    onSubmit={({ tpPrice, slPrice, trigger }) => {
-      sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
-    }}
-  />
-)}
+            {/* Khu vực biểu đồ */}
+            <div className="flex-1 relative min-h-0">
+              <section className="h-full min-w-0 bg-dark-800 rounded-xl overflow-hidden">
+                <div className="h-full min-h-0">
+                  <TradingBinance
+                    selectedSymbol={selectedSymbol}
+                    chartType={chartType}
+                    onChartTypeChange={setChartType}
+                    selectedInterval={selectedInterval}
+                    market={selectedMarket}
+                    floating={floatingInfo}
+                    showPositionTag={chartSettings.positionTag}
+                    onRequestSymbolChange={(sym) => setSelectedSymbol(sym)}
+                  />
+                </div>
+              </section>
 
+              {/* Overlay OHLCV */}
+               {/*<div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
+                {klineData && (
+                  <div className="space-y-1">
+                    <div>
+                      O:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.open || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      H:{" "}
+                      <span className="font-mono text-success-500">
+                        {parseFloat(klineData.high || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      L:{" "}
+                      <span className="font-mono text-danger-500">
+                        {parseFloat(klineData.low || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      C:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.close || "0").toFixed(2)}
+                      </span>
+                    </div>
+                    <div>
+                      V:{" "}
+                      <span className="font-mono">
+                        {parseFloat(klineData.volume || "0").toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div> */}
+            </div>
+          </div>
+        </div>
+
+        {/* Giữa: Order Book */}
+        <div className="min-h-0 w-56 md:w-64 bg-dark-800 border-r border-dark-700">
+          <div className="h-full flex flex-col">
+            <div className="flex items-center justify-between p-3 border-b border-dark-700">
+              <h3 className="text-sm font-medium">Order Book</h3>
+              <div className="flex items-center space-x-2">
+                <button className="text-xs text-dark-400 hover:text-dark-200">
+                  0.01
+                </button>
+                <Settings className="h-3 w-3 text-dark-400" />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              {orderBook ? (
+                <div className="h-full flex flex-col">
+                  {/* Asks */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-0.5 p-2">
+                      {orderBook.asks
+                        .slice(0, 15)
+                        .reverse()
+                        .map((ask, index) => (
+                          <div
+                            key={index}
+                            className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                            onClick={() =>
+                              handleClickOrderBookPrice(parseFloat(ask.price))
+                            }
+                          >
+                            <span className="text-danger-500 font-mono">
+                              {parseFloat(ask.price).toFixed(4)}
+                            </span>
+                            <span className="text-dark-300 font-mono">
+                              {parseFloat(ask.quantity).toFixed(3)}
+                            </span>
+                            <div
+                              className="absolute right-0 top-0 h-full bg-danger-500/10"
+                              style={{
+                                width: `${Math.min(
+                                  (parseFloat(ask.quantity) / 10) * 100,
+                                  100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Giá hiện tại */}
+                  <div className="px-2 py-1 border-y border-dark-700">
+                    <div className="text-center">
+                      <div
+                        className={`text-sm font-bold ${
+                          tickerData && parseFloat(tickerData.priceChange) >= 0
+                            ? "text-success-500"
+                            : "text-danger-500"
+                        }`}
+                      >
+                        {tickerData
+                          ? parseFloat(tickerData.lastPrice).toFixed(4)
+                          : "0.0000"}
+                      </div>
+                      <div className="text-xs text-dark-400">
+                        ≈ $
+                        {tickerData
+                          ? parseFloat(tickerData.lastPrice).toFixed(2)
+                          : "0.00"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bids */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-0.5 p-2">
+                      {orderBook.bids.slice(0, 15).map((bid, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                          onClick={() =>
+                            handleClickOrderBookPrice(parseFloat(bid.price))
+                          }
+                        >
+                          <span className="text-success-500 font-mono">
+                            {parseFloat(bid.price).toFixed(4)}
+                          </span>
+                          <span className="text-dark-300 font-mono">
+                            {parseFloat(bid.quantity).toFixed(3)}
+                          </span>
+                          <div
+                            className="absolute right-0 top-0 h-full bg-success-500/10"
+                            style={{
+                              width: `${Math.min(
+                                (parseFloat(bid.quantity) / 10) * 100,
+                                100
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-dark-400">
+                  <div className="text-center">
+                    <div className="text-sm">No order book data</div>
+                    <div className="text-xs mt-1">
+                      Waiting for WebSocket connection...
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Phải: Form đặt lệnh + (optional) Recent trades */}
+        <div className="min-h-0 w-64 md:w-72 lg:w-80 bg-dark-800 border-l border-dark-700 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <TradingForm
+              selectedSymbol={selectedSymbol}
+              price={livePrice}
+              internalBalance={availableBalance}
+              selectedMarket={selectedMarket}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Panel dưới: Positions/Orders */}
+      <div className="shrink-0 h-[28dvh] min-h-[220px] max-h-[40dvh] border-t border-dark-700 bg-dark-800 overflow-hidden">
+        <div className="h-full overflow-y-auto">
+          <PositionFunction
+            market={selectedMarket}
+            selectedSymbol={selectedSymbol}
+            orderBook={orderBook}
+            positions={positions}
+            onFloatingInfoChange={setFloatingInfo}
+          />
+        </div>
+      </div>
+       {/* ✅ THÊM MODAL Ở ĐÂY */}
+      <TimeframeModalWrapper
+  isOpen={showTimeframeSelector}
+  pinnedTimeframes={pinnedTimeframes}
+  onClose={handleCloseTimeframe}
+  onSave={handleSaveTimeframes}
+/>
     </div>
   );
-};
-
-export default Position;
-
-======================================================
-
-// BinanceWebSocketService.ts
-// Clean API: state machine + 2 queues (preAuth/authed), no generic send(), full wrappers
-
-type MarketType = 'spot' | 'futures';
-type WsState = 'closed' | 'connecting' | 'open' | 'authenticated';
-
-// ==== Types for placing orders ====
-export type WorkingType = 'MARK' | 'LAST';
-
-export interface PlaceOrderPayload {
-  symbol: string;
-  side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
-  market: 'futures' | 'spot';
-
-  // qty/price
-  quantity: number;
-  price?: number;     // LIMIT
-  stopPrice?: number; // *_MARKET (TP/SL)
-
-  // futures-only (optional)
-  reduceOnly?: boolean;
-  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
-  timeInForce?: 'GTC' | 'IOC' | 'FOK';
-
-  // trigger theo Binance Futures
-  workingType?: WorkingType; // 'MARK' | 'LAST'
 }
-
-class BinanceWebSocketService {
-  private socket: WebSocket | null = null;
-  private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
-
-  // ===== add fields =====
-  private authInFlight = false;
-  private authedOnceKeys = new Set<string>();
-  private pushAuthedUnique(key: string, msg: any) {
-    if (this.authedOnceKeys.has(key)) return;
-    this.authedOnceKeys.add(key);
-    this.authedQueue.push(msg);
-  }
-private noPositionRiskSupport = true;
-  // ===== State & queues =====
-  private state: WsState = 'closed';
-  private openResolvers: Array<() => void> = [];
-  private authResolvers: Array<() => void> = [];
-  private preAuthQueue: any[] = []; // gửi khi state >= 'open'
-  private authedQueue: any[] = [];  // gửi khi state === 'authenticated'
-
-  // ===== Handlers & caches =====
-  private messageHandlers: ((data: any) => void)[] = [];
-  private currentAccountId: number | null = null;
-  private orderUpdateHandler: ((orders: any[]) => void) | null = null;
-  private positionUpdateHandler: ((positions: any[]) => void) | null = null;
-
-  // Subscriptions / callbacks cho stream
-  private subscriptions: Map<string, any> = new Map();
-  private callbacks: Map<string, (data: any) => void> = new Map();
-
-  // ==== NEW: coalesce risk requests ====
-  private pendingRiskSymbols = new Set<string>();
-  private riskDebounceTimer: number | null = null;
-
-  // ---- cache leverage theo symbol ----
-private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
-
-// ====== LocalStorage helpers cho Leverage ======
-private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
-  return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
-}
-
-private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
-  try {
-    const key = this.levKey(this.currentAccountId, market, symbol);
-    localStorage.setItem(key, String(lev));
-  } catch {}
-}
-
-private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
-  if (!this.currentAccountId) return;
-  const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith(prefix)) continue;
-    const sym = k.slice(prefix.length).toUpperCase();
-    const v = localStorage.getItem(k);
-    const n = v ? Number(v) : NaN;
-    if (sym && Number.isFinite(n) && n > 0) {
-      this.symbolLeverage.set(sym, n);
-    }
-  }
-}
-
-private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
-  try {
-    const key = this.levKey(this.currentAccountId, market, symbol);
-    const v = localStorage.getItem(key);
-    const n = v ? Number(v) : NaN;
-    return Number.isFinite(n) && n > 0 ? n : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
-  const n = Number(lev);
-  if (Number.isFinite(n) && n > 0) {
-    const sym = symbol.toUpperCase();
-    this.symbolLeverage.set(sym, n);
-    this.saveLeverageLS(sym, n, market);   // ✅ persist
-    console.log("LEV CACHE SET ✅", sym, n);
-  }
-}
-
-  // ========= Helpers =========
-  private waitForOpen(): Promise<void> {
-    if (this.state === 'open' || this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.openResolvers.push(res));
-  }
-  private waitForAuth(): Promise<void> {
-    if (this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.authResolvers.push(res));
-  }
-
-  // === Position Risk (để backfill leverage/IM) ===
-// Client fallback: server không support -> dùng futures snapshot
-public requestPositionRisk(symbols?: string[]) {
-  this.getFuturesAccount(); // kéo leverage/isolatedWallet qua snapshot
-}
-
-// (không còn dùng tới)
-private _sendGetPositionRisk(symbols?: string[]) {
-  // no-op
-}
-
-  public setCurrentAccountId(id: number) {
-    this.currentAccountId = id;
-  }
-  public getCurrentAccountId(): number | null {
-    return this.currentAccountId;
-  }
-
-  public setPositionUpdateHandler(handler: (positions: any[]) => void) {
-    this.positionUpdateHandler = handler;
-  }
-  public setOrderUpdateHandler(handler: ((orders: any[]) => void) | null) {
-    this.orderUpdateHandler = handler;
-  }
-
-  public onMessage(handler: (data: any) => void) {
-    this.messageHandlers.push(handler);
-  }
-  public removeMessageHandler(handler: (data: any) => void) {
-    this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-  }
-
-  public isConnected() {
-    return this.socket?.readyState === WebSocket.OPEN;
-  }
-
-  // changeposition
-  public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
-
-    if (!onDone) return;
-    const once = (m: any) => {
-      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onDone(true, m);
-        this.removeMessageHandler(once);
-      } else if (m?.success === false && m?.error) {
-        onDone(false, m);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  public getPositionMode(onResult?: (dual: boolean) => void) {
-    this.sendAuthed({ action: 'getPositionMode' });
-    if (!onResult) return;
-    const once = (m: any) => {
-      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onResult(m.dualSidePosition);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  // Public: đóng WS + dọn state
-  public disconnect(reason?: string) {
-    try { this.socket?.close(1000, reason || 'client disconnect'); } catch {}
-    this.socket = null;
-    this.state = 'closed';
-    this.authInFlight = false;
-    this.openResolvers.splice(0);
-    this.authResolvers.splice(0);
-    this.preAuthQueue = [];
-    this.authedQueue = [];
-    this.accountSubActive = false;
-    this.messageHandlers = [];
-    this.callbacks.clear();
-    this.subscriptions.clear();
-    this.pendingRiskSymbols.clear();
-    if (this.riskDebounceTimer != null) {
-      clearTimeout(this.riskDebounceTimer);
-      this.riskDebounceTimer = null;
-    }
-  }
-
-  // Public: chờ tới khi AUTHENTICATED (dùng được cho select)
-  public async waitUntilAuthenticated() {
-    if (this.state === 'authenticated') return;
-    await this.waitForOpen();
-    await this.waitForAuth();
-  }
-
-  // Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
-  public async selectAccountAndWait(id: number, settleMs = 160) {
-    this.selectAccount(id);
-    await new Promise(res => setTimeout(res, settleMs)); // khớp với flushAuthed (120ms)
-  }
-
-  // ========= Connect (idempotent) =========
-  public connect(token: string, onMessage: (data: any) => void) {
-    // Nếu đã có socket CONNECTING/OPEN: không tạo thêm
-    if (this.socket && (this.socket.readyState === WebSocket.CONNECTING || this.socket.readyState === WebSocket.OPEN)) {
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-      if (token) this.authenticate(token); // tự auth nếu chưa
-      return;
-    }
-
-    this.state = 'connecting';
-    const sock = new WebSocket(this.wsUrl);
-    this.socket = sock;
-
-    sock.onopen = () => {
-      if (this.socket !== sock) return;
-      this.state = 'open';
-      console.log('✅ WebSocket connected');
-
-      // Resolve những promise chờ OPEN
-      this.openResolvers.splice(0).forEach(r => r());
-
-      // Flush những job KHÔNG cần auth
-      this.flushPreAuth();
-
-      // Auth nếu có token
-      if (token) this.authenticate(token);
-
-      // Gắn handler global
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-
-      // Khôi phục accountId từ localStorage (chỉ set state; gửi select sau khi authenticated)
-      const saved = localStorage.getItem('selectedBinanceAccountId');
-      if (saved !== null) {
-        const parsed = Number(saved);
-        if (!Number.isNaN(parsed)) this.setCurrentAccountId(parsed);
-      }
-    };
-
-    sock.onmessage = (event) => {
-
-      
-      if (this.socket !== sock) return;
-      console.log('📥 RAW WS MSG:', event.data);
-      try {
-        const data = JSON.parse(event.data);
-     // --- FORWARD SNAPSHOT POSITIONS (no cache) ---
-// 1) Backend trả về mảng thuần: [ { symbol, positionAmt, ... }, ... ]
-if (Array.isArray(data) &&
-    data.length &&
-    data[0] &&
-    typeof data[0].symbol === "string" &&
-    data[0].positionAmt !== undefined) {
-  console.log("📥 WS positions[] snapshot:", data);
-  this.positionUpdateHandler?.(data);
-  return;
-}
-
-// 2) Backend gói trong object có field positions
-if (data && Array.isArray((data as any).positions)) {
-  console.log("📥 WS positions snapshot (wrapped):", (data as any).positions);
-  this.positionUpdateHandler?.((data as any).positions);
-  return;
-}
-
-// 3) Một số BE trả theo type
-if ((data?.type === "getPositions" || data?.type === "positions" || data?.type === "futuresPositions") &&
-    Array.isArray((data as any).data)) {
-  console.log("📥 WS positions snapshot (data):", (data as any).data);
-  this.positionUpdateHandler?.((data as any).data);
-  return;
-}
-     // Phản hồi adjustLeverage từ backend: { symbol, leverage, ... }
-     // Nếu server trả về mảng orders (kết quả của getOpenOrders)
-if (Array.isArray(data) && data[0]?.orderId && data[0]?.symbol && data[0]?.status) {
-  console.log("📥 WS got openOrders array:", data);
-  localStorage.setItem("openOrders", JSON.stringify(data));
-  if (this.orderUpdateHandler) this.orderUpdateHandler(data);
-  return;
-}
-if (data?.symbol && Number.isFinite(data?.leverage)) {
-  this.setLeverageFor(data.symbol, data.leverage);
-  this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
-  // không return, để các handler khác cũng nhận được gói gốc (nếu cần)
-}
-
-        console.log('📥 WS Parsed:', data);
-
-        // Forward snapshot futures account để UI merge leverage/iw
-if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount') && Array.isArray(data.positions)) {
-  for (const r of data.positions) {
-    const sym = String(r.symbol ?? r.s ?? "");
-    if (!sym) continue;
-    const lev = Number(r.leverage ?? r.l);
-    if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures'); // ✅
-  }
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-
-        // ⬅️ ADD: server không hỗ trợ getPositionRisk → chuyển sang fallback
-if (data?.type === 'error' && data?.action === 'getPositionRisk') {
-  this.noPositionRiskSupport = true;
-  console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
-  this.getFuturesAccount();   // kéo leverage/isolatedWallet qua đây
-  return;                     // dừng xử lý message này
-}
-
-
-        // ===== AUTHENTICATED =====
-        if (data?.type === 'authenticated') {
-          this.state = 'authenticated';
-          this.authInFlight = false;
-          this.authResolvers.splice(0).forEach(r => r());
-          this.flushAuthed();
-          // ❌ Đừng auto select/subscribe ở đây
-          // ❌ Đừng auto getPositions/getFuturesAccount ở đây
-          return;
-        }
-
-        // ====== HANDLE getPositions (array) — RAW Position Risk ======
-        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
-  // ✅ nếu packet có leverage thì cache lại luôn
-  try {
-    for (const r of data) {
-      const sym = String(r.symbol ?? "");
-      const lev = Number(r.leverage ?? r.l);
-      if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
-    }
-  } catch {}
-
-  if (this.positionUpdateHandler) this.positionUpdateHandler(data);
-
-  try {
-    const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
-    if (symbols.length) {
-      if (this.noPositionRiskSupport) this.getFuturesAccount();
-      else this.requestPositionRisk(symbols);
-    }
-  } catch {}
-
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-
-        // ====== MiniTicker (public) ======
-        if (data.e === '24hrMiniTicker' || data.action === 'miniTickerUpdate') {
-          const id = `miniTicker_${data.s || data.symbol}`;
-          const cb = this.callbacks.get(id);
-          if (cb) cb(data);
-          else console.warn('⚠️ Không có callback cho miniTicker:', id);
-          return;
-        }
-
-        // ====== MarkPrice Update (custom action) ======
-        if (data.action === 'markPriceUpdate') {
-          this.handleMarkPriceData(data);
-          return;
-        }
-
-        // ====== ORDER UPDATE (futures) ======
-        if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
-  const o = data.o;
-  const order = {
-    orderId: o.i,
-    symbol: o.s,
-    side: o.S,
-    type: o.o,
-    price: o.p,
-    origQty: o.q,
-    executedQty: o.z ?? o.q ?? "0",
-    status: o.X,
-
-    stopPrice: o.sp,
-    workingType: o.wt,
-    time: o.T ?? data.T ?? Date.now(),
-    updateTime: data.T ?? o.T ?? Date.now(),
-  };
-
-          let currentOrders: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
-
-          // Tự huỷ TP/SL đối ứng khi một cái FILLED
-          if (['TAKE_PROFIT_MARKET', 'STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
-            const oppositeType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
-            const opposite = currentOrders.find(
-              (x) => x.symbol === order.symbol && x.type === oppositeType && x.status === 'NEW'
-            );
-            if (opposite) {
-              console.log('🤖 Huỷ lệnh đối ứng TP/SL:', oppositeType, 'orderId:', opposite.orderId);
-              this.sendAuthed({
-                action: 'cancelOrder',
-                symbol: order.symbol,
-                orderId: opposite.orderId,
-                market: 'futures',
-              });
-            }
-          }
-
-          // Cập nhật openOrders local
-          if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
-            currentOrders = currentOrders.filter((x) => x.orderId !== order.orderId);
-          } else {
-            const idx = currentOrders.findIndex((x) => x.orderId === order.orderId);
-            if (idx !== -1) currentOrders[idx] = order;
-            else currentOrders.push(order);
-          }
-
-          console.log('📦 Final openOrders:', currentOrders);
-          localStorage.setItem('openOrders', JSON.stringify(currentOrders));
-          if (this.orderUpdateHandler) this.orderUpdateHandler(currentOrders);
-          // Không return: để các handler khác vẫn nhận
-        }
-
-        // ====== ACCOUNT UPDATE (Spot/Futures) ======
-if (data?.type === 'update' && data?.channel === 'account') {
-  if (data.orders && this.orderUpdateHandler) {
-    console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
-    localStorage.setItem('openOrders', JSON.stringify(data.orders));
-    this.orderUpdateHandler(data.orders);
-  }
-
-  if (Array.isArray(data?.a?.P) && this.positionUpdateHandler) {
-    const positions = data.a.P.map((p: any) => {
-      const sym = String(p.s);
-      const levFromPacket = Number(p.l);
-      const lev = (Number.isFinite(levFromPacket) && levFromPacket > 0)
-  ? levFromPacket
-  : (this.getLeverage(p.s, 'futures') || undefined); // ✅ lấy từ cache nếu packet không có
-
-    return {
-        symbol: sym,
-        positionAmt: p.pa,
-        entryPrice: p.ep,
-        breakEvenPrice: p.bep,
-        marginType: (p.mt || '').toString().toLowerCase(),
-        isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
-        positionSide: p.ps,
-        leverage: lev, // ✅ enrich
-        // markPrice đến từ kênh khác
-      };
-    });
-
-    console.log("ACCOUNT_UPDATE ENRICH", positions.map(p => ({ s: p.symbol, lev: p.leverage })));
-
-    this.positionUpdateHandler(positions);
-
-    // Nếu còn thiếu lev ở bất kỳ position nào -> kéo snapshot để backfill
-    try {
-      const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
-      if (needBackfill) this.getFuturesAccount();
-    } catch (e) {
-      console.warn('position backfill check err:', e);
-    }
-  }
-
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-
-if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
-  const { s: symbol, l: leverage } = data.ac || {};
-  if (symbol && Number.isFinite(leverage)) {
-    this.setLeverageFor(symbol, leverage, 'futures'); // ✅
-    this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
-  }
-  return;
-}
-
-
-        // ====== Multi Assets Mode ======
-        if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
-          console.log('📥 [WS] Nhận multiAssetsMode:', data);
-          if (data.positions) {
-            localStorage.setItem('positions', JSON.stringify(data.positions));
-          }
-          if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
-            localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
-          }
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ====== POSITION RISK (backfill leverage/IM) ======
-        if (data?.type === 'positionRisk' && Array.isArray(data.data)) {
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ====== Forward còn lại ======
-        this.messageHandlers.forEach(h => h(data));
-      } catch (error) {
-        console.error('❌ WS parse error:', error);
-      }
-    };
-
-    sock.onerror = (event) => {
-      console.error('❌ WebSocket error:', event);
-    };
-
-    sock.onclose = (event) => {
-      console.warn('🔌 WebSocket closed:', event.reason || 'no reason');
-      this.state = 'closed';
-      // (tuỳ chọn) giữ queue để reconnect sau vẫn flush được
-    };
-  }
-
-  // ========= Low-level senders =========
-  private sendOpen(data: any) {
-    if (!this.socket) {
-      console.warn('⛔ WS null, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-      return;
-    }
-    if (this.socket.readyState === WebSocket.OPEN && (this.state === 'open' || this.state === 'authenticated')) {
-      console.log('📤 WS Sending (open):', data);
-      this.socket.send(JSON.stringify(data));
-    } else {
-      console.warn('⛔ WS not open, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-    }
-  }
-
-  private sendAuthed(data: any) {
-    if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
-      if (data?.action === 'selectBinanceAccount') {
-        // đưa lên đầu + khử trùng
-        this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
-      } else {
-        this.authedQueue.push(data);
-      }
-      return;
-    }
-    console.log('📤 WS Sending (authed):', data);
-    this.socket.send(JSON.stringify(data));
-  }
-
-  private flushPreAuth() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const q = this.preAuthQueue;
-    this.preAuthQueue = [];
-    q.forEach(msg => {
-      try { this.socket!.send(JSON.stringify(msg)); }
-      catch { this.preAuthQueue.push(msg); }
-    });
-  }
-
-  private flushAuthed() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') return;
-
-    const q = this.authedQueue;
-    this.authedQueue = [];
-
-    const selects = q.filter(m => m.action === 'selectBinanceAccount');
-    const subs    = q.filter(m => m.action === 'subscribeAccountUpdates');
-    const others  = q.filter(m => m.action !== 'selectBinanceAccount' && m.action !== 'subscribeAccountUpdates');
-
-    const send = (m: any) => this.socket!.send(JSON.stringify(m));
-
-    if (selects.length) {
-      selects.forEach(send);
-      // đợi server “ghi” xong account, rồi mới bắn phần còn lại
-      setTimeout(() => {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
-          this.authedQueue.push(...subs, ...others);
-          return;
-        }
-        subs.forEach(send);
-        others.forEach(send);
-      }, 120);
-    } else {
-      // không có select thì flush bình thường
-      [...subs, ...others].forEach(send);
-    }
-  }
-
-  // ========= Auth & session =========
-  public authenticate(token: string) {
-    if (this.state === 'authenticated' || this.authInFlight) return;
-    this.authInFlight = true;
-
-    // chỉ gửi auth 1 lần
-    this.sendOpen({ action: 'authenticate', token });
-
-    // chỉ xếp hàng getMyBinanceAccounts 1 lần
-    this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
-    this.pushAuthedUnique('getFuturesAccount', { action: 'getFuturesAccount' });
-  }
-
-  public getMyBinanceAccounts() {
-    this.sendAuthed({ action: 'getMyBinanceAccounts' });
-  }
-
-  public selectAccount(id: number) {
-  console.log('⚙️ Selecting account with ID:', id);
-  this.currentAccountId = id;
-  localStorage.setItem('selectedBinanceAccountId', String(id));
-  // ✅ nạp cache leverage từ local cho account này
-  this.hydrateLeverageCacheFromLS('futures');
-  this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
-}
-
-public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
-  const sym = symbol.toUpperCase();
-  const cache = this.symbolLeverage.get(sym);
-  if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
-
-  const fromLS = this.loadLeverageLS(sym, market);
-  if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
-    // đồng bộ lại vào cache cho lần sau
-    this.symbolLeverage.set(sym, fromLS as number);
-    return fromLS as number;
-  }
-  return fallback;
-}
-
-
-  public getBalances(market: 'spot' | 'futures' | 'both') {
-    console.log('🔎 Getting balances for market:', market);
-    this.sendAuthed({ action: 'getBalances', market });
-  }
-
-  // ========= Accounts / Positions (wrappers sạch) =========
-  public getPositions(binanceAccountId?: number) {
-    const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
-    const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
-    const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
-    if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
-    this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
-  }
-
-  public getFuturesAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
-  }
-
-  public getSpotAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
-  }
-
-  public getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-    // gửi yêu cầu
-    this.sendAuthed({ action: 'getMultiAssetsMode' });
-
-    if (!onResult) return;
-
-    // one-shot handler
-    const once = (msg: any) => {
-      if (msg?.type === 'getMultiAssetsMode') {
-        const isMulti = !!msg.multiAssetsMargin;
-        onResult(isMulti, msg);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  // ========= Orders =========
-  public placeOrder(payload: PlaceOrderPayload) {
-    this.sendAuthed({ action: 'placeOrder', ...payload });
-  }
-
-  /** Lấy danh sách lệnh mở theo market (và optional symbol) */
-  public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {
-    const payload: any = { action: 'getOpenOrders', market };
-    if (symbol) payload.symbol = symbol;
-    this.sendAuthed(payload);
-  }
-
-  /** Huỷ 1 lệnh theo orderId/symbol/market */
-  public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelOrder', symbol, orderId, market };
-    console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  public cancelAllOrders(symbol: string, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelAllOrders', symbol, market };
-    console.log('🛑 Gửi yêu cầu huỷ tất cả lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  private accountSubActive = false;
-
-  // ========= Realtime account updates =========
-  public subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
-    if (this.accountSubActive) return;
-    this.accountSubActive = true;
-    this.orderUpdateHandler = onOrderUpdate;
-    this.sendAuthed({ action: 'subscribeAccountUpdates', types });
-  }
-
-  public unsubscribeAccountUpdates(types: string[] = []) {
-    const payload = { action: 'unsubscribeAccountUpdates', types };
-    console.log('🔕 Hủy đăng ký cập nhật real-time:', payload);
-    this.sendAuthed(payload);
-    this.accountSubActive = false;
-  }
-
-  public changeMultiAssetsMode(
-    multiAssetsMargin: boolean,
-    onSuccess?: (res: any) => void,
-    onError?: (err: string) => void
-  ) {
-    const payload = { action: 'changeMultiAssetsMode', multiAssetsMargin };
-    this.sendAuthed(payload);
-
-    const tempHandler = (msg: any) => {
-      if (msg?.msg === 'success' && typeof msg.multiAssetsMargin === 'boolean') {
-        onSuccess?.(msg);
-        this.removeMessageHandler(tempHandler);
-      } else if (msg?.success === false && msg?.error) {
-        onError?.(msg.error);
-        this.removeMessageHandler(tempHandler);
-      }
-    };
-    this.onMessage(tempHandler);
-  }
-
-  // ========= Public/Futures streams =========
-  private handleMarkPriceData(data: any) {
-    const subscriptionId = `markPrice_${data.symbol}_${data.market}`;
-    console.log('Handle MarkPriceData for subscriptionId:', subscriptionId);
-    const callback = this.callbacks.get(subscriptionId);
-    if (callback) {
-      console.log('Callback found, calling with data:', data);
-      callback(data);
-    } else {
-      console.warn('No callback found for subscriptionId:', subscriptionId);
-    }
-  }
-
-  public subscribeMarkPrice(symbol: string, market: MarketType = 'futures', callback?: (data: any) => void) {
-    const subscriptionId = `markPrice_${symbol}_${market}`;
-    const message = { action: 'subscribeMarkPrice', market, symbol };
-    console.log('📤 Gửi subscribeMarkPrice:', message);
-
-    if (callback) this.callbacks.set(subscriptionId, callback);
-    this.subscriptions.set(subscriptionId, {
-      id: subscriptionId,
-      action: 'subscribeMarkPrice',
-      symbol,
-      market,
-      timestamp: Date.now(),
-    });
-
-    // BE của bạn hình như yêu cầu auth → dùng authed
-    this.sendAuthed(message);
-    return subscriptionId;
-  }
-
-  public subscribePublicMiniTicker(symbol: string, callback: (data: any) => void) {
-    const id = `miniTicker_${symbol}`;
-    this.callbacks.set(id, callback);
-
-    const message = { action: 'subscribePublicMiniTicker', symbol };
-    console.log('📤 Gửi subscribePublicMiniTicker:', message);
-
-    // Nếu thực sự public thì có thể sendOpen; hiện để authed cho chắc
-    this.sendAuthed(message);
-    return id;
-  }
-}
-
-export const binanceWS = new BinanceWebSocketService();
-
-
-
-//-=================================
-
-// BinanceWebSocketService.ts
-// Clean API: state machine + 2 queues (preAuth/authed), no generic send(), full wrappers
-
-type MarketType = 'spot' | 'futures';
-type WsState = 'closed' | 'connecting' | 'open' | 'authenticated';
-
-// ==== Types for placing orders ====
-export type WorkingType = 'MARK' | 'LAST';
-
-export interface PlaceOrderPayload {
-  symbol: string;
-  side: 'BUY' | 'SELL';
-  type: 'MARKET' | 'LIMIT' | 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
-  market: 'futures' | 'spot';
-
-  // qty/price
-  quantity: number;
-  price?: number;     // LIMIT
-  stopPrice?: number; // *_MARKET (TP/SL)
-
-  // futures-only (optional)
-  reduceOnly?: boolean;
-  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
-  timeInForce?: 'GTC' | 'IOC' | 'FOK';
-
-  // trigger theo Binance Futures
-  workingType?: WorkingType; // 'MARK' | 'LAST'
-}
-
-class BinanceWebSocketService {
-  private socket: WebSocket | null = null;
-  private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
-
-  // ===== add fields =====
-  private authInFlight = false;
-  private authedOnceKeys = new Set<string>();
-  private pushAuthedUnique(key: string, msg: any) {
-    if (this.authedOnceKeys.has(key)) return;
-    this.authedOnceKeys.add(key);
-    this.authedQueue.push(msg);
-  }
-  private noPositionRiskSupport = true;
-
-  // ===== State & queues =====
-  private state: WsState = 'closed';
-  private openResolvers: Array<() => void> = [];
-  private authResolvers: Array<() => void> = [];
-  private preAuthQueue: any[] = []; // gửi khi state >= 'open'
-  private authedQueue: any[] = [];  // gửi khi state === 'authenticated'
-
-  // ===== Handlers & caches =====
-  private messageHandlers: ((data: any) => void)[] = [];
-  private currentAccountId: number | null = null;
-  private orderUpdateHandler: ((orders: any[]) => void) | null = null;
-  private positionUpdateHandler: ((positions: any[]) => void) | null = null;
-
-  // Subscriptions / callbacks
-  private subscriptions: Map<string, any> = new Map();
-  private callbacks: Map<string, (data: any) => void> = new Map();
-
-  // RAM replay cho positions
-  private lastPositions: any[] | null = null;
-
-  // ==== coalesce risk requests ====
-  private pendingRiskSymbols = new Set<string>();
-  private riskDebounceTimer: number | null = null;
-
-  // ---- cache leverage theo symbol ----
-  private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
-
-  // ====== LocalStorage helpers cho Leverage ======
-  private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
-    return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
-  }
-// thêm trong class BinanceWebSocketService
-
-private chooseAccountAndBoot(accounts: any[]) {
-  if (!Array.isArray(accounts) || accounts.length === 0) return;
-
-  // ưu tiên id đã lưu trong LS
-  const saved = Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  let target = Number.isFinite(saved) && saved > 0
-    ? saved
-    : Number(accounts[0]?.id || accounts[0]?.binanceAccountId || 0);
-
-  if (!target) return;
-
-  // select + boot
-  this.selectAccount(target);
-  setTimeout(() => {
-    this.getFuturesAccount(target);
-    this.getPositions(target);
-  }, 160);
-}
-
-/** Dùng ở UI: đảm bảo đã có accountId để gọi API */
-public ensureAccountSelected() {
-  if (this.currentAccountId || Number(localStorage.getItem('selectedBinanceAccountId') || 0) > 0) {
-    return; // đã có
-  }
-  // yêu cầu LIST account; khi về sẽ auto-select trong onmessage
-  this.getMyBinanceAccounts();
-}
-
-  private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
-    try {
-      const key = this.levKey(this.currentAccountId, market, symbol);
-      localStorage.setItem(key, String(lev));
-    } catch {}
-  }
-
-  private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
-    if (!this.currentAccountId) return;
-    const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith(prefix)) continue;
-      const sym = k.slice(prefix.length).toUpperCase();
-      const v = localStorage.getItem(k);
-      const n = v ? Number(v) : NaN;
-      if (sym && Number.isFinite(n) && n > 0) {
-        this.symbolLeverage.set(sym, n);
-      }
-    }
-  }
-
-  private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
-    try {
-      const key = this.levKey(this.currentAccountId, market, symbol);
-      const v = localStorage.getItem(key);
-      const n = v ? Number(v) : NaN;
-      return Number.isFinite(n) && n > 0 ? n : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
-    const n = Number(lev);
-    if (Number.isFinite(n) && n > 0) {
-      const sym = symbol.toUpperCase();
-      this.symbolLeverage.set(sym, n);
-      this.saveLeverageLS(sym, n, market);   // persist
-      console.log("LEV CACHE SET ✅", sym, n);
-    }
-  }
-
-  // ===== add near other private fields =====
-private lastAccountInfoEmit: number = 0;
-private refreshTimer: any = null;
-
-// Chuẩn hoá phát event account info
-private emitAccountInformation(payload: {
-  availableBalance?: number;
-  totalWalletBalance?: number;
-  totalMarginBalance?: number;
-  totalUnrealizedProfit?: number;
-  multiAssetsMargin?: boolean;
-  source: 'ws-live' | 'snapshot' | 'database-cache';
-}) {
-  // làm sạch về number
-  const toNum = (v: any) => (typeof v === 'string' ? parseFloat(v) : Number(v ?? 0));
-  const info = {
-    availableBalance: toNum(payload.availableBalance),
-    totalWalletBalance: toNum(payload.totalWalletBalance),
-    totalMarginBalance: toNum(payload.totalMarginBalance),
-    totalUnrealizedProfit: toNum(payload.totalUnrealizedProfit),
-    multiAssetsMargin: !!payload.multiAssetsMargin,
-    source: payload.source,
-  };
-  this.lastAccountInfoEmit = Date.now();
-  this.messageHandlers.forEach(h => h({ type: 'accountInformation', data: info }));
-}
-
-// Debounce refresh snapshot (hạn chế spam)
-private scheduleAccountRefresh(ms = 350) {
-  if (this.refreshTimer) {
-    clearTimeout(this.refreshTimer);
-    this.refreshTimer = null;
-  }
-  this.refreshTimer = setTimeout(() => {
-    this.getFuturesAccount();
-  }, ms);
-}
-
-public getAccountInformation() {
-  // Server của bạn đã có getFuturesAccount → dùng làm nguồn account info
-  this.getFuturesAccount();
-}
-
-
-
-  // ========= Helpers =========
-  private waitForOpen(): Promise<void> {
-    if (this.state === 'open' || this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.openResolvers.push(res));
-  }
-  private waitForAuth(): Promise<void> {
-    if (this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.authResolvers.push(res));
-  }
-
-  // === Position Risk (backfill leverage/IM) ===
-  public requestPositionRisk(_symbols?: string[]) {
-    this.getFuturesAccount(); // fallback: kéo leverage/iw qua snapshot
-  }
-
-  // (không dùng)
-  private _sendGetPositionRisk(_symbols?: string[]) { /* no-op */ }
-
-  public setCurrentAccountId(id: number) {
-    this.currentAccountId = id;
-  }
-  public getCurrentAccountId(): number | null {
-    return this.currentAccountId;
-  }
-
-  public setPositionUpdateHandler(handler: (positions: any[]) => void) {
-    this.positionUpdateHandler = handler;
-    if (this.lastPositions) {
-      try { handler(this.lastPositions); } catch {}
-    }
-  }
-
-  public setOrderUpdateHandler(handler: ((orders: any[]) => void) | null) {
-    this.orderUpdateHandler = handler;
-  }
-
-  public onMessage(handler: (data: any) => void) {
-    this.messageHandlers.push(handler);
-  }
-  public removeMessageHandler(handler: (data: any) => void) {
-    this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-  }
-
-  public isConnected() {
-    return this.socket?.readyState === WebSocket.OPEN;
-  }
-
-  // changeposition
-  public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
-
-    if (!onDone) return;
-    const once = (m: any) => {
-      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onDone(true, m);
-        this.removeMessageHandler(once);
-      } else if (m?.success === false && m?.error) {
-        onDone(false, m);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  public getPositionMode(onResult?: (dual: boolean) => void) {
-    this.sendAuthed({ action: 'getPositionMode' });
-    if (!onResult) return;
-    const once = (m: any) => {
-      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onResult(m.dualSidePosition);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  // Public: đóng WS + dọn state
-  public disconnect(reason?: string) {
-    try { this.socket?.close(1000, reason || 'client disconnect'); } catch {}
-    this.socket = null;
-    this.state = 'closed';
-    this.authInFlight = false;
-    this.openResolvers.splice(0);
-    this.authResolvers.splice(0);
-    this.preAuthQueue = [];
-    this.authedQueue = [];
-    this.accountSubActive = false;
-    this.messageHandlers = [];
-    this.callbacks.clear();
-    this.subscriptions.clear();
-    this.pendingRiskSymbols.clear();
-    if (this.riskDebounceTimer != null) {
-      clearTimeout(this.riskDebounceTimer);
-      this.riskDebounceTimer = null;
-    }
-  }
-
-  // Public: chờ tới khi AUTHENTICATED
-  public async waitUntilAuthenticated() {
-    if (this.state === 'authenticated') return;
-    await this.waitForOpen();
-    await this.waitForAuth();
-  }
-
-  // Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
-  public async selectAccountAndWait(id: number, settleMs = 160) {
-    this.selectAccount(id);
-    await new Promise(res => setTimeout(res, settleMs)); // khớp flushAuthed (120ms)
-  }
-
-  // ========= Connect (idempotent) =========
-  public connect(token: string, onMessage: (data: any) => void) {
-    // Nếu đã có socket CONNECTING/OPEN: không tạo thêm
-    if (this.socket && (this.socket.readyState === WebSocket.CONNECTING || this.socket.readyState === WebSocket.OPEN)) {
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-      if (token) this.authenticate(token); // tự auth nếu chưa
-      return;
-    }
-
-    this.state = 'connecting';
-    const sock = new WebSocket(this.wsUrl);
-    this.socket = sock;
-
-    sock.onopen = () => {
-      if (this.socket !== sock) return;
-      this.state = 'open';
-      console.log('✅ WebSocket connected');
-
-      // Resolve những promise chờ OPEN
-      this.openResolvers.splice(0).forEach(r => r());
-
-      // Flush những job KHÔNG cần auth
-      this.flushPreAuth();
-
-      // Auth nếu có token
-      if (token) this.authenticate(token);
-
-      // Gắn handler global
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-
-      // Khôi phục accountId từ localStorage (chỉ set state; sẽ select sau khi authenticated)
-      const saved = localStorage.getItem('selectedBinanceAccountId');
-      if (saved !== null) {
-        const parsed = Number(saved);
-        if (!Number.isNaN(parsed)) this.setCurrentAccountId(parsed);
-      }
-    };
-
-    sock.onmessage = (event) => {
-      if (this.socket !== sock) return;
-      console.log('📥 RAW WS MSG:', event.data);
-      try {
-        const data = JSON.parse(event.data);
-
-        // ---- EARLY: nếu gói WS có top-level availableBalance (định dạng giống bạn paste) ----
-if (
-  (typeof (data as any)?.availableBalance === 'string' || typeof (data as any)?.availableBalance === 'number') &&
-  // kèm vài dấu hiệu là "tài khoản futures"
-  ((data as any)?.multiAssetsMargin !== undefined ||
-   (data as any)?.totalWalletBalance !== undefined ||
-   (data as any)?.assets !== undefined)
-) {
-  this.emitAccountInformation({
-    availableBalance: (data as any).availableBalance,
-    totalWalletBalance: (data as any).totalWalletBalance,
-    totalMarginBalance: (data as any).totalMarginBalance,
-    totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-    multiAssetsMargin: !!(data as any).multiAssetsMargin,
-    source: 'ws-live',
-  });
-  // không return; để các handler khác vẫn nhận được gói gốc nếu cần
-}
-
-
-        // --- FORWARD SNAPSHOT POSITIONS (no cache) ---
-        // 1) Mảng thuần
-        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt !== undefined) {
-          console.log("📥 WS positions[] snapshot:", data);
-          this.lastPositions = data;
-          this.positionUpdateHandler?.(data);
-          return;
-        }
-        // 2) Bọc trong object.positions
-        if (data && Array.isArray((data as any).positions)) {
-          const arr = (data as any).positions;
-          console.log("📥 WS positions snapshot (wrapped):", arr);
-          this.lastPositions = arr;
-          this.positionUpdateHandler?.(arr);
-          return;
-        }
-        // 3) Bọc trong object.data
-        if (
-          (data?.type === "getPositions" || data?.type === "positions" || data?.type === "futuresPositions") &&
-          Array.isArray((data as any).data)
-        ) {
-          const arr = (data as any).data;
-          console.log("📥 WS positions snapshot (data):", arr);
-          this.lastPositions = arr;
-          this.positionUpdateHandler?.(arr);
-          return;
-        }
-
-        // Nếu server trả mảng orders (kết quả của getOpenOrders)
-        if (Array.isArray(data) && data[0]?.orderId && data[0]?.symbol && data[0]?.status) {
-          console.log("📥 WS got openOrders array:", data);
-          localStorage.setItem("openOrders", JSON.stringify(data));
-          if (this.orderUpdateHandler) this.orderUpdateHandler(data);
-          return;
-        }
-
-        // Phản hồi leverage đơn
-        if (data?.symbol && Number.isFinite(data?.leverage)) {
-          this.setLeverageFor(data.symbol, data.leverage);
-          this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
-          // không return; để các handler khác cũng nhận gói gốc nếu cần
-        }
-
-        console.log('📥 WS Parsed:', data);
-
-        // Forward snapshot futures account để UI merge leverage/iw
-        if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount')) {
-  // 4.1 backfill leverage nếu có positions
-  if (Array.isArray(data.positions)) {
-    for (const r of data.positions) {
-      const sym = String(r.symbol ?? r.s ?? "");
-      if (!sym) continue;
-      const lev = Number(r.leverage ?? r.l);
-      if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures');
-    }
-  }
-
-  // 4.2 phát accountInformation (source: snapshot)
-  this.emitAccountInformation({
-    availableBalance: (data as any).availableBalance,
-    totalWalletBalance: (data as any).totalWalletBalance,
-    totalMarginBalance: (data as any).totalMarginBalance,
-    totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-    multiAssetsMargin: !!(data as any).multiAssetsMargin,
-    source: 'snapshot',
-  });
-
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-
-        // server không hỗ trợ getPositionRisk → fallback
-        if (data?.type === 'error' && data?.action === 'getPositionRisk') {
-          this.noPositionRiskSupport = true;
-          console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
-          this.getFuturesAccount();
-          return;
-        }
-// Auto-select account khi có danh sách
-if (data?.type === 'getMyBinanceAccounts' && Array.isArray(data.accounts)) {
-  this.chooseAccountAndBoot(data.accounts);
-  // forward nếu UI có cần
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-        // ===== AUTHENTICATED =====
-        if (data?.type === 'authenticated') {
-          this.state = 'authenticated';
-          this.authInFlight = false;
-          this.authResolvers.splice(0).forEach(r => r());
-          this.flushAuthed();
-
-          // 🔁 Auto boot: select account (nếu có) rồi kéo snapshot
-          let targetId = this.currentAccountId;
-          if (!targetId) {
-            const saved = Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-            targetId = Number.isFinite(saved) && saved > 0 ? saved : null;
-            if (targetId) this.currentAccountId = targetId;
-          }
-          if (targetId) {
-            // đưa select lên đầu hàng đợi nếu chưa có
-            this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: targetId });
-            setTimeout(() => {
-              this.getFuturesAccount(targetId!);
-              this.getPositions(targetId!);
-            }, 160);
-          }
-          return;
-        }
-
-        // ====== HANDLE getPositions (array) — RAW Position Risk ======
-        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
-          try {
-            for (const r of data) {
-              const sym = String(r.symbol ?? "");
-              const lev = Number(r.leverage ?? r.l);
-              if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
-            }
-          } catch {}
-
-          this.lastPositions = data;
-          if (this.positionUpdateHandler) this.positionUpdateHandler(data);
-
-          try {
-            const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
-            if (symbols.length) {
-              if (this.noPositionRiskSupport) this.getFuturesAccount();
-              else this.requestPositionRisk(symbols);
-            }
-          } catch {}
-
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ====== MiniTicker (public) ======
-        if (data.e === '24hrMiniTicker' || data.action === 'miniTickerUpdate') {
-          const id = `miniTicker_${data.s || data.symbol}`;
-          const cb = this.callbacks.get(id);
-          if (cb) cb(data);
-          else console.warn('⚠️ Không có callback cho miniTicker:', id);
-          return;
-        }
-
-        // ====== MarkPrice Update (custom action) ======
-        if (data.action === 'markPriceUpdate') {
-          this.handleMarkPriceData(data);
-          return;
-        }
-
-        // === Single order object (ACK / PARTIALLY_FILLED / FILLED / CANCELED …)
-if (data?.orderId && data?.symbol && typeof data?.status === 'string') {
-  const order = {
-    orderId: data.orderId,
-    symbol:  data.symbol,
-    side:    data.side,
-    type:    data.type,
-    price:   data.price,
-    origQty: data.quantity,
-    executedQty: data.executedQty ?? data.quantity ?? "0",
-    status:  data.status,
-    stopPrice: data.stopPrice,
-    workingType: data.workingType || data.wt,
-    time: data.time ?? data.T ?? Date.now(),
-    updateTime: data.updateTime ?? data.T ?? Date.now(),
-  };
-
-  let current: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
-  if (['FILLED','CANCELED','REJECTED','EXPIRED'].includes(order.status)) {
-    current = current.filter(x => x.orderId !== order.orderId);
-  } else {
-    const i = current.findIndex(x => x.orderId === order.orderId);
-    if (i !== -1) current[i] = order; else current.push(order);
-  }
-  localStorage.setItem('openOrders', JSON.stringify(current));
-  if (this.orderUpdateHandler) this.orderUpdateHandler(current);
-
-  // Nếu lệnh đã FILLED → chủ động refresh
-if (order.status === 'FILLED' || order.status === 'PARTIALLY_FILLED') {
-  this.scheduleAccountRefresh(200);   // account
-  setTimeout(() => this.getPositions(), 200); // positions
-}
-
-  // TP/SL FILLED → huỷ lệnh đối ứng (nếu còn NEW)
-  if (['TAKE_PROFIT_MARKET','STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
-    const oppType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
-    const opp = current.find(x => x.symbol === order.symbol && x.type === oppType && x.status === 'NEW');
-    if (opp) this.sendAuthed({ action:'cancelOrder', symbol: order.symbol, orderId: opp.orderId, market:'futures' });
-  }
-
-  this.messageHandlers.forEach(h => h({ type:'orderUpdate', data: order }));
-  return;
-}
-
-
-        // ====== ORDER UPDATE (futures) ======
-        if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
-          this.scheduleAccountRefresh(350);
-
-          const o = data.o;
-          const order = {
-            orderId: o.i,
-            symbol: o.s,
-            side: o.S,
-            type: o.o,
-            price: o.p,
-            origQty: o.q,
-            executedQty: o.z ?? o.q ?? "0",
-            status: o.X,
-            stopPrice: o.sp,
-            workingType: o.wt,
-            time: o.T ?? data.T ?? Date.now(),
-            updateTime: data.T ?? o.T ?? Date.now(),
-          };
-
-          let currentOrders: typeof order[] = JSON.parse(localStorage.getItem('openOrders') || '[]');
-
-          // Tự huỷ TP/SL đối ứng khi một cái FILLED
-          if (['TAKE_PROFIT_MARKET', 'STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
-            const oppositeType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
-            const opposite = currentOrders.find(
-              (x) => x.symbol === order.symbol && x.type === oppositeType && x.status === 'NEW'
-            );
-            if (opposite) {
-              console.log('🤖 Huỷ lệnh đối ứng TP/SL:', oppositeType, 'orderId:', opposite.orderId);
-              this.sendAuthed({
-                action: 'cancelOrder',
-                symbol: order.symbol,
-                orderId: opposite.orderId,
-                market: 'futures',
-              });
-            }
-          }
-
-          // Cập nhật openOrders local
-          if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
-            currentOrders = currentOrders.filter((x) => x.orderId !== order.orderId);
-          }
-           else {
-            const idx = currentOrders.findIndex((x) => x.orderId === order.orderId);
-            if (idx !== -1) currentOrders[idx] = order;
-            else currentOrders.push(order);
-          }
-
-          console.log('📦 Final openOrders:', currentOrders);
-          localStorage.setItem('openOrders', JSON.stringify(currentOrders));
-          if (this.orderUpdateHandler) this.orderUpdateHandler(currentOrders);
-          // không return
-        }
-
-        // ====== ACCOUNT UPDATE (Spot/Futures) ======
-        // ====== REALTIME UPDATE (theo kênh sub: balance/positions/orders) ======
-if (data?.type === 'update' && ['account','positions','orders','balance'].includes(data?.channel)) {
-  // Balance (nếu packet có số cụ thể)
-  if (data.availableBalance !== undefined || data.totalWalletBalance !== undefined) {
-    this.emitAccountInformation({
-      availableBalance: data.availableBalance,
-      totalWalletBalance: data.totalWalletBalance,
-      totalMarginBalance: data.totalMarginBalance,
-      totalUnrealizedProfit: data.totalUnrealizedProfit,
-      multiAssetsMargin: data.multiAssetsMargin,
-      source: 'ws-live',
-    });
-  } else {
-    this.scheduleAccountRefresh(350);
-  }
-
-  // Orders (nếu BE nhét vào data.orders)
-  if (Array.isArray(data.orders) && this.orderUpdateHandler) {
-    localStorage.setItem('openOrders', JSON.stringify(data.orders));
-    this.orderUpdateHandler(data.orders);
-  }
-
-  // Positions – bắt đủ 3 format phổ biến
-  if (this.positionUpdateHandler) {
-    if (Array.isArray(data?.a?.P)) {
-      const positions = data.a.P.map((p: any) => {
-        const levPkt = Number(p.l);
-        const lev = (Number.isFinite(levPkt) && levPkt > 0) ? levPkt : (this.getLeverage(p.s,'futures') || undefined);
-        return {
-          symbol: String(p.s),
-          positionAmt: p.pa,
-          entryPrice: p.ep,
-          breakEvenPrice: p.bep,
-          marginType: (p.mt || '').toString().toLowerCase(),
-          isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
-          positionSide: p.ps,
-          leverage: lev,
-        };
-      });
-      this.lastPositions = positions;
-      this.positionUpdateHandler(positions);
-    } else if (Array.isArray(data.positions)) {
-      this.lastPositions = data.positions;
-      this.positionUpdateHandler(data.positions);
-    } else if (Array.isArray(data.data?.positions)) {
-      this.lastPositions = data.data.positions;
-      this.positionUpdateHandler(data.data.positions);
-    }
-  }
-
-  this.messageHandlers.forEach(h => h(data));
-  return;
-}
-
-        
-
-        if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
-          const { s: symbol, l: leverage } = data.ac || {};
-          if (symbol && Number.isFinite(leverage)) {
-            this.setLeverageFor(symbol, leverage, 'futures');
-            this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
-          }
-          return;
-        }
-
-        // ====== Multi Assets Mode ======
-        if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
-          console.log('📥 [WS] Nhận multiAssetsMode:', data);
-          // ❌ Không lưu positions vào localStorage để tránh “bóng ma”
-          if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
-            localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
-          }
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ====== POSITION RISK (backfill leverage/IM) ======
-        if (data?.type === 'positionRisk' && Array.isArray(data.data)) {
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ====== Forward còn lại ======
-        this.messageHandlers.forEach(h => h(data));
-      } catch (error) {
-        console.error('❌ WS parse error:', error);
-      }
-    };
-
-    sock.onerror = (event) => {
-      console.error('❌ WebSocket error:', event);
-    };
-
-    sock.onclose = (event) => {
-      console.warn('🔌 WebSocket closed:', event.reason || 'no reason');
-      this.state = 'closed';
-      // (tuỳ chọn) giữ queue để reconnect sau vẫn flush được
-    };
-  }
-
-  // ========= Low-level senders =========
-  private sendOpen(data: any) {
-    if (!this.socket) {
-      console.warn('⛔ WS null, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-      return;
-    }
-    if (this.socket.readyState === WebSocket.OPEN && (this.state === 'open' || this.state === 'authenticated')) {
-      console.log('📤 WS Sending (open):', data);
-      this.socket.send(JSON.stringify(data));
-    } else {
-      console.warn('⛔ WS not open, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-    }
-  }
-
-  private sendAuthed(data: any) {
-    if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
-      if (data?.action === 'selectBinanceAccount') {
-        this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
-      } else {
-        this.authedQueue.push(data);
-      }
-      return;
-    }
-    console.log('📤 WS Sending (authed):', data);
-    this.socket.send(JSON.stringify(data));
-  }
-
-  private flushPreAuth() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const q = this.preAuthQueue;
-    this.preAuthQueue = [];
-    q.forEach(msg => {
-      try { this.socket!.send(JSON.stringify(msg)); }
-      catch { this.preAuthQueue.push(msg); }
-    });
-  }
-
-  private flushAuthed() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') return;
-
-    const q = this.authedQueue;
-    this.authedQueue = [];
-
-    const selects = q.filter(m => m.action === 'selectBinanceAccount');
-    const subs    = q.filter(m => m.action === 'subscribeAccountUpdates');
-    const others  = q.filter(m => m.action !== 'selectBinanceAccount' && m.action !== 'subscribeAccountUpdates');
-
-    const send = (m: any) => this.socket!.send(JSON.stringify(m));
-
-    if (selects.length) {
-      selects.forEach(send);
-      setTimeout(() => {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
-          this.authedQueue.push(...subs, ...others);
-          return;
-        }
-        subs.forEach(send);
-        others.forEach(send);
-      }, 120);
-    } else {
-      [...subs, ...others].forEach(send);
-    }
-  }
-
-  // ========= Auth & session =========
-  public authenticate(token: string) {
-    if (this.state === 'authenticated' || this.authInFlight) return;
-    this.authInFlight = true;
-
-    // chỉ gửi auth 1 lần
-    this.sendOpen({ action: 'authenticate', token });
-
-    // chỉ xếp hàng 1 lần
-    this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
-    this.pushAuthedUnique('getFuturesAccount', { action: 'getFuturesAccount' });
-  }
-
-  public getMyBinanceAccounts() {
-    this.sendAuthed({ action: 'getMyBinanceAccounts' });
-  }
-
-  public selectAccount(id: number) {
-    console.log('⚙️ Selecting account with ID:', id);
-    this.currentAccountId = id;
-    localStorage.setItem('selectedBinanceAccountId', String(id));
-    // nạp cache leverage từ local cho account này
-    this.hydrateLeverageCacheFromLS('futures');
-    this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
-  }
-
-  public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
-    const sym = symbol.toUpperCase();
-    const cache = this.symbolLeverage.get(sym);
-    if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
-
-    const fromLS = this.loadLeverageLS(sym, market);
-    if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
-      this.symbolLeverage.set(sym, fromLS as number);
-      return fromLS as number;
-    }
-    return fallback;
-  }
-
-  public getBalances(market: 'spot' | 'futures' | 'both') {
-    console.log('🔎 Getting balances for market:', market);
-    this.sendAuthed({ action: 'getBalances', market });
-  }
-
-  // ========= Accounts / Positions (wrappers sạch) =========
-  public getPositions(binanceAccountId?: number) {
-    const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
-    const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
-    const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
-    if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
-    this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
-  }
-
-  public getFuturesAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
-  }
-
-  public getSpotAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
-  }
-
-  public getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'getMultiAssetsMode' });
-    if (!onResult) return;
-
-    const once = (msg: any) => {
-      if (msg?.type === 'getMultiAssetsMode') {
-        const isMulti = !!msg.multiAssetsMargin;
-        onResult(isMulti, msg);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  // ========= Orders =========
-  public placeOrder(payload: PlaceOrderPayload) {
-  this.sendAuthed({ action: 'placeOrder', ...payload });
-
-  // Nếu server chưa đẩy ORDER_TRADE_UPDATE, ta chủ động refresh vài nhịp
-  const retries = [400, 1200, 2500];
-  retries.forEach(ms => {
-    setTimeout(() => {
-      this.getPositions();
-      this.getFuturesAccount();
-    }, ms);
-  });
-}
-
-  public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {
-    const payload: any = { action: 'getOpenOrders', market };
-    if (symbol) payload.symbol = symbol;
-    this.sendAuthed(payload);
-  }
-
-  public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelOrder', symbol, orderId, market };
-    console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  public cancelAllOrders(symbol: string, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelAllOrders', symbol, market };
-    console.log('🛑 Gửi yêu cầu huỷ tất cả lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  private accountSubActive = false;
-
-  // ========= Realtime account updates =========
-  public subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
-    if (this.accountSubActive) return;
-    this.accountSubActive = true;
-    this.orderUpdateHandler = onOrderUpdate;
-    this.sendAuthed({ action: 'subscribeAccountUpdates', types });
-  }
-
-  public unsubscribeAccountUpdates(types: string[] = []) {
-    const payload = { action: 'unsubscribeAccountUpdates', types };
-    console.log('🔕 Hủy đăng ký cập nhật real-time:', payload);
-    this.sendAuthed(payload);
-    this.accountSubActive = false;
-  }
-
-  public changeMultiAssetsMode(
-    multiAssetsMargin: boolean,
-    onSuccess?: (res: any) => void,
-    onError?: (err: string) => void
-  ) {
-    const payload = { action: 'changeMultiAssetsMode', multiAssetsMargin };
-    this.sendAuthed(payload);
-
-    const tempHandler = (msg: any) => {
-      if (msg?.msg === 'success' && typeof msg.multiAssetsMargin === 'boolean') {
-        onSuccess?.(msg);
-        this.removeMessageHandler(tempHandler);
-      } else if (msg?.success === false && msg?.error) {
-        onError?.(msg.error);
-        this.removeMessageHandler(tempHandler);
-      }
-    };
-    this.onMessage(tempHandler);
-  }
-
-  // ========= Public/Futures streams =========
-  private handleMarkPriceData(data: any) {
-    const subscriptionId = `markPrice_${data.symbol}_${data.market}`;
-    console.log('Handle MarkPriceData for subscriptionId:', subscriptionId);
-    const callback = this.callbacks.get(subscriptionId);
-    if (callback) {
-      console.log('Callback found, calling with data:', data);
-      callback(data);
-    } else {
-      console.warn('No callback found for subscriptionId:', subscriptionId);
-    }
-  }
-
-  public subscribeMarkPrice(symbol: string, market: MarketType = 'futures', callback?: (data: any) => void) {
-    const subscriptionId = `markPrice_${symbol}_${market}`;
-    const message = { action: 'subscribeMarkPrice', market, symbol };
-    console.log('📤 Gửi subscribeMarkPrice:', message);
-
-    if (callback) this.callbacks.set(subscriptionId, callback);
-    this.subscriptions.set(subscriptionId, {
-      id: subscriptionId,
-      action: 'subscribeMarkPrice',
-      symbol,
-      market,
-      timestamp: Date.now(),
-    });
-
-    this.sendAuthed(message);
-    return subscriptionId;
-  }
-
-  public subscribePublicMiniTicker(symbol: string, callback: (data: any) => void) {
-    const id = `miniTicker_${symbol}`;
-    this.callbacks.set(id, callback);
-
-    const message = { action: 'subscribePublicMiniTicker', symbol };
-    console.log('📤 Gửi subscribePublicMiniTicker:', message);
-
-    this.sendAuthed(message);
-    return id;
-  }
-}
-
-export const binanceWS = new BinanceWebSocketService();
-

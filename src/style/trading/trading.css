@@ -1,0 +1,102 @@
+/* ============================================
+   TRADING TERMINAL - MAIN STYLESHEET
+   Import all trading-related CSS modules
+   ============================================ */
+
+/* Core Variables & Base Layout */
+@import './trading-variables.css';
+@import './trading-layout.css';
+
+/* Component Styles */
+@import './trading-header.css';
+@import './trading-chart.css';
+@import './trading-orderbook.css';
+@import './trading-form.css';
+@import './trading-positions.css';
+
+/* ===== GLOBAL OVERRIDES ===== */
+
+/* Prevent horizontal scroll everywhere */
+.trading-terminal,
+.trading-terminal * {
+  max-width: 100%;
+}
+
+/* Smooth scrolling */
+.trading-terminal {
+  scroll-behavior: smooth;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+/* Hide on mobile */
+@media (max-width: 767px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* Hide on tablet */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hide-tablet {
+    display: none !important;
+  }
+}
+
+/* Hide on desktop */
+@media (min-width: 1024px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+/* Focus visible for keyboard navigation */
+.trading-terminal button:focus-visible,
+.trading-terminal a:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.8);
+  outline-offset: 2px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .trading-terminal,
+  .trading-terminal * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+
+/* GPU acceleration for smooth animations */
+.trading-form-panel,
+.positions-panel {
+  will-change: transform;
+}
+
+/* Prevent layout shifts */
+.trading-terminal img,
+.trading-terminal svg {
+  display: block;
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .trading-terminal {
+    background: white;
+    color: black;
+  }
+  
+  .trading-form-panel,
+  .positions-panel,
+  .orderbook-panel {
+    display: none;
+  }
+  
+  .chart-panel {
+    page-break-inside: avoid;
+  }
+}

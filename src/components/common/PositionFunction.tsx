@@ -123,12 +123,12 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
   }, []);
 
   const tabs = useMemo(() => ([
-    { key: 'position',   label: 'Postion' },
-    { key: 'openOrder',  label: 'OpenOrder' },
-    { key: 'orderHistory', label: 'OrderHistoryPosition' },
-    { key: 'tradeHistory', label: 'TradeHistory' },
-    { key: 'pnlHistory',   label: 'PositionRealizedProfitHistory' },
-  ] as const), []);
+  { key: 'position',   label: 'Position' },
+  { key: 'openOrder',  label: 'Orders' },
+  { key: 'orderHistory', label: 'History' },
+  { key: 'tradeHistory', label: 'Trades' },
+  { key: 'pnlHistory',   label: 'PnL' },
+] as const), []);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -187,12 +187,12 @@ useEffect(() => {
   
 
   return (
-  <div className="w-full p-4">
-    <div className="flex space-x-4 border-b border-dark-700 mb-4">
+  <div className="w-full max-w-full overflow-hidden p-2 sm:p-4">
+  <div className="flex space-x-2 sm:space-x-4 border-b border-dark-700 mb-2 sm:mb-4 overflow-x-auto scrollbar-hide">
       {tabs.map((tab) => (
         <button
           key={tab.key}
-          className={`py-2 px-4 text-sm font-medium border-b-2 ${
+           className={`py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap flex-shrink-0 ${
             activeTab === tab.key
               ? 'border-primary-500 text-primary-500'
               : 'border-transparent text-gray-400 hover:text-white'
