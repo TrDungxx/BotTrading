@@ -44,6 +44,23 @@ import { useAuth } from "../context/AuthContext";
 import { User } from "../utils/types";
 import { PositionData, FloatingInfo } from "../utils/types";
 import PositionFunction from "../components/common/PositionFunction";
+import "../style/trading/trading.css";
+import "../style/trading/trading-variables.css";
+import "../style/trading/trading-header.css";
+import "../style/trading/trading-chart.css";
+import "../style/trading/trading-orderbook.css";
+import "../style/trading/trading-positions.css";
+import "../../src/style/trading/position-mobile-layout.css"
+
+import "../style/trading/trading-layout.css";
+
+
+import "../style/trading/trading-form.css";
+
+
+
+import "../style/trading/sidebar.css";
+
 import ChartTypePanel, {
   ChartType,
 } from "../components/layoutchart/Charttypepanel";
@@ -224,7 +241,7 @@ class CustomWebSocketService {
   private authToken: string | null = null;
   private binanceAccountId: number | null = null;
   private isConnected = false;
-  public onStatusChange: (status: ConnectionStatus) => void = () => {};
+  public onStatusChange: (status: ConnectionStatus) => void = () => { };
 
   constructor() {
     this.connect();
@@ -951,7 +968,7 @@ export default function TradingTerminal() {
   }, []);
 
   // Refs
-  const symbolButtonRef = useRef<HTMLButtonElement>(null);
+  const symbolButtonRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handlers
@@ -985,9 +1002,7 @@ export default function TradingTerminal() {
   const [bookTicker, setBookTicker] = useState<BookTickerData | null>(null);
   const [miniTicker, setMiniTicker] = useState<MiniTickerData | null>(null);
 
-  // Account data (private)
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-  const [orderUpdates, setOrderUpdates] = useState<OrderUpdate[]>([]);
+
 
   // UI
   const [activeOrderTab, setActiveOrderTab] = useState<
@@ -1532,22 +1547,26 @@ export default function TradingTerminal() {
       setAmount("");
     }
   };
-useEffect(() => {
-  const timer = setTimeout(() => {
-    window.dispatchEvent(new Event('resize'));
-  }, 150);
-  
-  return () => clearTimeout(timer);
-}, [
-  isPositionPanelOpen,
-  isTradingFormOpen,
-  positions?.length,
-  showPositionTab,
-  positionCount,
-  isMobile,                    // Thêm: Khi responsive breakpoint đổi
-  selectedSymbol,              // Thêm: Khi đổi symbol
-]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [
+    isPositionPanelOpen,
+    isTradingFormOpen,
+    positions?.length,
+    showPositionTab,
+    positionCount,
+    isMobile,                    // Thêm: Khi responsive breakpoint đổi
+    selectedSymbol,              // Thêm: Khi đổi symbol
+  ]);
+
+
+
   return (
+    
     <div className="trading-terminal">
       {/* ===== HEADER ===== */}
       <div className="trading-header">
@@ -1646,21 +1665,19 @@ useEffect(() => {
 
                 <div className="flex flex-col">
                   <span
-                    className={`text-sm font-medium ${
-                      parseFloat(tickerData.priceChange) >= 0
+                    className={`text-sm font-medium ${parseFloat(tickerData.priceChange) >= 0
                         ? "text-success-500"
                         : "text-danger-500"
-                    }`}
+                      }`}
                   >
                     {parseFloat(tickerData.priceChange) >= 0 ? "+" : ""}
                     {parseFloat(tickerData.priceChange).toFixed(4)}
                   </span>
                   <span
-                    className={`text-xs ${
-                      parseFloat(tickerData.priceChangePercent) >= 0
+                    className={`text-xs ${parseFloat(tickerData.priceChangePercent) >= 0
                         ? "text-success-500"
                         : "text-danger-500"
-                    }`}
+                      }`}
                   >
                     {parseFloat(tickerData.priceChangePercent) >= 0 ? "+" : ""}
                     {tickerData.priceChangePercent}%
@@ -1669,7 +1686,7 @@ useEffect(() => {
               </div>
             )}
           </div>
- {/* Stats Row 24h - Show only on XL */}
+          {/* Stats Row 24h - Show only on XL */}
           <div className="stats-row-24h">
             {tickerData ? (
               <>
@@ -1766,315 +1783,311 @@ useEffect(() => {
       </div>
 
       {/* ===== WORKSPACE ===== */}
-<div className="trading-workspace">
-  {/* Column 1+2: Chart & OrderBook & Position */}
-  <div className="workspace-left-columns">
-    {/* Row 1: Chart + OrderBook */}
-    <div className="workspace-chart-orderbook-row">
-      {/* Chart Panel */}
-      <div className="chart-panel">
-        <div className="h-full flex flex-col">
-          {/* Chart Controls */}
-          <div className="flex items-center justify-between p-3 border-b border-dark-700">
-            <div className="flex items-center space-x-4">
-              {/* Timeframe Selector */}
-              <div className="flex items-center space-x-2">
-                {pinnedTimeframes.map((interval) => (
-                  <button
-                    key={interval}
-                    onClick={() => handleIntervalChange(interval)}
-                    className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
-                      selectedInterval === interval ? "bg-dark-700" : ""
-                    }`}
-                  >
-                    {interval}
-                  </button>
-                ))}
+      <div className="trading-workspace">
+        {/* Column 1+2: Chart & OrderBook & Position */}
+        <div className="workspace-left-columns">
+          {/* Row 1: Chart + OrderBook */}
+          <div className="workspace-chart-orderbook-row">
+            {/* Chart Panel */}
+            <div className="chart-panel">
+              <div className="h-full flex flex-col">
+                {/* Chart Controls */}
+                <div className="flex items-center justify-between p-3 border-b border-dark-700">
+                  <div className="flex items-center space-x-4">
+                    {/* Timeframe Selector */}
+                    <div className="flex items-center space-x-2">
+                      {pinnedTimeframes.map((interval) => (
+                        <button
+                          key={interval}
+                          onClick={() => handleIntervalChange(interval)}
+                          className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${selectedInterval === interval ? "bg-dark-700" : ""
+                            }`}
+                        >
+                          {interval}
+                        </button>
+                      ))}
 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTimeout(() => {
-                      setShowTimeframeSelector(true);
-                    }, 0);
-                  }}
-                  className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
-                  title="Edit timeframes"
-                >
-                  <ChevronDown className="h-3 w-3" />
-                </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTimeout(() => {
+                            setShowTimeframeSelector(true);
+                          }, 0);
+                        }}
+                        className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
+                        title="Edit timeframes"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Chart Type Panel */}
+                    <ChartTypePanel
+                      currentType={chartType}
+                      onTypeChange={(newType) => {
+                        setChartType(newType);
+                        console.log("[ChartType] Changed to:", newType);
+                      }}
+                    />
+
+                    {/* Settings Button */}
+                    <div className="flex items-center gap-2 relative" ref={panelRef}>
+                      <button
+                        ref={settingsButtonRef}
+                        onClick={() => setShowSettings((v) => !v)}
+                        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+                        title="Cài đặt biểu đồ"
+                      >
+                        <Settings size={15} />
+                      </button>
+
+                      {showSettings && (
+                        <SettingControl
+                          settings={chartSettings}
+                          onToggle={(k, v) => setShowSettings(false)}
+                          onClose={() => setShowSettings(false)}
+                          triggerRef={settingsButtonRef}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Controls */}
+                  <div className="flex items-center space-x-2">
+                    <button className="p-1 hover:bg-dark-700 rounded non-essential">
+                      <TrendingUp className="h-4 w-4 text-dark-400" />
+                    </button>
+                    <button className="p-1 hover:bg-dark-700 rounded non-essential">
+                      <Maximize2 className="h-4 w-4 text-dark-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Chart Container */}
+                <div className="flex-1 relative min-h-0">
+                  <section className="h-full w-full bg-dark-800 rounded-xl overflow-hidden">
+                    <div className="h-full w-full chart-main-container">
+                      <TradingBinance
+                        selectedSymbol={selectedSymbol}
+                        chartType={chartType}
+                        onChartTypeChange={setChartType}
+                        selectedInterval={selectedInterval}
+                        market={selectedMarket}
+                        floating={floatingInfo}
+                        showPositionTag={chartSettings.positionTag}
+                        onRequestSymbolChange={(sym) => setSelectedSymbol(sym)}
+                      />
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+
+            {/* OrderBook Panel */}
+            <div className="orderbook-panel">
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b border-dark-700">
+                  <h3 className="text-sm font-medium">Order Book</h3>
+                  <div className="flex items-center space-x-2">
+                    <button className="text-xs text-dark-400 hover:text-dark-200">
+                      0.01
+                    </button>
+                    <Settings className="h-3 w-3 text-dark-400" />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  {orderBook ? (
+                    <div className="h-full flex flex-col">
+                      {/* Asks */}
+                      <div className="flex-1 overflow-y-auto">
+                        <div className="space-y-0.5 p-2">
+                          {orderBook.asks
+                            .slice(0, 10)
+                            .reverse()
+                            .map((ask, index) => (
+                              <div
+                                key={index}
+                                className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                                onClick={() =>
+                                  handleClickOrderBookPrice(parseFloat(ask.price))
+                                }
+                              >
+                                <span className="text-danger-500 font-mono">
+                                  {parseFloat(ask.price).toFixed(4)}
+                                </span>
+                                <span className="text-dark-300 font-mono">
+                                  {parseFloat(ask.quantity).toFixed(3)}
+                                </span>
+                                <div
+                                  className="absolute right-0 top-0 h-full bg-danger-500/10"
+                                  style={{
+                                    width: `${Math.min(
+                                      (parseFloat(ask.quantity) / 10) * 100,
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Current Price */}
+                      <div className="px-2 py-1 border-y border-dark-700">
+                        <div className="text-center">
+                          <div
+                            className={`text-sm font-bold ${tickerData && parseFloat(tickerData.priceChange) >= 0
+                                ? "text-success-500"
+                                : "text-danger-500"
+                              }`}
+                          >
+                            {tickerData
+                              ? parseFloat(tickerData.lastPrice).toFixed(4)
+                              : "0.0000"}
+                          </div>
+                          <div className="text-xs text-dark-400">
+                            ≈ $
+                            {tickerData
+                              ? parseFloat(tickerData.lastPrice).toFixed(2)
+                              : "0.00"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bids */}
+                      <div className="flex-1 overflow-y-auto">
+                        <div className="space-y-0.5 p-2">
+                          {orderBook.bids.slice(0, 10).map((bid, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                              onClick={() =>
+                                handleClickOrderBookPrice(parseFloat(bid.price))
+                              }
+                            >
+                              <span className="text-success-500 font-mono">
+                                {parseFloat(bid.price).toFixed(4)}
+                              </span>
+                              <span className="text-dark-300 font-mono">
+                                {parseFloat(bid.quantity).toFixed(3)}
+                              </span>
+                              <div
+                                className="absolute right-0 top-0 h-full bg-success-500/10"
+                                style={{
+                                  width: `${Math.min(
+                                    (parseFloat(bid.quantity) / 10) * 100,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-dark-400">
+                      <div className="text-center">
+                        <div className="text-sm">No order book data</div>
+                        <div className="text-xs mt-1">
+                          Waiting for WebSocket connection...
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Position Panel (Full width of Chart + OrderBook) */}
+          <div
+            className={`positions-panel ${isPositionPanelOpen ? "is-open" : ""}`}
+            data-count={positions.length} // ✅ Thêm attribute này
+          >
+            {/* Tab Header */}
+            {showPositionTab && (
+              <div
+                className="position-panel-header flex items-center justify-between cursor-pointer"
+                
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="font-semibold text-sm">Positions & Orders</span>
+                  {positionCount > 0 && (
+                    <span className="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-1 rounded-full bg-primary-500/20 text-primary-300 font-medium">
+                      {positionCount}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center">
+                  {isPositionPanelOpen ? (
+                    <ChevronDown className="h-4 w-4 text-dark-300" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4 text-dark-300" />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Panel Content */}
+            <div
+              className={`position-panel-content ${showPositionTab && !isPositionPanelOpen ? "hidden" : ""
+                }`}
+            >
+              <PositionFunction
+                market={selectedMarket}
+                selectedSymbol={selectedSymbol}
+                orderBook={orderBook}
+                positions={positions}
+                onFloatingInfoChange={setFloatingInfo}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Column 3: Trading Form (Độc lập) */}
+        <div
+          className={`trading-form-panel ${isTradingFormOpen ? "is-open" : ""}`}
+        >
+          {/* Mobile Header */}
+          {isMobile && (
+            <div
+              className="trading-form-mobile-header flex items-center justify-between p-3.5 bg-dark-700/80 backdrop-blur cursor-pointer border-b border-dark-600 hover:bg-dark-700 active:bg-dark-700/95 transition-colors"
+              onClick={() => setIsTradingFormOpen(!isTradingFormOpen)}
+            >
+              <div className="flex items-center space-x-2.5">
+                <span className="font-semibold text-sm">Trade {selectedSymbol}</span>
+                <span className="text-[10px] text-dark-400 bg-dark-800 px-1.5 py-0.5 rounded uppercase">
+                  {selectedMarket}
+                </span>
               </div>
 
-              {/* Chart Type Panel */}
-              <ChartTypePanel
-                currentType={chartType}
-                onTypeChange={(newType) => {
-                  setChartType(newType);
-                  console.log("[ChartType] Changed to:", newType);
-                }}
-              />
-
-              {/* Settings Button */}
-              <div className="flex items-center gap-2 relative" ref={panelRef}>
-                <button
-                  ref={settingsButtonRef}
-                  onClick={() => setShowSettings((v) => !v)}
-                  className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
-                  title="Cài đặt biểu đồ"
-                >
-                  <Settings size={15} />
-                </button>
-
-                {showSettings && (
-                  <SettingControl
-                    settings={chartSettings}
-                    onToggle={(k, v) => setShowSettings(false)}
-                    onClose={() => setShowSettings(false)}
-                    triggerRef={settingsButtonRef}
-                  />
+              <div className="flex items-center">
+                {isTradingFormOpen ? (
+                  <ChevronDown className="h-5 w-5 text-dark-300" />
+                ) : (
+                  <ChevronUp className="h-5 w-5 text-dark-300" />
                 )}
               </div>
             </div>
-
-            {/* Right Controls */}
-            <div className="flex items-center space-x-2">
-              <button className="p-1 hover:bg-dark-700 rounded non-essential">
-                <TrendingUp className="h-4 w-4 text-dark-400" />
-              </button>
-              <button className="p-1 hover:bg-dark-700 rounded non-essential">
-                <Maximize2 className="h-4 w-4 text-dark-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* Chart Container */}
-          <div className="flex-1 relative min-h-0">
-            <section className="h-full w-full bg-dark-800 rounded-xl overflow-hidden">
-              <div className="h-full w-full chart-main-container">
-                <TradingBinance
-                  selectedSymbol={selectedSymbol}
-                  chartType={chartType}
-                  onChartTypeChange={setChartType}
-                  selectedInterval={selectedInterval}
-                  market={selectedMarket}
-                  floating={floatingInfo}
-                  showPositionTag={chartSettings.positionTag}
-                  onRequestSymbolChange={(sym) => setSelectedSymbol(sym)}
-                />
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-
-      {/* OrderBook Panel */}
-      <div className="orderbook-panel">
-        <div className="h-full flex flex-col">
-          <div className="flex items-center justify-between p-3 border-b border-dark-700">
-            <h3 className="text-sm font-medium">Order Book</h3>
-            <div className="flex items-center space-x-2">
-              <button className="text-xs text-dark-400 hover:text-dark-200">
-                0.01
-              </button>
-              <Settings className="h-3 w-3 text-dark-400" />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-hidden">
-            {orderBook ? (
-              <div className="h-full flex flex-col">
-                {/* Asks */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="space-y-0.5 p-2">
-                    {orderBook.asks
-                      .slice(0, 10)
-                      .reverse()
-                      .map((ask, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
-                          onClick={() =>
-                            handleClickOrderBookPrice(parseFloat(ask.price))
-                          }
-                        >
-                          <span className="text-danger-500 font-mono">
-                            {parseFloat(ask.price).toFixed(4)}
-                          </span>
-                          <span className="text-dark-300 font-mono">
-                            {parseFloat(ask.quantity).toFixed(3)}
-                          </span>
-                          <div
-                            className="absolute right-0 top-0 h-full bg-danger-500/10"
-                            style={{
-                              width: `${Math.min(
-                                (parseFloat(ask.quantity) / 10) * 100,
-                                100
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* Current Price */}
-                <div className="px-2 py-1 border-y border-dark-700">
-                  <div className="text-center">
-                    <div
-                      className={`text-sm font-bold ${
-                        tickerData && parseFloat(tickerData.priceChange) >= 0
-                          ? "text-success-500"
-                          : "text-danger-500"
-                      }`}
-                    >
-                      {tickerData
-                        ? parseFloat(tickerData.lastPrice).toFixed(4)
-                        : "0.0000"}
-                    </div>
-                    <div className="text-xs text-dark-400">
-                      ≈ $
-                      {tickerData
-                        ? parseFloat(tickerData.lastPrice).toFixed(2)
-                        : "0.00"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bids */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="space-y-0.5 p-2">
-                    {orderBook.bids.slice(0, 10).map((bid, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
-                        onClick={() =>
-                          handleClickOrderBookPrice(parseFloat(bid.price))
-                        }
-                      >
-                        <span className="text-success-500 font-mono">
-                          {parseFloat(bid.price).toFixed(4)}
-                        </span>
-                        <span className="text-dark-300 font-mono">
-                          {parseFloat(bid.quantity).toFixed(3)}
-                        </span>
-                        <div
-                          className="absolute right-0 top-0 h-full bg-success-500/10"
-                          style={{
-                            width: `${Math.min(
-                              (parseFloat(bid.quantity) / 10) * 100,
-                              100
-                            )}%`,
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-dark-400">
-                <div className="text-center">
-                  <div className="text-sm">No order book data</div>
-                  <div className="text-xs mt-1">
-                    Waiting for WebSocket connection...
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Row 2: Position Panel (Full width of Chart + OrderBook) */}
-    <div
-  className={`positions-panel ${isPositionPanelOpen ? "is-open" : ""}`}
-  data-count={positions.length} // ✅ Thêm attribute này
->
-      {/* Tab Header */}
-      {showPositionTab && (
-        <div
-          className="position-panel-header flex items-center justify-between cursor-pointer"
-          onClick={() => setIsPositionPanelOpen(!isPositionPanelOpen)}
-        >
-          <div className="flex items-center space-x-3">
-            <span className="font-semibold text-sm">Positions & Orders</span>
-            {positionCount > 0 && (
-              <span className="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-1 rounded-full bg-primary-500/20 text-primary-300 font-medium">
-                {positionCount}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center">
-            {isPositionPanelOpen ? (
-              <ChevronDown className="h-4 w-4 text-dark-300" />
-            ) : (
-              <ChevronUp className="h-4 w-4 text-dark-300" />
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Panel Content */}
-      <div
-        className={`position-panel-content ${
-          showPositionTab && !isPositionPanelOpen ? "hidden" : ""
-        }`}
-      >
-        <PositionFunction
-          market={selectedMarket}
-          selectedSymbol={selectedSymbol}
-          orderBook={orderBook}
-          positions={positions}
-          onFloatingInfoChange={setFloatingInfo}
-        />
-      </div>
-    </div>
-  </div>
-
-  {/* Column 3: Trading Form (Độc lập) */}
-  <div
-    className={`trading-form-panel ${isTradingFormOpen ? "is-open" : ""}`}
-  >
-    {/* Mobile Header */}
-    {isMobile && (
-      <div
-        className="trading-form-mobile-header flex items-center justify-between p-3.5 bg-dark-700/80 backdrop-blur cursor-pointer border-b border-dark-600 hover:bg-dark-700 active:bg-dark-700/95 transition-colors"
-        onClick={() => setIsTradingFormOpen(!isTradingFormOpen)}
-      >
-        <div className="flex items-center space-x-2.5">
-          <span className="font-semibold text-sm">Trade {selectedSymbol}</span>
-          <span className="text-[10px] text-dark-400 bg-dark-800 px-1.5 py-0.5 rounded uppercase">
-            {selectedMarket}
-          </span>
-        </div>
-
-        <div className="flex items-center">
-          {isTradingFormOpen ? (
-            <ChevronDown className="h-5 w-5 text-dark-300" />
-          ) : (
-            <ChevronUp className="h-5 w-5 text-dark-300" />
           )}
+
+          {/* Trading Form Content */}
+          <div
+            className={`trading-form-content flex-1 min-h-0 overflow-y-auto ${isMobile && !isTradingFormOpen ? "hidden" : ""
+              }`}
+          >
+            <TradingForm
+              selectedSymbol={selectedSymbol}
+              price={livePrice}
+              internalBalance={availableBalance}
+              selectedMarket={selectedMarket}
+            />
+          </div>
         </div>
       </div>
-    )}
-
-    {/* Trading Form Content */}
-    <div
-      className={`trading-form-content flex-1 min-h-0 overflow-y-auto ${
-        isMobile && !isTradingFormOpen ? "hidden" : ""
-      }`}
-    >
-      <TradingForm
-        selectedSymbol={selectedSymbol}
-        price={livePrice}
-        internalBalance={availableBalance}
-        selectedMarket={selectedMarket}
-      />
-    </div>
-  </div>
-</div>
 
       {/* Timeframe Modal */}
       <TimeframeModalWrapper

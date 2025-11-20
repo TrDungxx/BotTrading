@@ -817,6 +817,7 @@ const updatePriceFormat = async (candles: Candle[]) => {
     if (!mainEl || !volumeEl) return;
 
     const mainChart = createChart(mainEl, {
+      autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
@@ -921,13 +922,13 @@ const updatePriceFormat = async (candles: Candle[]) => {
         mouse: true,
         touch: true,
       },
-      width: mainEl.clientWidth,
-      height: mainEl.clientHeight,
+      
     });
 
     chartRef.current = mainChart;
 
     const volumeChart = createChart(volumeEl, {
+      autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
@@ -1027,8 +1028,7 @@ const updatePriceFormat = async (candles: Candle[]) => {
         mouse: true,
         touch: true,
       },
-      width: volumeEl.clientWidth,
-      height: volumeEl.clientHeight,
+      
     });
 
     volumeChartRef.current = volumeChart;
@@ -1295,29 +1295,40 @@ mavol2Ref.current = volumeChart.addLineSeries({
   priceScaleId: 'right',
 });
 
-    const ro = new ResizeObserver(() => {
-      mainChart.applyOptions({ width: mainEl.clientWidth, height: mainEl.clientHeight });
-      volumeChart.applyOptions({ width: volumeEl.clientWidth, height: volumeEl.clientHeight });
-      
-      // Resize canvas overlay
-      if (bollCanvasRef.current) {
-        bollCanvasRef.current.width = mainEl.clientWidth;
-        bollCanvasRef.current.height = mainEl.clientHeight;
-        
-        // Redraw BOLL fill after resize
-        if (bollData && mainVisible.boll && chartRef.current) {
-          setTimeout(() => {
-            if (bollCanvasRef.current && chartRef.current) {
-              drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, bollData.upper, bollData.lower);
-            }
-          }, 100);
+   const ro = new ResizeObserver(() => {
+  if (!mainChart || !volumeChart) return;
+  
+  // ✅ NO NEED to call applyOptions with width/height anymore
+  // autoSize handles it automatically
+  
+  // Only resize canvas overlay
+  const mainW = mainEl.clientWidth;
+  const mainH = mainEl.clientHeight;
+  
+  if (bollCanvasRef.current && mainW > 0 && mainH > 0) {
+    bollCanvasRef.current.width = mainW;
+    bollCanvasRef.current.height = mainH;
+    
+    if (bollData && mainVisible.boll && chartRef.current) {
+      setTimeout(() => {
+        if (bollCanvasRef.current && chartRef.current) {
+          drawBollFill(
+            bollCanvasRef.current, 
+            chartRef.current, 
+            candleSeries.current!, 
+            bollData.upper, 
+            bollData.lower
+          );
         }
-      }
-      
-      setTimeout(() => forceSyncCharts(), 50);
-    });
-    ro.observe(mainEl);
-    ro.observe(volumeEl);
+      }, 100);
+    }
+  }
+  
+  setTimeout(() => forceSyncCharts(), 50);
+});
+
+ro.observe(mainEl);
+ro.observe(volumeEl);
     resizeObsRef.current = ro;
 const handleInteractionStart = () => {
   isInteractingRef.current = true;
@@ -1549,16 +1560,65 @@ useEffect(() => {
 }, [selectedSymbol, selectedInterval, market]);
 
 useEffect(() => {
+  console.log('[Reset] 🗑️ Clearing chart data for', selectedSymbol, selectedInterval, market);
+  setCandles([]);
+  setVolumeData([]);
+  setBollData(null); // Clear BOLL data too
+}, [selectedSymbol, selectedInterval, market]);
+
+// Main data loading useEffect
+useEffect(() => {
   if (!candleSeries.current || !volumeSeries.current || !chartRef.current) return;
 
   const mySession = ++sessionRef.current;
+  
+  // ✅ Clear chart series immediately
+  console.log('[LoadHistory] 🔄 Starting load for', selectedSymbol, selectedInterval, market);
+  
   try {
-    wsRef.current?.close();
+    candleSeries.current.setData([]);
+    volumeSeries.current.setData([]);
+    
+    // Clear indicator lines
+    if (ma7Ref.current) ma7Ref.current.setData([]);
+    if (ma25Ref.current) ma25Ref.current.setData([]);
+    if (ma99Ref.current) ma99Ref.current.setData([]);
+    if (ema12Ref.current) ema12Ref.current.setData([]);
+    if (ema26Ref.current) ema26Ref.current.setData([]);
+    if (bollUpperRef.current) bollUpperRef.current.setData([]);
+    if (bollMiddleRef.current) bollMiddleRef.current.setData([]);
+    if (bollLowerRef.current) bollLowerRef.current.setData([]);
+    if (mavol1Ref.current) mavol1Ref.current.setData([]);
+    if (mavol2Ref.current) mavol2Ref.current.setData([]);
+    
+    // Clear canvas
+    if (bollCanvasRef.current) {
+      const ctx = bollCanvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, bollCanvasRef.current.width, bollCanvasRef.current.height);
+      }
+    }
+  } catch (e) {
+    console.warn('[LoadHistory] ⚠️ Failed to clear series:', e);
+  }
+  
+  // Close old WebSocket
+  try {
+    if (wsRef.current) {
+      console.log('[WS] 🔌 Closing old WebSocket');
+      wsRef.current.close();
+      wsRef.current = null;
+    }
   } catch {}
 
-  const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://api.binance.com';
-  const wsBase =
-    market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
+  // ✅ CRITICAL: Force dùng data.binance.com cho spot
+  const restBase = market === 'futures' 
+    ? 'https://fapi.binance.com'
+    : 'https://data.binance.com';  // ⚠️ KHÔNG BAO GIỜ thay đổi!
+  
+  const wsBase = market === 'futures' 
+    ? 'wss://fstream.binance.com/ws' 
+    : 'wss://stream.binance.com:9443/ws';
 
   const controller = new AbortController();
 
@@ -1566,29 +1626,64 @@ useEffect(() => {
     const path = market === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
     const url = `${restBase}${path}?symbol=${selectedSymbol.toUpperCase()}&interval=${selectedInterval}&limit=500`;
     
+    console.log('[LoadHistory] 🔄 Fetching:', url);
+    
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, { 
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
       const data = await res.json();
 
-      if (sessionRef.current !== mySession) return;
+      if (!Array.isArray(data)) {
+        console.error('[LoadHistory] ❌ Invalid response type:', typeof data);
+        throw new Error('Expected array of klines');
+      }
+
+      if (data.length === 0) {
+        console.warn('[LoadHistory] ⚠️ No data returned for', selectedSymbol);
+        return;
+      }
+
+      if (sessionRef.current !== mySession) {
+        console.log('[LoadHistory] ⏭️ Skipping stale data (session changed)');
+        return;
+      }
 
       const cs: Candle[] = data.map((d: any) => ({
-        time: toTs(d[0]), open: +d[1], high: +d[2], low: +d[3], close: +d[4],
+        time: toTs(d[0]), 
+        open: +d[1], 
+        high: +d[2], 
+        low: +d[3], 
+        close: +d[4],
       }));
+      
       const vs: VolumeBar[] = data.map((d: any) => ({
-        time: toTs(d[0]), value: +d[5],
+        time: toTs(d[0]), 
+        value: +d[5],
         color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
       }));
 
+      console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles for', selectedSymbol);
+
       candleSeries.current!.setData(cs);
       volumeSeries.current!.setData(vs);
-setVolumeData(vs);
-if (vs.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
-  mavol1Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol1));
-}
-if (vs.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
-  mavol2Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol2));
-}
+      setVolumeData(vs);
+      
+      if (vs.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
+        mavol1Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol1));
+      }
+      if (vs.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
+        mavol2Ref.current.setData(calculateVolumeMA(vs, indicatorPeriods.mavol2));
+      }
+      
       await updatePriceFormat(cs);
 
       if (cs.length > 0) {
@@ -1640,157 +1735,175 @@ if (vs.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
       if (cs.length >= 7 && ma7Ref.current) ma7Ref.current.setData(calculateMA(cs, 7));
       if (cs.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(cs, 25));
       if (cs.length >= 99 && ma99Ref.current) ma99Ref.current.setData(calculateMA(cs, 99));
-// ✅ ADD EMA calculations
-if (cs.length >= 12 && ema12Ref.current && mainVisible.ema12) {
-  ema12Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema12 || 12));
-}
-if (cs.length >= 26 && ema26Ref.current && mainVisible.ema26) {
-  ema26Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema26 || 26));
-}
+      
+      if (cs.length >= 12 && ema12Ref.current && mainVisible.ema12) {
+        ema12Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema12 || 12));
+      }
+      if (cs.length >= 26 && ema26Ref.current && mainVisible.ema26) {
+        ema26Ref.current.setData(calculateEMA(cs, indicatorPeriods.ema26 || 26));
+      }
 
-// ✅ ADD BOLL calculations
-if (cs.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
-  const calculated = calculateBollingerBands(
-    cs, 
-    indicatorPeriods.boll?.period || 20, 
-    indicatorPeriods.boll?.stdDev || 2
-  );
-  if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
-  if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
-  if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
-  
-  // Save BOLL data to state for canvas rendering
-  setBollData(calculated);
-  
-  // Trigger canvas redraw
-  setTimeout(() => {
-    if (bollCanvasRef.current && chartRef.current) {
-      drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, calculated.upper, calculated.lower);
-    }
-  }, 100);
-}
+      if (cs.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
+        const calculated = calculateBollingerBands(
+          cs, 
+          indicatorPeriods.boll?.period || 20, 
+          indicatorPeriods.boll?.stdDev || 2
+        );
+        if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
+        if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
+        if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
+        
+        setBollData(calculated);
+        
+        setTimeout(() => {
+          if (bollCanvasRef.current && chartRef.current) {
+            drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current!, calculated.upper, calculated.lower);
+          }
+        }, 100);
+      }
+      
       setCandles(cs);
 
+      // ✅ Setup WebSocket for real-time updates
       const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
       wsRef.current = ws;
 
+      ws.onopen = () => {
+        console.log('[WS] ✅ Connected for', selectedSymbol, selectedInterval);
+      };
+
       ws.onmessage = (ev) => {
-  if (sessionRef.current !== mySession) return;
-  const parsed = JSON.parse(ev.data) as KlineMessage;
-  const k = parsed.k;
-  const t = toTs(k.t);
-  
-  const isClosed = k.x === true;
-
-  const candle: Candle = { 
-    time: t, 
-    open: +k.o, 
-    high: +k.h, 
-    low: +k.l, 
-    close: +k.c 
-  };
-  
-  const vol: VolumeBar = { 
-    time: t, 
-    value: +k.v, 
-    color: +k.c >= +k.o ? '#0ECB81' : '#F6465D' 
-  };
-
-  if (candleSeries.current && volumeSeries.current) {
-    candleSeries.current.update(candle);
-    volumeSeries.current.update(vol);
-setVolumeData((prev) => {
-  const i = prev.findIndex((v) => v.time === vol.time);
-  const next = i >= 0 
-    ? [...prev.slice(0, i), vol, ...prev.slice(i + 1)] 
-    : [...prev, vol];
-  
-  if (next.length > 500) next.shift();
-
-  if (next.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
-  mavol1Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol1));
-}
-if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
-  mavol2Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol2));
-} 
-
-  return next;
-});
-    
-    if (isClosed) {
-      console.log('[WS] 🕯️ New candle closed at', new Date(t * 1000).toISOString());
-      setTimeout(() => {
-        if (!chartRef.current || !volumeChartRef.current) return;
+        if (sessionRef.current !== mySession) return;
+        const parsed = JSON.parse(ev.data) as KlineMessage;
+        const k = parsed.k;
+        const t = toTs(k.t);
         
-        const mainTimeScale = chartRef.current.timeScale();
-        const volumeTimeScale = volumeChartRef.current.timeScale();
-        const logicalRange = mainTimeScale.getVisibleLogicalRange();
+        const isClosed = k.x === true;
+
+        const candle: Candle = { 
+          time: t, 
+          open: +k.o, 
+          high: +k.h, 
+          low: +k.l, 
+          close: +k.c 
+        };
         
-        if (logicalRange) {
-          volumeTimeScale.setVisibleLogicalRange(logicalRange);
-        }
-      }, 50);
-    }
-  }
+        const vol: VolumeBar = { 
+          time: t, 
+          value: +k.v, 
+          color: +k.c >= +k.o ? '#0ECB81' : '#F6465D' 
+        };
 
-  setCandles((prev) => {
-    if (sessionRef.current !== mySession) return prev;
-    const i = prev.findIndex((c) => c.time === candle.time);
-    const next = i >= 0 
-      ? [...prev.slice(0, i), candle, ...prev.slice(i + 1)] 
-      : [...prev, candle];
-    
-    if (next.length > 500) next.shift();
+        if (candleSeries.current && volumeSeries.current) {
+          candleSeries.current.update(candle);
+          volumeSeries.current.update(vol);
+          
+          setVolumeData((prev) => {
+            const i = prev.findIndex((v) => v.time === vol.time);
+            const next = i >= 0 
+              ? [...prev.slice(0, i), vol, ...prev.slice(i + 1)] 
+              : [...prev, vol];
+            
+            if (next.length > 500) next.shift();
 
-    if (next.length >= 7 && ma7Ref.current) ma7Ref.current.setData(calculateMA(next, 7));
-    if (next.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(next, 25));
-    if (next.length >= 99 && ma99Ref.current) ma99Ref.current.setData(calculateMA(next, 99));
+            if (next.length >= indicatorPeriods.mavol1 && mavol1Ref.current) {
+              mavol1Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol1));
+            }
+            if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
+              mavol2Ref.current.setData(calculateVolumeMA(next, indicatorPeriods.mavol2));
+            }
 
-    // ✅ ADD: Update EMA
-    if (next.length >= (indicatorPeriods.ema12 || 12) && ema12Ref.current && mainVisible.ema12) {
-      ema12Ref.current.setData(calculateEMA(next, indicatorPeriods.ema12 || 12));
-    }
-    if (next.length >= (indicatorPeriods.ema26 || 26) && ema26Ref.current && mainVisible.ema26) {
-      ema26Ref.current.setData(calculateEMA(next, indicatorPeriods.ema26 || 26));
-    }
-
-    // ✅ ADD: Update BOLL and redraw canvas
-    if (next.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
-      const calculated = calculateBollingerBands(
-        next, 
-        indicatorPeriods.boll?.period || 20, 
-        indicatorPeriods.boll?.stdDev || 2
-      );
-      if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
-      if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
-      if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
-      
-      // Update BOLL data state
-      setBollData(calculated);
-      
-      // Redraw canvas if fill is visible
-      if (bollFillVisible && bollCanvasRef.current && chartRef.current && candleSeries.current) {
-        requestAnimationFrame(() => {
-          if (bollCanvasRef.current && chartRef.current && candleSeries.current) {
-            drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current, calculated.upper, calculated.lower, indicatorColors.boll?.fill);
+            return next;
+          });
+          
+          if (isClosed) {
+            console.log('[WS] 🕯️ New candle closed at', new Date(t * 1000).toISOString());
+            setTimeout(() => {
+              if (!chartRef.current || !volumeChartRef.current) return;
+              
+              const mainTimeScale = chartRef.current.timeScale();
+              const volumeTimeScale = volumeChartRef.current.timeScale();
+              const logicalRange = mainTimeScale.getVisibleLogicalRange();
+              
+              if (logicalRange) {
+                volumeTimeScale.setVisibleLogicalRange(logicalRange);
+              }
+            }, 50);
           }
+        }
+
+        setCandles((prev) => {
+          if (sessionRef.current !== mySession) return prev;
+          const i = prev.findIndex((c) => c.time === candle.time);
+          const next = i >= 0 
+            ? [...prev.slice(0, i), candle, ...prev.slice(i + 1)] 
+            : [...prev, candle];
+          
+          if (next.length > 500) next.shift();
+
+          if (next.length >= 7 && ma7Ref.current) ma7Ref.current.setData(calculateMA(next, 7));
+          if (next.length >= 25 && ma25Ref.current) ma25Ref.current.setData(calculateMA(next, 25));
+          if (next.length >= 99 && ma99Ref.current) ma99Ref.current.setData(calculateMA(next, 99));
+
+          if (next.length >= (indicatorPeriods.ema12 || 12) && ema12Ref.current && mainVisible.ema12) {
+            ema12Ref.current.setData(calculateEMA(next, indicatorPeriods.ema12 || 12));
+          }
+          if (next.length >= (indicatorPeriods.ema26 || 26) && ema26Ref.current && mainVisible.ema26) {
+            ema26Ref.current.setData(calculateEMA(next, indicatorPeriods.ema26 || 26));
+          }
+
+          if (next.length >= (indicatorPeriods.boll?.period || 20) && mainVisible.boll) {
+            const calculated = calculateBollingerBands(
+              next, 
+              indicatorPeriods.boll?.period || 20, 
+              indicatorPeriods.boll?.stdDev || 2
+            );
+            if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
+            if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
+            if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
+            
+            setBollData(calculated);
+            
+            if (bollFillVisible && bollCanvasRef.current && chartRef.current && candleSeries.current) {
+              requestAnimationFrame(() => {
+                if (bollCanvasRef.current && chartRef.current && candleSeries.current) {
+                  drawBollFill(bollCanvasRef.current, chartRef.current, candleSeries.current, calculated.upper, calculated.lower, indicatorColors.boll?.fill);
+                }
+              });
+            }
+          }
+
+          return next;
         });
-      }
-    }
+      };
 
-    return next;
-  });
-};
+      ws.onerror = (error) => {
+        console.error('[WS] ❌ WebSocket error:', error);
+      };
 
-      ws.onerror = () => {};
+      ws.onclose = () => {
+        console.log('[WS] 🔌 WebSocket closed for', selectedSymbol);
+      };
+
     } catch (err) {
-      console.error('[LoadHistory] Error:', err);
+      console.error('[LoadHistory] ❌ Error:', err);
+      
+      if (sessionRef.current === mySession) {
+        console.log('[LoadHistory] 🔄 Retrying in 3 seconds...');
+        setTimeout(() => {
+          if (sessionRef.current === mySession) {
+            loadHistory();
+          }
+        }, 3000);
+      }
     }
   };
 
   loadHistory();
 
   return () => {
+    console.log('[Cleanup] 🧹 Cleaning up for', selectedSymbol);
+    
     try {
       if (candleSeries.current) {
         const prices = getAllLinePrices(candleSeries.current);
@@ -1798,7 +1911,6 @@ if (next.length >= indicatorPeriods.mavol2 && mavol2Ref.current) {
       }
     } catch {}
 
-    // Cleanup canvas overlay
     if (bollCanvasRef.current && bollCanvasRef.current.parentElement) {
       bollCanvasRef.current.parentElement.removeChild(bollCanvasRef.current);
       bollCanvasRef.current = null;
@@ -2018,67 +2130,7 @@ const volumeIndicatorValues: IndicatorValue[] = [
     }
   }, [bollFillVisible, bollData, mainVisible.boll]);
 
-useEffect(() => {
-  // ✅ Đổi từ chartContainerRef thành mainChartContainerRef
-  if (!mainChartContainerRef.current || !chartRef.current) return;
 
-  let animationFrameId: number | null = null;
-
-  const handleResize = () => {
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-    }
-
-    animationFrameId = requestAnimationFrame(() => {
-      // ✅ Đổi ở đây nữa
-      if (!mainChartContainerRef.current || !chartRef.current) return;
-
-      try {
-        // ✅ Và đây
-        const container = mainChartContainerRef.current;
-        const { clientWidth, clientHeight } = container;
-
-        if (clientWidth > 0 && clientHeight > 0) {
-          chartRef.current.applyOptions({
-            width: Math.floor(clientWidth),
-            height: Math.floor(clientHeight),
-          });
-
-          console.log(`[Chart Auto Resize] ${clientWidth}x${clientHeight}`);
-        }
-      } catch (error) {
-        console.error('[Chart Resize Error]', error);
-      }
-    });
-  };
-
-  // ResizeObserver to detect container size changes
-  const resizeObserver = new ResizeObserver((entries) => {
-    if (entries.length > 0) {
-      handleResize();
-    }
-  });
-
-  // ✅ Đổi ở đây
-  if (mainChartContainerRef.current) {
-    resizeObserver.observe(mainChartContainerRef.current);
-  }
-
-  // Window resize listener as backup
-  window.addEventListener('resize', handleResize);
-
-  // Trigger initial resize
-  const initialTimer = setTimeout(handleResize, 100);
-
-  return () => {
-    if (animationFrameId) {
-      cancelAnimationFrame(animationFrameId);
-    }
-    resizeObserver.disconnect();
-    window.removeEventListener('resize', handleResize);
-    clearTimeout(initialTimer);
-  };
-}, []); // Run once after mount
 
   return (
     <div className="h-full w-full min-w-0 relative">
@@ -2511,21 +2563,33 @@ useEffect(() => {
       
 
       <div className="relative w-full h-full flex flex-col">
-        <div 
-          ref={mainChartContainerRef}
-          className="relative w-full flex-[3]"
-          onContextMenu={openCtxMenu}
-        />
-        
-        <div 
-          className="w-full h-[2px] bg-[#2b3139] shrink-0 relative z-10"
-          style={{ boxShadow: '0 0 3px rgba(80, 77, 77, 0.4)' }}
-        />
-        
-        <div 
-          ref={volumeChartContainerRef}
-          className="relative w-full flex-1"
-        >
+  <div 
+    ref={mainChartContainerRef}
+    className="relative w-full"
+    style={{ 
+      flex: '3 1 0%',
+      minHeight: '300px', // ✅ Minimum 300px
+      height: '75%'
+    }}
+    onContextMenu={openCtxMenu}
+  />
+  
+  <div 
+    className="w-full h-[2px] bg-[#2b3139] shrink-0 relative z-10"
+    style={{ boxShadow: '0 0 3px rgba(80, 77, 77, 0.4)' }}
+  />
+  
+  <div 
+  ref={volumeChartContainerRef}
+  className="relative w-full"
+  style={{ 
+    flex: '1 1 0%',
+    minHeight: '100px',
+    height: '25%',
+    zIndex: 1, // ✅ Force z-index
+    position: 'relative' // ✅ Ensure position is set
+  }}
+>
          {volumeIndicatorVisible && (
   <LineIndicatorHeader
     type="volume"

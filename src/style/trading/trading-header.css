@@ -1,7 +1,9 @@
 /* ============================================
-   SYMBOL SELECTOR ROW
+   TRADING HEADER - AGGRESSIVE STATS HIDING
+   Ẩn stats row sớm hơn để tránh cắt trading form
    ============================================ */
 
+/* ===== SYMBOL SELECTOR ROW ===== */
 .symbol-selector-row {
   display: flex;
   align-items: center;
@@ -9,6 +11,8 @@
   padding: 0.75rem 1rem;
   min-height: var(--header-height);
   gap: 1rem;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 /* Left side: Symbol + Stats */
@@ -18,6 +22,7 @@
   gap: 1.5rem;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 /* Symbol selector */
@@ -25,6 +30,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 /* Price display */
@@ -32,6 +38,9 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Right side: Controls */
@@ -39,27 +48,129 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
-/* ===== STATS ROW (24h) ===== */
+/* ===== STATS ROW - AGGRESSIVE HIDING ===== */
 .stats-row-24h {
-  display: none; /* Hidden by default */
+  display: flex;
   align-items: center;
   gap: 2rem;
-  padding: 0.75rem 1rem;
-  min-height: var(--stats-row-height);
-  border-top: 1px solid var(--border-panel);
+  padding: 0 1rem;
   font-size: 0.75rem;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  border-left: 1px solid rgba(51, 65, 85, 0.3);
+  border-right: 1px solid rgba(51, 65, 85, 0.3);
 }
 
-/* Show on XL screens */
-@media (min-width: 1280px) {
+.stats-row-24h > * {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ===== AGGRESSIVE HIDING STRATEGY ===== */
+
+/* >= 1800px: Show all 4 stats (Ultra wide only) */
+@media (min-width: 1800px) {
   .stats-row-24h {
-    display: flex;
+    display: flex !important;
+    gap: 2rem;
+    font-size: 0.7rem;
   }
 }
 
-/* ===== MOBILE ADJUSTMENTS ===== */
+/* 1650-1799px: Show 4 stats, compact */
+@media (min-width: 1650px) and (max-width: 1799px) {
+  .stats-row-24h {
+    display: flex !important;
+    gap: 0.5rem;
+    font-size: 0.6rem;
+  }
+}
+
+/* 1500-1649px: Hide 1 stat (last) → 3 stats */
+@media (min-width: 1500px) and (max-width: 1649px) {
+  .stats-row-24h {
+    display: flex !important;
+    gap: 1.25rem;
+    padding: 0 0.75rem;
+    font-size: 0.7rem;
+  }
+  
+  .stats-row-24h > *:nth-child(4) {
+    display: none !important; /* Hide "24h Volume (USDT)" */
+  }
+}
+
+/* 1350-1499px: Hide 2 stats → 2 stats */
+@media (min-width: 1350px) and (max-width: 1499px) {
+  .stats-row-24h {
+    display: flex !important;
+    gap: 1rem;
+    padding: 0 0.5rem;
+    font-size: 0.65rem;
+  }
+  
+  .stats-row-24h > *:nth-child(3),
+  .stats-row-24h > *:nth-child(4) {
+    display: none !important; /* Hide both volume stats */
+  }
+}
+
+/* 1200-1349px: Hide 3 stats → Only 1 stat */
+@media (min-width: 1200px) and (max-width: 1349px) {
+  .stats-row-24h {
+    display: flex !important;
+    gap: 0.75rem;
+    padding: 0 0.5rem;
+    font-size: 0.65rem;
+  }
+  
+  .stats-row-24h > *:not(:first-child) {
+    display: none !important; /* Only show "24h High" */
+  }
+}
+
+/* < 1200px: Hide completely */
+@media (max-width: 1199px) {
+  .stats-row-24h {
+    display: none !important;
+  }
+}
+
+/* ===== HEADER CONTROLS HIDING ===== */
+
+/* Hide controls progressively */
+@media (max-width: 1599px) {
+  .header-controls > *:nth-child(3) { /* Subscriptions */
+    display: none !important;
+  }
+}
+
+@media (max-width: 1399px) {
+  .header-controls > *:nth-child(4) { /* Refresh */
+    display: none !important;
+  }
+}
+
+@media (max-width: 1299px) {
+  .header-controls > *:nth-child(5) { /* Settings */
+    display: none !important;
+  }
+}
+
+@media (max-width: 1199px) {
+  /* Keep only connection + account */
+  .header-controls > *:not(:first-child):not(:nth-child(2)) {
+    display: none !important;
+  }
+}
+
+/* ===== MOBILE/TABLET ===== */
 @media (max-width: 767px) {
   .symbol-selector-row {
     padding: 0.5rem 0.75rem;
@@ -74,19 +185,62 @@
     gap: 0.5rem;
   }
   
-  /* Hide non-essential elements */
   .non-essential {
     display: none;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
+  .symbol-selector-row {
+    gap: 0.75rem;
+  }
+  
   .symbol-info-group {
     gap: 1rem;
   }
+  
+  /* Hide market selector */
+  .symbol-info-group > div:has(select) {
+    display: none;
+  }
 }
 
+/* ===== ENSURE PROPER WIDTHS ===== */
+.trading-header {
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+  background: #1e293b;
+}
+
+.symbol-selector-row {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.symbol-info-group,
+.price-display-group,
 .stats-row-24h {
-  overflow-x: hidden !important;
-  overflow-y: hidden !important;
+  min-width: 0 !important;
+  overflow: hidden;
+}
+
+/* ===== ADDITIONAL: HIDE MARKET SELECTOR LABEL EARLIER ===== */
+@media (max-width: 1399px) {
+  .symbol-info-group > div:has(select) > span {
+    display: none; /* Hide "Market:" label */
+  }
+}
+
+/* ===== PRICE DISPLAY COMPACT ===== */
+@media (max-width: 1299px) {
+  .price-display-group {
+    gap: 0.5rem;
+  }
+  
+  /* Hide secondary price info */
+  .price-display-group > div:nth-child(2) {
+    display: none;
+  }
 }
