@@ -1,0 +1,21 @@
+/* ============================================================
+   HIDE TRADINGVIEW LOGO ONLY - SAFE VERSION
+   ============================================================
+   Chỉ ẩn logo, KHÔNG ảnh hưởng đến chart
+   ============================================================ */
+
+/* Target cụ thể logo layer - z-index 3 là watermark layer */
+div[style*="z-index: 3"][style*="pointer-events: none"] {
+  display: none !important;
+}
+
+/* Ẩn watermark table (chỉ có logo, không phải chart) */
+div[style*="z-index: 3"] table {
+  display: none !important;
+}
+
+/* Ẩn text TradingView trong watermark layer */
+div[style*="z-index: 3"] td,
+div[style*="z-index: 3"] svg {
+  display: none !important;
+}

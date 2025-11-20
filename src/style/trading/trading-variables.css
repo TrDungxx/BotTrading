@@ -1,0 +1,60 @@
+:root {
+  /* ===== BREAKPOINTS ===== */
+  --bp-mobile-max: 767px;
+  --bp-tablet-min: 768px;
+  --bp-tablet-max: 1023px;
+  --bp-desktop-min: 1024px;
+  --bp-large-min: 1280px;
+  --bp-xl-min: 1536px;
+  
+  /* ===== LAYOUT DIMENSIONS ===== */
+  --header-height: 56px;
+  --stats-row-height: 52px;
+  --position-panel-desktop: 280px;
+  --position-panel-collapsed: 44px;
+  
+  /* ===== COMPONENT WIDTHS ===== */
+  /* OrderBook */
+  --orderbook-xl: 300px;      /* > 1536px */
+  --orderbook-lg: 280px;      /* 1280-1536px */
+  --orderbook-md: 260px;      /* 1024-1280px */
+  --orderbook-sm: 240px;      /* < 1024px (floating) */
+  
+  /* Trading Form */
+  --form-xl: 340px;           /* > 1536px */
+  --form-lg: 320px;           /* 1280-1536px */
+  --form-md: 300px;           /* 1024-1280px */
+  --form-sm: 280px;           /* 768-1024px */
+  --form-xs: 100%;            /* < 768px (bottom sheet) */
+  
+  /* Mobile */
+  --mobile-chart-min: 400px;
+  --bottom-sheet-max: 85vh;
+  --floating-btn-size: 56px;
+  
+  /* ===== Z-INDEX LAYERS ===== */
+  --z-base: 1;
+  --z-header: 40;
+  --z-floating: 50;
+  --z-orderbook-mobile: 60;
+  --z-position-tab: 70;
+  --z-trading-tab: 80;
+  --z-modal: 100;
+  
+  /* ===== COLORS (Dark Theme) ===== */
+  --bg-workspace: #0b1426;
+  --bg-panel: #1e293b;
+  --bg-panel-hover: #2d3b52;
+  --border-panel: rgba(51, 65, 85, 0.5);
+  --border-active: rgba(59, 130, 246, 0.5);
+  
+  /* ===== TRANSITIONS ===== */
+  --transition-fast: 0.15s ease;
+  --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-panel: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* ===== SHADOWS ===== */
+  --shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-floating: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.4);
+}

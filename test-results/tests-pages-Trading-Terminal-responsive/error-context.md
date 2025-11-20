@@ -1,0 +1,41 @@
+# Page snapshot
+
+```yaml
+- button "View as Guest":
+  - img
+  - text: View as Guest
+- img
+- text: Development Mode - Test Credentials
+- button "Admin admin123"
+- button "Super super"
+- button "User user"
+- paragraph: Click any credential above to auto-fill the form
+- text: TW1
+- heading "Welcome Back" [level=1]
+- paragraph: Sign in to your account to continue
+- text: Tên đăng nhập
+- img
+- textbox "Tên đăng nhập"
+- text: Password
+- img
+- textbox "Password"
+- button:
+  - img
+- checkbox "Remember me"
+- text: Remember me
+- link "Forgot Password":
+  - /url: /forgot-password
+- button "Sign In":
+  - text: Sign In
+  - img
+- paragraph:
+  - text: Don't have an account?
+  - link "Sign Up":
+    - /url: /register
+- text: By signing up, you agree to our
+- link "Terms of Service":
+  - /url: "#"
+- text: and
+- link "Privacy Policy":
+  - /url: "#"
+```
