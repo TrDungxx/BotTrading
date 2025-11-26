@@ -7,6 +7,7 @@ import PositionTpSlModal from "./function/PositionTpSlModal";
 import { Edit3 } from "lucide-react";
 import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
 import { createPortal } from 'react-dom';
+import CloseAllPositionsModal from "../popupposition/CloseAllPositionsModal";
 // ===== Helpers =====
 function loadLeverageLS(
   accountId?: number | null,
@@ -80,7 +81,7 @@ const Position: React.FC<PositionProps> = ({
   const latestVersionRef = React.useRef<number>(0);
   const refreshingRef = React.useRef<boolean>(false);
   const deltaQueueRef = React.useRef<PositionCalc[]>([]);
-
+const [showCloseAllModal, setShowCloseAllModal] = useState(false);
   const [positionsView, setPositionsView] = useState<PositionCalc[]>([]);
 
   const flushView = React.useCallback(() => {
@@ -840,26 +841,29 @@ useEffect(() => {
   <div className="w-full max-w-full overflow-hidden">
     {/* ✅ THÊM WRAPPER CHO TABLE */}
     <div className="position-table-container w-full max-w-full overflow-x-auto">
-      <table className="position-table w-full min-w-[800px] text-sm">
+      <table className="position-table w-full min-w-[900px] text-sm">
         <thead>
           <tr className="border-b border-dark-700 text-left text-xs uppercase tracking-wider text-dark-300">
             <th className="px-4 py-2">Symbol</th>
             <th className="px-4 py-2">Size</th>
             <th className="px-4 py-2">Entry</th>
             <th className="px-4 py-2">Mark Price</th>
+            <th className="px-4 py-2">Margin</th>
             <th className="px-4 py-2">PNL(ROI%)</th>
+            
+            
             
             {/* ✅ FIX: closePosition header - loại bỏ fixed width */}
             <th className="closePosition px-2">
               <div className="flex items-center justify-start space-x-2 min-w-[200px]">
                 {/* ✅ Button 1: Close All Market - rút gọn text */}
                 <button
-                  onClick={handleCloseAllMarket}
-                  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
-                  title="Đóng tất cả Market Order"
-                >
-                  Close All
-                </button>
+  onClick={() => setShowCloseAllModal(true)}  // ✅ Mở modal thay vì gọi trực tiếp
+  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
+  title="Đóng tất cả Market Order"
+>
+  Close All
+</button>
                 
                 {/* Divider */}
                 <div className="w-[1px] h-[16px] bg-gray-600"></div>
@@ -878,168 +882,206 @@ useEffect(() => {
         </thead>
 
         <tbody>
-          {positionsView.map((pos) => {
-            const size = parseFloat(pos.positionAmt || "0");
-            const pnl = calculatePnl(pos);
-            const key = rowKey(pos);
-            const step = getStepSize(pos.symbol);
-            const tick = getPriceTick(pos.symbol);
-            const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
-            const mark = Number(pos.markPrice || NaN);
+  {positionsView.length === 0 ? (
+    <tr>
+      {/* ✅ UPDATE COLSPAN từ 6 lên 7 */}
+      <td colSpan={7} className="text-center py-8 text-dark-400 text-sm">
+        Bạn không có vị thế nào.
+      </td>
+    </tr>
+  ) : (
+    positionsView.map((pos) => {
+      const size = parseFloat(pos.positionAmt || "0");
+      const pnl = calculatePnl(pos);
+      const key = rowKey(pos);
+      const step = getStepSize(pos.symbol);
+      const tick = getPriceTick(pos.symbol);
+      const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
+      const mark = Number(pos.markPrice || NaN);
+      
+      // ✅ TÍNH MARGIN
+      const margin = getInitialMargin(pos);
+      const marginType = pos.marginType || "cross";
 
-            const pnlClass =
-              pnl == null
-                ? "text-white"
-                : pnl > 0
-                ? "text-[#0ecb81]"
-                : pnl < 0
-                ? "text-[#f6465d]"
-                : "text-white";
+      const pnlClass =
+        pnl == null
+          ? "text-white"
+          : pnl > 0
+          ? "text-[#0ecb81]"
+          : pnl < 0
+          ? "text-[#f6465d]"
+          : "text-white";
 
-            const sizeClass =
-              size > 0
-                ? "text-[#0ecb81]"
-                : size < 0
-                ? "text-[#f6465d]"
-                : "text-white";
+      const sizeClass =
+        size > 0
+          ? "text-[#0ecb81]"
+          : size < 0
+          ? "text-[#f6465d]"
+          : "text-white";
 
-              return (
-              <tr
-                key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
-                className="border-b border-dark-700"
-              >
-                <td className="px-4 py-3 font-medium text-white">
-                  {pos.symbol}
-                </td>
-                <td className={`px-4 py-3 font-medium ${sizeClass}`}>
-                  {size > 0 ? "" : "-"} {Math.abs(size)}
-                </td>
-                <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
-
-                <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
-
-                <td className={`px-4 py-3 font-medium ${pnlClass}`}>
-                  {pnl == null
-                    ? "--"
-                    : nearZero(pnl)
-                    ? "0.00"
-                    : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
-                  <br />
-                  <span className="text-xs opacity-80">
-                    {(() => {
-                      const pnlPct = (() => {
-                        const im = getInitialMargin(pos);
-                        if (!im) return undefined;
-                        return (pnl! / im) * 100;
-                      })();
-                      return pnlPct == null
-                        ? "--"
-                        : nearZero(pnlPct)
-                        ? "0.00%"
-                        : `(${pnlPct > 0 ? "+" : "-"}${fmt(
-                            Math.abs(pnlPct),
-                            2
-                          )}%)`;
-                    })()}
-                  </span>
-                </td>
-
-                  <td>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <div className="text-[13px] font-normal text-white flex items-center space-x-1">
-                        <span
-                          className={`cursor-pointer ${
-                            orderType === "market"
-                              ? "text-[#fcd535]"
-                              : "text-white"
-                          }`}
-                          onClick={() => {
-                            setOrderType("market");
-                            setCloseModal({ open: true, mode: "market", pos });
-                            setRowQty(key, absSize ? String(absSize) : "");
-                          }}
-                        >
-                          Thị trường
-                        </span>
-                        <span className="text-gray-600">|</span>
-                        <span
-                          className={`cursor-pointer ${
-                            orderType === "limit"
-                              ? "text-[#fcd535]"
-                              : "text-white"
-                          }`}
-                          onClick={() => {
-                            setOrderType("limit");
-                            setCloseModal({ open: true, mode: "limit", pos });
-                            if (Number.isFinite(mark))
-                              setRowPrice(key, String(mark));
-                            setRowQty(key, absSize ? String(absSize) : "");
-                          }}
-                        >
-                          Giới hạn
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="pr-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setActivePos(pos);
-                          setShowTpSl(true);
-                        }}
-                        className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
-                        title="TP/SL cho vị thế (modal)"
-                      >
-                        <Edit3 size={14} /> TP/SL
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          const size = parseFloat(pos.positionAmt || "0");
-                          if (!size) return;
-                          const side = (size > 0 ? "LONG" : "SHORT") as
-                            | "LONG"
-                            | "SHORT";
-                          const payload = {
-                            positionId: `${pos.symbol}:${
-                              pos.positionSide ?? side
-                            }`,
-                            symbol: pos.symbol,
-                            side,
-                            entry: parseFloat(pos.entryPrice || "0"),
-                          };
-                          try {
-                            localStorage.setItem(
-                              "activeTool",
-                              JSON.stringify(payload)
-                            );
-                          } catch {}
-                          window.dispatchEvent(
-                            new CustomEvent("chart-symbol-change-request", {
-                              detail: { symbol: pos.symbol },
-                            })
-                          );
-                          setTimeout(() => {
-                            window.dispatchEvent(
-                              new CustomEvent("active-tool-changed", {
-                                detail: payload,
-                              })
-                            );
-                          }, 300);
-                        }}
-                        className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-primary/60 text-primary hover:bg-dark-700"
-                        title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
-                      >
-                        Nâng cao
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+      return (
+        <tr
+          key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
+          className="border-b border-dark-700"
+        >
+          <td 
+            className="px-4 py-3 font-medium text-white cursor-pointer hover:text-[#fcd535] transition-colors"
+            onClick={() => {
+              window.dispatchEvent(
+                new CustomEvent("chart-symbol-change-request", {
+                  detail: { symbol: pos.symbol },
+                })
               );
-            })}
-          </tbody>
+              try {
+                localStorage.setItem("selectedSymbol", pos.symbol);
+              } catch {}
+            }}
+            title={`Click để chuyển chart sang ${pos.symbol}`}
+          >
+            {pos.symbol}
+          </td>
+
+          <td className={`px-4 py-3 font-medium ${sizeClass}`}>
+            {size > 0 ? "" : "-"} {Math.abs(size)}
+          </td>
+
+          <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
+
+          <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
+
+          <td className={`px-4 py-3 font-medium ${pnlClass}`}>
+            {pnl == null
+              ? "--"
+              : nearZero(pnl)
+              ? "0.00"
+              : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
+            <br />
+            <span className="text-xs opacity-80">
+              {(() => {
+                const pnlPct = (() => {
+                  const im = getInitialMargin(pos);
+                  if (!im) return undefined;
+                  return (pnl! / im) * 100;
+                })();
+                return pnlPct == null
+                  ? "--"
+                  : nearZero(pnlPct)
+                  ? "0.00%"
+                  : `(${pnlPct > 0 ? "+" : "-"}${fmt(
+                      Math.abs(pnlPct),
+                      2
+                    )}%)`;
+              })()}
+            </span>
+          </td>
+
+          {/* ✅ THÊM CỘT MARGIN */}
+          <td className="px-4 py-3 text-white">
+            <div>
+              <div>{margin > 0 ? `${fmtShort(margin)} USDT` : "--"}</div>
+              <div className="text-xs text-gray-400">
+                ({marginType === "isolated" ? "Isolated" : "Cross"})
+              </div>
+            </div>
+          </td>
+
+          <td>
+            <div className="flex items-center space-x-2 mt-2">
+              <div className="text-[13px] font-normal text-white flex items-center space-x-1">
+                <span
+                  className={`cursor-pointer ${
+                    orderType === "market"
+                      ? "text-[#fcd535]"
+                      : "text-white"
+                  }`}
+                  onClick={() => {
+                    setOrderType("market");
+                    setCloseModal({ open: true, mode: "market", pos });
+                    setRowQty(key, absSize ? String(absSize) : "");
+                  }}
+                >
+                  Thị trường
+                </span>
+                <span className="text-gray-600">|</span>
+                <span
+                  className={`cursor-pointer ${
+                    orderType === "limit"
+                      ? "text-[#fcd535]"
+                      : "text-white"
+                  }`}
+                  onClick={() => {
+                    setOrderType("limit");
+                    setCloseModal({ open: true, mode: "limit", pos });
+                    if (Number.isFinite(mark))
+                      setRowPrice(key, String(mark));
+                    setRowQty(key, absSize ? String(absSize) : "");
+                  }}
+                >
+                  Giới hạn
+                </span>
+              </div>
+            </div>
+          </td>
+
+          <td className="pr-4">
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setActivePos(pos);
+                  setShowTpSl(true);
+                }}
+                className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
+                title="TP/SL cho vị thế (modal)"
+              >
+                <Edit3 size={14} /> TP/SL
+              </button>
+
+              <button
+                onClick={() => {
+                  const size = parseFloat(pos.positionAmt || "0");
+                  if (!size) return;
+                  const side = (size > 0 ? "LONG" : "SHORT") as
+                    | "LONG"
+                    | "SHORT";
+                  const payload = {
+                    positionId: `${pos.symbol}:${
+                      pos.positionSide ?? side
+                    }`,
+                    symbol: pos.symbol,
+                    side,
+                    entry: parseFloat(pos.entryPrice || "0"),
+                  };
+                  try {
+                    localStorage.setItem(
+                      "activeTool",
+                      JSON.stringify(payload)
+                    );
+                  } catch {}
+                  window.dispatchEvent(
+                    new CustomEvent("chart-symbol-change-request", {
+                      detail: { symbol: pos.symbol },
+                    })
+                  );
+                  setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent("active-tool-changed", {
+                        detail: payload,
+                      })
+                    );
+                  }, 300);
+                }}
+                className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-primary/60 text-primary hover:bg-dark-700"
+                title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
+              >
+                Nâng cao
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    })
+  )}
+</tbody>
         </table>
 
         {showPopup && createPortal(
@@ -1079,9 +1121,9 @@ useEffect(() => {
       ) ||
       1
     }
-    onSubmit={({ tpPrice, slPrice, trigger }) => {
-      sendTpSlOrders(activePos, tpPrice, slPrice, trigger);
-    }}
+    onSubmit={() => {
+  // Modal đã tự gửi lệnh, không cần gửi lại
+}}
   />,
   document.body
 )}
@@ -1113,6 +1155,16 @@ useEffect(() => {
       }))
     }
     onConfirm={handleConfirmClose}
+  />,
+  document.body
+)}
+
+{showCloseAllModal && createPortal(
+  <CloseAllPositionsModal
+    isOpen={showCloseAllModal}
+    onClose={() => setShowCloseAllModal(false)}
+    onConfirm={handleCloseAllMarket}
+    positionCount={positionsView.length}
   />,
   document.body
 )}

@@ -121,6 +121,7 @@
     @apply bg-dark-600 text-dark-200;
   }
 }
+
 @layer utilities {
   /* 📱 Responsive fix cho bảng trên iPhone 13 trở xuống */
   @media (max-width: 480px) {
@@ -183,6 +184,7 @@
     }
   }
 }
+
 @media (max-width: 480px) {
   .form-input {
     height: 48px !important;
@@ -192,28 +194,18 @@
     line-height: 1.25rem !important;
   }
 }
+
 .bg-dark-700 {
-  background-color: #2a2f3a; /* hoặc dùng bg-gray-800 nếu xài Tailwind */
+  background-color: #2a2f3a;
 }
 
-
-.trading-chart-container {
+html, body, #root { 
   height: 100%;
-  min-height: 500px;
-  max-width: 1400px; /* hoặc kích thước bạn muốn */
-  margin: 0 auto;    /* căn giữa */
-  padding: 0 1rem;   /* khoảng cách hai bên */
+  box-sizing: border-box;
 }
-.chart-container {
-  display: grid;
-  grid-template-rows: 75% 25%;
-  height: 100%;
-}
-html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
- 
 
 .btn-signal {
-  padding: 6px 12px; /* nhỏ gọn */
+  padding: 6px 12px;
   font-size: 0.85rem;
   border-radius: 6px;
   font-weight: 500;
@@ -221,19 +213,19 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
 }
 
 .btn-long {
-  background-color: rgba(16, 185, 129, 0.15); /* xanh pastel */
+  background-color: rgba(16, 185, 129, 0.15);
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .btn-short {
-  background-color: rgba(239, 68, 68, 0.15); /* đỏ pastel */
+  background-color: rgba(239, 68, 68, 0.15);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .btn-exit {
-  background-color: rgba(107, 114, 128, 0.15); /* xám nhạt */
+  background-color: rgba(107, 114, 128, 0.15);
   color: #6b7280;
   border: 1px solid rgba(107, 114, 128, 0.3);
 }
@@ -243,301 +235,50 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Dark scrollbar – đẹp, mảnh, bo tròn */
+/* Dark scrollbar */
 .tw-scroll { 
-  scrollbar-width: thin;                 /* Firefox */
-  scrollbar-color: #4b5563 #0b1220;      /* thumb | track */
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #0b1220;
 }
 
-/* Chrome / Edge / Safari */
 .tw-scroll::-webkit-scrollbar { width: 10px; }
 .tw-scroll::-webkit-scrollbar-track {
-  background: #0b1220;                   /* gần bg-dark-900 */
+  background: #0b1220;
   border-radius: 12px;
 }
 .tw-scroll::-webkit-scrollbar-thumb {
-  background: #4b5563;                   /* slate-600 */
+  background: #4b5563;
   border-radius: 12px;
-  border: 2px solid #0b1220;             /* tạo rãnh đẹp */
+  border: 2px solid #0b1220;
 }
-.tw-scroll::-webkit-scrollbar-thumb:hover { background: #6b7280; } /* slate-500 */
+.tw-scroll::-webkit-scrollbar-thumb:hover { background: #6b7280; }
 
-/* Tuỳ chọn: hiện đậm khi hover cả khung dropdown */
 .symbol-dropdown:hover .tw-scroll::-webkit-scrollbar-thumb {
-  background: #9ca3af;                   /* slate-400 */
+  background: #9ca3af;
 }
 
-
 /* ==========================================
-   FIX: Trading Form luôn visible cho đến mobile
+   ✅ REMOVED ALL .trading-main-grid RULES
+   Let trading-layout.css handle all trading layout
    ========================================== */
 
-/* Desktop & Tablet: Trading Form luôn hiện đầy đủ */
-/* Desktop & Tablet: Trading Form luôn visible với flexible width */
-@media (min-width: 768px) {
-  .trading-main-grid {
-    display: grid;
-    gap: 0; /* Không gap để tiết kiệm space */
-  }
-  
-  /* ✅ Trading Form: Luôn hiện, flexible width */
-  .trading-form-container {
-    display: flex !important;
-    flex-direction: column;
-    position: relative !important;
-    transform: none !important;
-    max-height: none !important;
-    border-radius: 0 !important;
-    background: rgba(30, 41, 59, 1) !important;
-    min-width: 240px; /* Minimum width */
-    max-width: 320px; /* Maximum width */
-  }
-  
-  /* ✅ Ẩn mobile header */
-  .trading-form-mobile-header {
-    display: none !important;
-  }
-  
-  .trading-form-content {
-    overflow-y: auto;
-    max-height: none !important;
-    padding: 1rem;
-  }
-}
-
 /* ==========================================
-   RESPONSIVE BREAKPOINTS - FIXED GRID
-   ========================================== */
-
-/* Extra Large (>1600px): 3 cột full size */
-@media (min-width: 1600px) {
-  .trading-main-grid {
-    grid-template-columns: 1fr 280px 340px; /* Chart | OrderBook | Form */
-  }
-  
-  .orderbook-container {
-    display: flex !important;
-  }
-}
-
-/* Large (1400-1600px): 3 cột medium */
-@media (min-width: 1400px) and (max-width: 1599px) {
-  .trading-main-grid {
-    grid-template-columns: 1fr 260px 320px;
-  }
-  
-  .orderbook-container {
-    display: flex !important;
-  }
-}
-
-/* Medium-Large (1200-1400px): 3 cột compact */
-@media (min-width: 1200px) and (max-width: 1399px) {
-  .trading-main-grid {
-    grid-template-columns: 1fr 220px 300px;
-  }
-  
-  .orderbook-container {
-    display: flex !important;
-    width: 220px;
-  }
-  
-  .trading-form-container {
-    max-width: 300px;
-  }
-}
-
-/* Medium (992-1200px): 2 cột, ẨN OrderBook */
-@media (min-width: 992px) and (max-width: 1199px) {
-  .trading-main-grid {
-    grid-template-columns: 1fr 280px; /* Chart + Form */
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .trading-form-container {
-    max-width: 280px;
-  }
-}
-
-/* Small-Medium (768-992px): 2 cột compact - ✅ FIX CHO 997px */
-@media (min-width: 768px) and (max-width: 991px) {
-  .trading-main-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 260px); /* ✅ Flexible */
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .trading-form-container {
-    width: 100%; /* ✅ Take full grid cell */
-    max-width: 260px;
-    min-width: 240px;
-    font-size: 0.9rem;
-  }
-  
-  /* Compact buttons */
-  .trading-form-container .btn {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-  }
-  
-  .trading-form-container input {
-    font-size: 0.875rem;
-  }
-  
-  .stats-24h-row {
-    display: none !important;
-  }
-}
-
-/* ==========================================
-   MOBILE: TAB MODE ONLY < 768px
+   POSITION PANEL - MOBILE ONLY
    ========================================== */
 @media (max-width: 767px) {
-  .trading-main-grid {
-    display: flex !important;
-    flex-direction: column !important;
-    position: relative;
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  /* ✅ Trading Form: Fixed tab bottom */
-  .trading-form-container {
-    position: fixed !important;
-    bottom: 0;
-    right: 0;
-    left: 0; /* ✅ Full width mobile */
-    width: 100%;
-    max-width: 100%;
-    max-height: 85vh;
-    background: linear-gradient(to top, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96)) !important;
-    backdrop-filter: blur(12px);
-    border-left: none;
-    border-right: none;
-    border-top: 1px solid rgba(51, 65, 85, 0.4);
-    border-radius: 16px 16px 0 0;
-    z-index: 100;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
-    
-    /* ✅ Collapsed: Show header only */
-    transform: translateY(calc(100% - 52px)) !important;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  /* ✅ Expanded */
-  .trading-form-container.is-open {
-    transform: translateY(0) !important;
-  }
-  
-  /* ✅ Tab header */
-  .trading-form-mobile-header {
-    display: flex !important;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: rgba(30, 41, 59, 0.95);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-    padding: 0.875rem 1rem;
-    min-height: 52px;
-  }
-  
-  /* ✅ Content */
-  .trading-form-content {
-    display: block !important;
-    overflow-y: auto;
-    max-height: calc(85vh - 52px);
-    overscroll-behavior: contain;
-    padding: 1rem;
-  }
-  
-  .chart-main-container {
-    width: 100% !important;
-    min-width: 100% !important;
-  }
-  
   .position-panel-bottom {
-    margin-bottom: 60px !important;
-  }
-}
-
-/* ==========================================
-   BONUS: PREVENT OVERFLOW
-   ========================================== */
-
-/* Ensure chart doesn't overflow */
-.chart-main-container {
-  min-width: 0 !important; /* Allow flex/grid shrink */
-  overflow: hidden;
-  flex: 1;
-}
-
-.trading-main-grid > div:first-child {
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Ensure form doesn't overflow */
-.trading-form-container {
-  overflow: hidden;
-}
-
-.trading-form-content {
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-/* ==========================================
-   POSITION PANEL COLLAPSIBLE - GIỐNG BINANCE
-   ========================================== */
-
-/* Desktop (>1200px): Panel cố định dưới */
-@media (min-width: 1200px) {
-  .position-panel-bottom {
-    position: relative;
-    height: 28vh;
-    min-height: 220px;
-    max-height: 40vh;
-    border-top: 1px solid rgba(51, 65, 85, 0.5);
-    background: rgba(30, 41, 59, 1);
-    overflow: hidden;
-  }
-  
-  .position-panel-header {
-    display: none; /* Không cần header tab */
-  }
-  
-  .position-panel-content {
-    height: 100%;
-    overflow-y: auto;
-  }
-}
-
-/* Medium (768-1200px): Collapsible Tab - GIỐNG BINANCE */
-@media (min-width: 768px) and (max-width: 1199px) {
-  .position-panel-bottom {
-    position: fixed !important;
+    position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     width: 100%;
-    max-height: 60vh;
+    max-height: 70vh;
     background: linear-gradient(to top, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(51, 65, 85, 0.4);
-    z-index: 90;
+    border-radius: 16px 16px 0 0;
+    z-index: 85;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-    
-    /* Collapsed: Chỉ hiện header */
     transform: translateY(calc(100% - 44px));
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -546,7 +287,6 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
     transform: translateY(0);
   }
   
-  /* Tab Header */
   .position-panel-header {
     display: flex !important;
     align-items: center;
@@ -570,82 +310,13 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
     background: rgba(51, 65, 85, 0.8);
   }
   
-  /* Content */
   .position-panel-content {
     overflow-y: auto;
     max-height: calc(60vh - 44px);
     overscroll-behavior: contain;
   }
-  
-  /* Adjust main grid to account for fixed panel */
-  .trading-main-grid {
-    padding-bottom: 50px; /* Space for collapsed tab */
-  }
 }
 
-/* Mobile (<768px): Stack layout */
-@media (max-width: 767px) {
-  .trading-main-grid {
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .chart-section {
-    width: 100% !important;
-  }
-  
-  /* ✅ THÊM: Trading Form tab bottom */
-  .trading-form-container {
-    position: fixed !important;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-width: 100%;
-    max-height: 85vh;
-    background: linear-gradient(to top, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96)) !important;
-    backdrop-filter: blur(12px);
-    border-left: none;
-    border-right: none;
-    border-top: 1px solid rgba(51, 65, 85, 0.4);
-    border-radius: 16px 16px 0 0;
-    z-index: 100;
-    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
-    transform: translateY(calc(100% - 52px)) !important;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .trading-form-container.is-open {
-    transform: translateY(0) !important;
-  }
-  
-  .trading-form-mobile-header {
-    display: flex !important;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: rgba(30, 41, 59, 0.95);
-    backdrop-filter: blur(8px);
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-    padding: 0.875rem 1rem;
-    min-height: 52px;
-  }
-  
-  .trading-form-content {
-    display: block !important;
-    overflow-y: auto;
-    max-height: calc(85vh - 52px);
-    overscroll-behavior: contain;
-    padding: 1rem;
-  }
-}
-/* ==========================================
-   BONUS: SMOOTH SCROLLBAR
-   ========================================== */
 .position-panel-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -663,190 +334,8 @@ html, body, #root { height: 100%; } /* để h-dvh hoạt động ổn */
   background: rgba(100, 116, 139, 0.9);
 }
 
-/* ==========================================
-   PREVENT OVERLAP WITH TRADING FORM
-   ========================================== */
-@media (max-width: 767px) {
-  /* Stack order: Trading Form (100) > Position Panel (85) */
-  .position-panel-bottom.is-open {
-    /* Khi position mở, thu nhỏ nếu trading form cũng mở */
-    max-height: calc(70vh - 52px); /* 52px = trading form tab height */
-  }
-  
-  .trading-form-container.is-open ~ .position-panel-bottom {
-    /* Adjust nếu trading form đang mở */
-    transform: translateY(calc(100% - 44px)) !important;
-  }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
 }
-
-/* ==========================================
-   FIX: CHART RESPONSIVE
-   ========================================== */
-.chart-main-container {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0 !important; /* ✅ Allow shrink */
-}
-
-/* Ensure chart canvas respects container */
-.chart-main-container > div {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* ==========================================
-   SIMPLE GRID FIX - FINAL SOLUTION
-   ========================================== */
-
-/* Desktop & Tablet: Grid layout */
-@media (min-width: 768px) {
-  .trading-main-grid {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) auto; /* ✅ Chart flexible + Form auto */
-    gap: 0;
-  }
-  
-  .chart-section {
-    grid-column: 1;
-    min-width: 0;
-    overflow: hidden;
-  }
-  
-  .orderbook-container {
-    grid-column: 2;
-    width: auto;
-    min-width: 220px;
-    max-width: 280px;
-    flex-shrink: 1; /* ✅ Cho phép co lại */
-  }
-  
-  .trading-form-container {
-    grid-column: 3;
-    width: auto; /* ✅ Không fixed */
-    min-width: 240px; /* ✅ Minimum */
-    max-width: 320px; /* ✅ Maximum */
-    flex-shrink: 1; /* ✅ Cho phép co lại */
-  }
-}
-
-/* Extra Large (>1400px): Full size */
-@media (min-width: 1400px) {
-  .trading-main-grid {
-    grid-template-columns: minmax(0, 1fr) 260px 300px; /* Chart + Orderbook + Form */
-  }
-  
-  .orderbook-container {
-    display: flex !important;
-    width: 260px;
-  }
-  
-  .trading-form-container {
-    width: 300px;
-  }
-}
-
-/* Large (1200-1400px): Compact 3 columns */
-@media (min-width: 1200px) and (max-width: 1399px) {
-  .trading-main-grid {
-    grid-template-columns: minmax(0, 1fr) 240px 280px;
-  }
-  
-  .orderbook-container {
-    display: flex !important;
-    width: 240px;
-  }
-  
-  .trading-form-container {
-    width: 280px;
-  }
-}
-
-/* Medium (992-1200px): Hide orderbook, flexible form */
-@media (min-width: 992px) and (max-width: 1199px) {
-  .trading-main-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(240px, 280px); /* ✅ Form flexible */
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .trading-form-container {
-    width: auto;
-    min-width: 240px;
-    max-width: 280px;
-  }
-}
-
-/* Small-Medium (768-992px): Compact form */
-@media (min-width: 768px) and (max-width: 991px) {
-  .trading-main-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px); /* ✅ Form smaller */
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .trading-form-container {
-    width: auto;
-    min-width: 220px;
-    max-width: 260px;
-    font-size: 0.9rem; /* ✅ Smaller font */
-  }
-  
-  /* Compact buttons */
-  .trading-form-container .btn {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
-  }
-  
-  .trading-form-container input,
-  .trading-form-container select {
-    font-size: 0.875rem;
-    padding: 0.5rem;
-  }
-}
-
-/* Mobile: Stack layout */
-@media (max-width: 767px) {
-  .trading-main-grid {
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  
-  .orderbook-container {
-    display: none !important;
-  }
-  
-  .chart-section {
-    width: 100% !important;
-  }
-}
-
-/* Ensure chart canvas respects container */
-.chart-main-container,
-.chart-main-container > div {
-  width: 100% !important;
-  height: 100% !important;
-  min-width: 0;
-  overflow: hidden;
-}
-
-/* Trading Form adjustments */
-@media (min-width: 768px) {
-  .trading-form-container {
-    overflow-x: hidden; /* ✅ Hide horizontal overflow */
-  }
-  
-  .trading-form-content {
-    padding: 0.75rem; /* ✅ Reduce padding when small */
-  }
-}
-
-
-
-
-
-

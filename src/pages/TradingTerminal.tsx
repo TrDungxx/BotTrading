@@ -23,9 +23,9 @@ import {
   Menu,
 } from "lucide-react";
 import TradingBinance from "../components/common/TradingBinance";
-import { FormattedMessage, FormattedNumber } from "react-intl";
-import "../style/trading/trading.css";
-import { CandlestickData } from "lightweight-charts";
+import MaintenanceModal from "../components/common/popuptradingterminal/MaintenanceModal";
+
+import { ErrorPopup } from "../components/common/popuptradingterminal/ErrorPopup";
 import { fetchHistoricalKlines } from "../utils/fetchKline";
 import { ExtendedCandle } from "../utils/types";
 import { Order } from "../utils/types";
@@ -35,8 +35,8 @@ import TradingForm from "../components/common/TradingForm";
 import { useMiniTickerStore } from "../utils/miniTickerStore";
 import { binanceWS } from "../components/binancewebsocket/BinanceWebSocketService";
 import { toast } from "react-toastify";
-import { AlertTriangle } from "lucide-react";
-import OrderOpenHistory from "../components/orderlayout/OrderOpenHistory";
+
+
 import SettingControl from "../components/common/controlsetting/SetiingControl";
 import { BinanceAccount } from "../utils/types";
 import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
@@ -67,7 +67,8 @@ import ChartTypePanel, {
 // ✅ THÊM
 import TimeframeModalWrapper from "./layout panel/Timeframemodalwrapper";
 // Trạng thái kết nối WS
-type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error" | "maintenance";
+
 
 // Loại thị trường
 type MarketType = "spot" | "futures";
@@ -163,41 +164,9 @@ interface MiniTickerData {
   percentChange: string;
 }
 
-// Account (cho stream private)
-interface AccountInfo {
-  makerCommission: number;
-  takerCommission: number;
-  buyerCommission: number;
-  sellerCommission: number;
-  canTrade: boolean;
-  canWithdraw: boolean;
-  canDeposit: boolean;
-  balances: Array<{
-    asset: string;
-    free: string;
-    locked: string;
-  }>;
-}
 
-interface OrderUpdate {
-  symbol: string;
-  orderId: number;
-  orderListId: number;
-  clientOrderId: string;
-  price: string;
-  origQty: string;
-  executedQty: string;
-  cummulativeQuoteQty: string;
-  status: string;
-  timeInForce: string;
-  type: string;
-  side: string;
-  stopPrice: string;
-  icebergQty: string;
-  time: number;
-  updateTime: number;
-  isWorking: boolean;
-}
+
+
 
 interface Subscription {
   id: string;
@@ -217,11 +186,7 @@ interface SymbolItem {
   volume: number;
 }
 
-interface Position {
-  symbol: string;
-  positionSide: string;
-  positionAmt: string;
-}
+
 interface Order {
   orderId: number;
   symbol: string;
@@ -250,61 +215,75 @@ class CustomWebSocketService {
   private messageQueue: any[] = [];
 
   private connect() {
-    try {
-      this.onStatusChange("connecting");
+  try {
+    this.onStatusChange("connecting");
 
-      this.ws = new WebSocket(
-        "ws://45.77.33.141/w-binance-socket/signalr/connect"
-      );
+    this.ws = new WebSocket(
+      "ws://45.77.33.141/w-binance-socket/signalr/connect"
+    );
 
-      this.ws.onopen = () => {
-        console.log("✅ WebSocket connected");
-        this.onStatusChange("connected");
-        this.isConnected = true;
+    this.ws.onopen = () => {
+      console.log("✅ WebSocket connected");
+      this.onStatusChange("connected");
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
 
-        // gửi lại các message đã queue
-        this.messageQueue.forEach((msg) => {
-          if (this.ws?.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(msg));
-          }
-        });
-        this.messageQueue = [];
-
-        // đăng ký mặc định tối thiểu
-        const subs = [
-          { action: "subscribePublicTicker", symbol: "BTCUSDT" },
-          { action: "subscribePublicKline", symbol: "BTCUSDT", interval: "1m" },
-          { action: "subscribePublicTrade", symbol: "BTCUSDT" },
-        ];
-        subs.forEach((msg) => this.sendMessage(msg));
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this.handleMessage(data);
-        } catch (error) {
-          console.error("❌ Error parsing message:", error);
+      // gửi lại các message đã queue
+      this.messageQueue.forEach((msg) => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify(msg));
         }
-      };
+      });
+      this.messageQueue = [];
 
-      this.ws.onerror = (error) => {
-        console.error("❌ WebSocket error:", error);
-        this.onStatusChange("error");
-        this.isConnected = false;
-      };
+      // đăng ký mặc định tối thiểu
+      const subs = [
+        { action: "subscribePublicTicker", symbol: "BTCUSDT" },
+        { action: "subscribePublicKline", symbol: "BTCUSDT", interval: "1m" },
+        { action: "subscribePublicTrade", symbol: "BTCUSDT" },
+      ];
+      subs.forEach((msg) => this.sendMessage(msg));
+    };
 
-      this.ws.onclose = () => {
-        console.warn("🔌 WebSocket closed. Reconnecting...");
+    this.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        this.handleMessage(data);
+      } catch (error) {
+        console.error("❌ Error parsing message:", error);
+      }
+    };
+
+    this.ws.onerror = (error) => {
+      console.error("❌ WebSocket error:", error);
+      
+      // ✅ HIỆN MODAL NGAY LẬP TỨC KHI CÓ LỖI
+      this.onStatusChange("maintenance");
+      this.isConnected = false;
+      this.reconnectAttempts++;
+    };
+
+    this.ws.onclose = (event) => {
+      console.warn("🔌 WebSocket closed:", event.code, event.reason);
+      
+      // ✅ NẾU ĐÓNG BẤT THƯỜNG (không phải close bình thường)
+      if (event.code !== 1000 && event.code !== 1001) {
+        this.onStatusChange("maintenance");
+      } else {
         this.onStatusChange("disconnected");
-        this.isConnected = false;
-        this.attemptReconnect();
-      };
-    } catch (error) {
-      console.error("❌ Failed to connect WebSocket:", error);
-      this.onStatusChange("error");
-    }
+      }
+      
+      this.isConnected = false;
+      this.attemptReconnect();
+    };
+  } catch (error) {
+    console.error("❌ Failed to connect WebSocket:", error);
+    
+    // ✅ HIỆN MODAL NGAY KHI KHÔNG TẠO ĐƯỢC WEBSOCKET
+    this.onStatusChange("maintenance");
+    this.reconnectAttempts++;
   }
+}
 
   private handleMessage(data: any) {
     if (data.action) {
@@ -479,11 +458,7 @@ class CustomWebSocketService {
     }
   }
 
-  private resubscribeAll() {
-    this.subscriptions.forEach((subscription) => {
-      this.sendMessage(subscription);
-    });
-  }
+
 
   private sendMessage(message: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -867,6 +842,9 @@ const DEFAULT_SETTINGS: ChartSettings = {
 };
 
 export default function TradingTerminal() {
+
+
+
   const hasConnectedRef = React.useRef(false);
   const [isTradingFormOpen, setIsTradingFormOpen] = useState(false);
   const [isPositionPanelOpen, setIsPositionPanelOpen] = useState(true); // Default open
@@ -894,35 +872,33 @@ export default function TradingTerminal() {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [livePrice, setLivePrice] = useState<number>(0);
   const [positions, setPositions] = useState<PositionData[]>([]);
-  const [currentOrders, setCurrentOrders] = useState<Order[]>(() => {
-    const stored = localStorage.getItem("openOrders");
-    return stored ? JSON.parse(stored) : [];
-  });
+
   const [showSettings, setShowSettings] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingRef = useRef<HTMLDivElement>(null);
-  const [orderHistory, setOrderHistory] = useState<Order[]>([]);
+
   const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
     null
   );
   const [candles, setCandles] = useState<ExtendedCandle[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
-  const miniTickerCallbacks = useRef<
-    Map<string, (data: MiniTickerData) => void>
-  >(new Map());
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [favoriteSymbols, setFavoriteSymbols] = useState<string[]>(() => {
-    const stored = localStorage.getItem("favoriteSymbols");
-    return stored ? JSON.parse(stored) : [];
-  });
+
   const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">(
     "all"
   );
   const [availableBalance, setAvailableBalance] = useState<number>(0);
   const token = localStorage.getItem("token") || "";
-  const [showCancelAllConfirm, setShowCancelAllConfirm] = useState(false);
 
+const [errorPopup, setErrorPopup] = useState<{
+  show: boolean;
+  message: string;
+}>({
+  show: false,
+  message: ''
+});
   // State chính
   const [selectedSymbol, setSelectedSymbol] = useState(() => {
     return localStorage.getItem("selectedSymbol") || "BTCUSDT";
@@ -985,6 +961,137 @@ export default function TradingTerminal() {
     }
   };
 
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+
+
+ useEffect(() => {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let errorCount = 0;
+  let modalTimer: NodeJS.Timeout | null = null;
+  let resetTimer: NodeJS.Timeout | null = null;
+  
+  const handleError = () => {
+    errorCount++;
+    console.log(`🚨 WebSocket error #${errorCount}`);
+    
+    // Reset counter sau 15 giây (tăng lên để cho đủ thời gian connect)
+    if (resetTimer) clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
+      console.log('🔄 Resetting error count (connection recovered)');
+      errorCount = 0;
+    }, 15000);
+    
+    // ✅ CHỈ hiện modal nếu có >= 3 lỗi VÀ connectionStatus !== "connected"
+    if (errorCount >= 3) {
+      console.log('🚨 Multiple errors detected, checking connection status...');
+      
+      if (modalTimer) clearTimeout(modalTimer);
+      
+      // ✅ Đợi 8 giây rồi check status
+      modalTimer = setTimeout(() => {
+        // Kiểm tra xem đã connect lại chưa
+        if (connectionStatus !== "connected") {
+          console.log('⏰ Connection still failed → Showing modal');
+          setShowMaintenanceModal(true);
+        } else {
+          console.log('✅ Connection recovered → NOT showing modal');
+          errorCount = 0; // Reset vì đã ổn
+        }
+      }, 8000); // Tăng lên 8 giây để cho đủ thời gian reconnect
+    }
+  };
+  
+  console.error = function(...args) {
+  const msg = args.join(' ');
+  
+  if (msg.includes('WebSocket') || msg.includes('ws://')) {
+    // ✅ Chỉ log nếu không đang connecting
+    if (connectionStatus !== 'connecting') {
+      handleError();
+    } else {
+      console.log('⏳ WebSocket connecting... (ignoring error)');
+    }
+  }
+  
+  originalError.apply(console, args);
+};
+  
+  console.warn = function(...args) {
+    const msg = args.join(' ');
+    if (msg.includes('WebSocket closed') && msg.includes('1006')) {
+      handleError();
+    }
+    originalWarn.apply(console, args);
+  };
+
+  return () => {
+    console.error = originalError;
+    console.warn = originalWarn;
+    if (modalTimer) clearTimeout(modalTimer);
+    if (resetTimer) clearTimeout(resetTimer);
+  };
+}, [connectionStatus]); // ✅ Thêm dependency
+
+// ===== ERROR POPUP LISTENER (Giống MaintenanceModal pattern) =====
+useEffect(() => {
+  const originalLog = console.log;
+  
+  console.log = function(...args) {
+    const msg = args.join(' ');
+    
+    // Bắt RAW WS MSG từ BinanceWebSocketService
+    if (msg.includes('📥 RAW WS MSG:') && msg.includes('"type":"error"')) {
+      try {
+        // Tìm JSON object trong message
+        const jsonMatch = msg.match(/(\{[^}]*"type"\s*:\s*"error"[^}]*\})/);
+        if (jsonMatch) {
+          const data = JSON.parse(jsonMatch[0]);
+          if (data.type === 'error' && data.message) {
+            
+            setErrorPopup({
+              show: true,
+              message: data.message
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing popup message:', e);
+      }
+    }
+    
+    originalLog.apply(console, args);
+  };
+  
+  return () => {
+    console.log = originalLog;
+  };
+}, []);
+  
+useEffect(() => {
+  // ✅ Show modal when connection status is "maintenance"
+  
+  if (connectionStatus === "maintenance") {
+    
+    setShowMaintenanceModal(true);
+  } else if (connectionStatus === "connected") {
+    
+    setShowMaintenanceModal(false);
+  }
+}, [connectionStatus]);
+
+const handleRefreshConnection = () => {
+  setShowMaintenanceModal(false);
+  
+  // Force reconnect by creating new WebSocket service
+  wsService.disconnect();
+  
+  // Wait a bit then reload page
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
+};
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -1005,23 +1112,19 @@ export default function TradingTerminal() {
 
 
   // UI
-  const [activeOrderTab, setActiveOrderTab] = useState<
-    "limit" | "market" | "stop"
-  >("limit");
-  const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+
+
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
 
   // Trading form
   const [price, setPrice] = useState<number>(0);
-  const [amount, setAmount] = useState("");
-  const [total, setTotal] = useState("");
+
 
   const { user } = useAuth() as { user: User };
   const binanceAccountId = user?.internalAccountId;
 
   const [floatingInfo, setFloatingInfo] = useState<FloatingInfo | null>(null);
-  // ✅ State cho mobile trading form modal
-  const [showMobileTradingForm, setShowMobileTradingForm] = useState(false);
+
   // Toggle control setting
   const [chartSettings, setChartSettings] = React.useState<ChartSettings>(
     () => {
@@ -1036,12 +1139,11 @@ export default function TradingTerminal() {
     }
   );
 
-  const wsRef = useRef<any>(null);
+
 
   // ============= RESPONSIVE STATE (THÊM MỚI) =============
   const [isMobile, setIsMobile] = useState(false);
-  const [showOrderBook, setShowOrderBook] = useState(false);
-  const [showTradingForm, setShowTradingForm] = useState(false);
+
 
   // Detect screen size
   useEffect(() => {
@@ -1067,16 +1169,7 @@ export default function TradingTerminal() {
   }, [selectedSymbol]);
   // ======================================================
 
-  const setSetting = React.useCallback(
-    (key: keyof ChartSettings, value: boolean) => {
-      setChartSettings((prev) => {
-        const next = { ...prev, [key]: value };
-        localStorage.setItem("chartSettings", JSON.stringify(next));
-        return next;
-      });
-    },
-    []
-  );
+
 
   // đóng panel setting khi click ngoài (có guard modal Time)
   const panelRef = React.useRef<HTMLDivElement>(null);
@@ -1089,7 +1182,7 @@ export default function TradingTerminal() {
       if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
     };
 
-    document.addEventListener("mousedown", onClick, true);
+    document.addEventListener("mousedown", onClick,);
     return () => document.removeEventListener("mousedown", onClick, true);
   }, [showSettings, showTimeframeSelector]); // ✅ Thêm dependency
 
@@ -1104,10 +1197,7 @@ export default function TradingTerminal() {
     }
   }, [selectedSymbol]);
 
-  const updateCurrentOrders = (orders: Order[]) => {
-    setOpenOrders(orders);
-    localStorage.setItem("openOrders", JSON.stringify(orders));
-  };
+
 
   // đóng menu setting khi click ra ngoài (có guard modal Time)
 
@@ -1171,9 +1261,18 @@ export default function TradingTerminal() {
       // ❌ BỎ chọn account ở đây để tránh double select
       // case "myBinanceAccounts": { ... }
 
+      case "error": {
+  
+  
+  setErrorPopup({
+    show: true,
+    message: msg.message || "An error occurred"
+  });
+  
+  break;
+}
+
       case "cancelAllOrdersSuccess":
-        toast.success("Huỷ tất cả lệnh thành công!");
-        break;
 
       case "cancelAllOrdersFailed":
         toast.error("Huỷ tất cả lệnh thất bại!");
@@ -1196,19 +1295,16 @@ export default function TradingTerminal() {
     if (hasConnectedRef.current) return;
     hasConnectedRef.current = true;
 
+    // ✅ THÊM - Set maintenance callback TRƯỚC KHI connect
+    binanceWS.setMaintenanceCallback(() => {
+      console.log('🚨 BinanceWS maintenance callback triggered!');
+      setShowMaintenanceModal(true);
+    });
+
     binanceWS.connect(token, globalWsHandler);
   }, [token, globalWsHandler]);
 
-  // Kết nối WS trading (service chính) 1 lần
-  useEffect(() => {
-    if (!token) return;
-    binanceWS.connect(token, globalWsHandler);
-  }, [token, globalWsHandler]);
 
-  const handleCancelAllOrders = () => {
-    binanceWS.cancelAllOrders(selectedSymbol, selectedMarket);
-    setShowCancelAllConfirm(false);
-  };
 
   // Tải dữ liệu nến lịch sử ban đầu
   useEffect(() => {
@@ -1216,10 +1312,12 @@ export default function TradingTerminal() {
 
     const loadHistoricalKlines = async () => {
       try {
+     
         const historicalData = await fetchHistoricalKlines(
           selectedSymbol,
-          selectedInterval,
-          500
+  selectedInterval,
+  500,
+  selectedMarket 
         );
         if (isMounted) {
           setCandles(historicalData);
@@ -1406,17 +1504,7 @@ export default function TradingTerminal() {
     };
   }, [selectedMarket, selectedSymbol]);
 
-  const sortedSymbols: SymbolItem[] = symbolList.map((symbol) => {
-    const matched = allSymbols.find((s) => s.symbol === symbol);
-    return (
-      matched ?? {
-        symbol,
-        price: 0,
-        percentChange: 0,
-        volume: 0,
-      }
-    );
-  });
+
 
   // ✅ Subscribe realtime theo account đã chọn (thêm ref-guard chống duplicate)
   const subOnceRef = useRef<number | null>(null);
@@ -1484,18 +1572,13 @@ export default function TradingTerminal() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleUnsubscribe = (subscriptionId: string) => {
-    wsService.unsubscribe(subscriptionId);
-    setSubscriptions(wsService.getSubscriptions());
-  };
+
 
   const handleClickOrderBookPrice = (price: number) => {
     setPrice(price);
   };
 
-  const handleSymbolChange = (newSymbol: string) => {
-    setSelectedSymbol(newSymbol);
-  };
+
 
   const handleMarketChange = (newMarket: MarketType) => {
     setSelectedMarket(newMarket);
@@ -1514,39 +1597,9 @@ export default function TradingTerminal() {
     localStorage.setItem("selectedInterval", newInterval); // ✅ Thêm dòng này
   };
 
-  const calculateTotal = (price: string, amount: string) => {
-    if (price && amount) {
-      const calculatedTotal = parseFloat(price) * parseFloat(amount);
-      return calculatedTotal.toFixed(8);
-    }
-    return "";
-  };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newAmount = e.target.value;
-    setAmount(newAmount);
-    setTotal(calculateTotal(String(price), newAmount));
-  };
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newPrice = e.target.value;
-    setPrice(Number(newPrice));
-    setTotal(calculateTotal(newPrice, amount));
-  };
 
-  const handleTotalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTotal = e.target.value;
-    setTotal(newTotal);
-
-    if (newTotal && price && parseFloat(String(price)) !== 0) {
-      const calculatedAmount = (
-        parseFloat(newTotal) / parseFloat(String(price))
-      ).toFixed(8);
-      setAmount(calculatedAmount);
-    } else {
-      setAmount("");
-    }
-  };
   useEffect(() => {
     const timer = setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
@@ -1566,7 +1619,7 @@ export default function TradingTerminal() {
 
 
   return (
-    
+
     <div className="trading-terminal">
       {/* ===== HEADER ===== */}
       <div className="trading-header">
@@ -1666,8 +1719,8 @@ export default function TradingTerminal() {
                 <div className="flex flex-col">
                   <span
                     className={`text-sm font-medium ${parseFloat(tickerData.priceChange) >= 0
-                        ? "text-success-500"
-                        : "text-danger-500"
+                      ? "text-success-500"
+                      : "text-danger-500"
                       }`}
                   >
                     {parseFloat(tickerData.priceChange) >= 0 ? "+" : ""}
@@ -1675,8 +1728,8 @@ export default function TradingTerminal() {
                   </span>
                   <span
                     className={`text-xs ${parseFloat(tickerData.priceChangePercent) >= 0
-                        ? "text-success-500"
-                        : "text-danger-500"
+                      ? "text-success-500"
+                      : "text-danger-500"
                       }`}
                   >
                     {parseFloat(tickerData.priceChangePercent) >= 0 ? "+" : ""}
@@ -1740,6 +1793,7 @@ export default function TradingTerminal() {
           </div>
           {/* Right: Controls */}
           <div className="header-controls">
+            
             <div className="flex items-center space-x-2">
               {connectionStatus === "connected" ? (
                 <Wifi className="h-4 w-4 text-success-500" />
@@ -1844,7 +1898,11 @@ export default function TradingTerminal() {
                       {showSettings && (
                         <SettingControl
                           settings={chartSettings}
-                          onToggle={(k, v) => setShowSettings(false)}
+                          onToggle={(k, v) => {
+                            const newSettings = { ...chartSettings, [k]: v };
+                            setChartSettings(newSettings);
+                            localStorage.setItem("chartSettings", JSON.stringify(newSettings));
+                          }}
                           onClose={() => setShowSettings(false)}
                           triggerRef={settingsButtonRef}
                         />
@@ -1900,10 +1958,10 @@ export default function TradingTerminal() {
                   {orderBook ? (
                     <div className="h-full flex flex-col">
                       {/* Asks */}
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="overflow-y-auto scrollbar-hide" style={{ minHeight: '200px' }}>
                         <div className="space-y-0.5 p-2">
                           {orderBook.asks
-                            .slice(0, 10)
+                            .slice(0, 15)
                             .reverse()
                             .map((ask, index) => (
                               <div
@@ -1938,8 +1996,8 @@ export default function TradingTerminal() {
                         <div className="text-center">
                           <div
                             className={`text-sm font-bold ${tickerData && parseFloat(tickerData.priceChange) >= 0
-                                ? "text-success-500"
-                                : "text-danger-500"
+                              ? "text-success-500"
+                              : "text-danger-500"
                               }`}
                           >
                             {tickerData
@@ -1956,9 +2014,9 @@ export default function TradingTerminal() {
                       </div>
 
                       {/* Bids */}
-                      <div className="flex-1 overflow-y-auto">
+                      <div className="overflow-y-auto scrollbar-hide" style={{ minHeight: '200px' }}>
                         <div className="space-y-0.5 p-2">
-                          {orderBook.bids.slice(0, 10).map((bid, index) => (
+                          {orderBook.bids.slice(0, 15).map((bid, index) => (
                             <div
                               key={index}
                               className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
@@ -2010,7 +2068,7 @@ export default function TradingTerminal() {
             {showPositionTab && (
               <div
                 className="position-panel-header flex items-center justify-between cursor-pointer"
-                
+
               >
                 <div className="flex items-center space-x-3">
                   <span className="font-semibold text-sm">Positions & Orders</span>
@@ -2096,6 +2154,19 @@ export default function TradingTerminal() {
         onClose={handleCloseTimeframe}
         onSave={handleSaveTimeframes}
       />
+ <MaintenanceModal 
+      isOpen={showMaintenanceModal}
+      onRefresh={handleRefreshConnection}
+    />
+
+    {/* Error Popup */}
+    {errorPopup.show && (
+      <ErrorPopup
+        message={errorPopup.message}
+        onClose={() => setErrorPopup({ show: false, message: '' })}
+      />
+    )}
+      
     </div>
   );
 }

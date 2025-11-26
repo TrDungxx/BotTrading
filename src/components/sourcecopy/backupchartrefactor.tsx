@@ -11,7 +11,7 @@ import {
   UTCTimestamp,
   ISeriesApi,
 } from 'lightweight-charts';
-import { useChartType } from './hooks/userChartType';
+
 import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import { copyPrice } from '../clickchart/CopyPrice';
@@ -151,22 +151,12 @@ const TradingBinance: React.FC<Props> = ({
   floating,
   showPositionTag,
   onRequestSymbolChange,
-  chartType: controlledChartType,
-  onChartTypeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mainChartContainerRef = useRef<HTMLDivElement | null>(null);
   const volumeChartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const volumeChartRef = useRef<IChartApi | null>(null);
-
-  // ✅ chartType state (controlled/uncontrolled)
-  const [innerChartType, setInnerChartType] = useState<ChartType>("Candles");
-  const chartType = controlledChartType ?? innerChartType;
-  const setChartType = (t: ChartType) => {
-    if (onChartTypeChange) onChartTypeChange(t);
-    else setInnerChartType(t);
-  };
 
   // ✅ Khai báo refs TRƯỚC (để tránh lỗi initialization)
   const candleSeries = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -191,6 +181,7 @@ const TradingBinance: React.FC<Props> = ({
     ema26Ref,
     mavol1Ref,
     mavol2Ref,
+    mainVisibleRef,
     updateMainIndicators,
     updateVolumeIndicators,
     clearAllIndicators,
@@ -231,6 +222,9 @@ const TradingBinance: React.FC<Props> = ({
 
   const wsRef = useRef<WebSocket | null>(null);
   const sessionRef = useRef(0);
+  const resizeObsRef = useRef<ResizeObserver | null>(null);
+  const lastSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
+
   const [floatingPos, setFloatingPos] = useState<PositionForTag | undefined>(undefined);
   const [candles, setCandles] = useState<Candle[]>([]);
 
@@ -248,20 +242,10 @@ const TradingBinance: React.FC<Props> = ({
   const [orderSeedPrice, setOrderSeedPrice] = useState<number | null>(null);
   const [orderPresetType, setOrderPresetType] = useState<PresetType>('LIMIT');
   const syncSourceRef = useRef<'main' | 'volume' | null>(null);
-  const { updateSeriesData } = useChartType({
-    chartType,
-    chartRef,
-    candleSeriesRef: candleSeries,
-    candles,
-    selectedSymbol,
-    market,
-    sessionRef,
-    updateMainIndicators,
-    updateBollingerBands,
-    addHLine,
-    hlineKey,
-  });
+
   const isSyncingRef = useRef(false);
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInteractingRef = useRef(false);
   const snapToTick = (price: number) => {
     const cacheKey = `${market}:${selectedSymbol.toUpperCase()}`;
     const meta = symbolMetaCache.get(cacheKey) ?? heuristicMetaFromPrice(price);
@@ -278,6 +262,11 @@ const TradingBinance: React.FC<Props> = ({
     return Number((Math.round(price / tick) * tick).toFixed(precision));
   };
   const [alertOpen, setAlertOpen] = useState(false);
+
+  const lastCandleTime = (candles.at(-1)?.time ?? null) as UTCTimestamp | null;
+
+  const positionSide: 'LONG' | 'SHORT' =
+    parseFloat(floatingPos?.positionAmt ?? '0') < 0 ? 'SHORT' : 'LONG';
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -375,88 +364,115 @@ const TradingBinance: React.FC<Props> = ({
     setCtxSubOpen(false);
   };
 
-  const updatePriceFormat = async (candles: Candle[]) => {
-    const chart = chartRef.current;
-    const cs = candleSeries.current;
+  const updatePriceFormat = async (data: Candle[]) => {
+    if (!data.length) return;
 
-    if (!chart || !cs || candles.length === 0) {
-      return;
-    }
-
-    const lastPrice = candles.at(-1)?.close;
-
-    if (!lastPrice || !Number.isFinite(lastPrice) || lastPrice <= 0) {
-      return;
-    }
-
-    let meta: SymbolMeta;
     try {
-      meta = await getSymbolMeta(selectedSymbol, market);
-    } catch {
-      meta = heuristicMetaFromPrice(lastPrice);
-    }
+      const meta = await getSymbolMeta(selectedSymbol, market);
 
-    let { tickSize, precision } = meta;
+      const priceScale = chartRef.current?.priceScale('right');
+      if (priceScale && candleSeries.current) {
+        priceScale.applyOptions({
+          autoScale: true,
+          scaleMargins: { top: 0.08, bottom: 0.02 },
+        });
 
-    // ✅ Điều chỉnh displayTickSize cho cột giá (bước nhảy nhỏ = nhiều mốc)
-    let displayTickSize = tickSize;
-
-    if (lastPrice < 1) {
-      if (lastPrice >= 0.1 && lastPrice < 1) {
-        displayTickSize = 0.0001;
-        precision = 5;
-      } else if (lastPrice < 0.1) {
-        displayTickSize = 0.00001;
-        precision = 6;
+        candleSeries.current.applyOptions({
+          priceFormat: {
+            type: 'price',
+            precision: meta.precision,
+            minMove: meta.tickSize,
+          },
+        });
       }
-    } else if (lastPrice >= 1 && lastPrice < 10) {
-      displayTickSize = 0.001;  // Nhiều mốc: 2.330, 2.331, 2.332...
-      precision = 3;
-    } else if (lastPrice >= 10 && lastPrice < 100) {
-      displayTickSize = 0.01;   // Nhiều mốc: 23.30, 23.31...
-      precision = 2;
-    } else if (lastPrice >= 100) {
-      displayTickSize = 0.1;    // Nhiều mốc: 230.0, 230.1...
-      precision = 4;
+    } catch (err) {
+      console.warn('[UpdatePriceFormat] Failed, using heuristic', err);
+      const lastClose = data.at(-1)?.close ?? 1;
+      const heuristic = heuristicMetaFromPrice(lastClose);
+
+      const priceScale = chartRef.current?.priceScale('right');
+      if (priceScale && candleSeries.current) {
+        priceScale.applyOptions({
+          autoScale: true,
+          scaleMargins: { top: 0.08, bottom: 0.02 },
+        });
+
+        candleSeries.current.applyOptions({
+          priceFormat: {
+            type: 'price',
+            precision: heuristic.precision,
+            minMove: heuristic.tickSize,
+          },
+        });
+      }
     }
+  };
 
-    // ✅ Apply displayTickSize cho chart series (cột giá bên phải)
-    cs.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma7Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ema12Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ema26Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+  const pickPos = (arr: any[]) => {
+    if (!arr || !Array.isArray(arr)) return;
+    const item = arr.find((p: any) => p.symbol?.toUpperCase() === selectedSymbol.toUpperCase());
+    if (!item) return;
 
-    // ✅ KHÔNG làm tròn giá live - hiển thị đúng giá gốc
-    chart.applyOptions({
-      localization: {
-        locale: 'vi-VN',
-        priceFormatter: (p: number) => {
-          // KHÔNG có Math.round() - giữ nguyên giá gốc
-          return p.toLocaleString('vi-VN', {
-            minimumFractionDigits: precision,
-            maximumFractionDigits: precision,
-          });
-        },
-        // ✅ FIX: Format time theo timezone Việt Nam (UTC+7) - Hiển thị khi HOVER
-        timeFormatter: (timestamp: number) => {
-          const date = new Date(timestamp * 1000);
-          const time = date.toLocaleTimeString('vi-VN', {
-            timeZone: 'Asia/Ho_Chi_Minh',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          });
-          const day = date.toLocaleDateString('vi-VN', {
-            timeZone: 'Asia/Ho_Chi_Minh',
-            day: '2-digit',
-            month: '2-digit',
-          });
-          return `${time} ${day}`; // Format: "16:00 12-11"
-        },
-      },
-    });
+    const amt = parseFloat(item.positionAmt ?? '0');
+    if (Math.abs(amt) < 0.00001) {
+      setFloatingPos(undefined);
+    } else {
+      setFloatingPos({
+        symbol: item.symbol,
+        positionAmt: item.positionAmt,
+        entryPrice: item.entryPrice,
+        markPrice: item.markPrice,
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (market !== 'futures') {
+      setFloatingPos(undefined);
+      return;
+    }
+    const handler = (msg: any) => {
+      if (Array.isArray(msg) && msg[0]?.symbol && msg[0]?.positionAmt !== undefined) {
+        pickPos(msg);
+        return;
+      }
+      if (msg?.a?.P && Array.isArray(msg.a.P)) {
+        pickPos(msg.a.P);
+        return;
+      }
+    };
+    binanceWS.onMessage(handler);
+    return () => binanceWS.removeMessageHandler(handler);
+  }, [selectedSymbol, market]);
+
+  const forceSyncCharts = () => {
+    if (isSyncingRef.current) return;
+    if (!chartRef.current || !volumeChartRef.current) return;
+
+    try {
+      isSyncingRef.current = true;
+
+      const mainTimeScale = chartRef.current.timeScale();
+      const volumeTimeScale = volumeChartRef.current.timeScale();
+
+      const logicalRange = mainTimeScale.getVisibleLogicalRange();
+
+      if (logicalRange) {
+        volumeTimeScale.setVisibleLogicalRange(logicalRange);
+      }
+
+      const mainOptions = mainTimeScale.options();
+      if (mainOptions && 'barSpacing' in mainOptions) {
+        volumeTimeScale.applyOptions({
+          barSpacing: mainOptions.barSpacing,
+          rightOffset: mainOptions.rightOffset,
+        });
+      }
+    } catch (err) {
+      console.error('[ForceSyncCharts] Error:', err);
+    } finally {
+      isSyncingRef.current = false;
+    }
   };
 
   // Sync bollData changes
@@ -466,9 +482,9 @@ const TradingBinance: React.FC<Props> = ({
 
   // ✅ Auto redraw BOLL fill when data changes
   useEffect(() => {
-  if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-    requestAnimationFrame(() => redrawBollFill()); // Instant
-  }
+    if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
+      setTimeout(() => redrawBollFill(), 100);
+    }
   }, [bollData, mainVisible.boll, bollFillVisible, redrawBollFill]);
 
   // Main chart initialization
@@ -483,7 +499,6 @@ const TradingBinance: React.FC<Props> = ({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
-      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
       localization: {
         locale: 'vi-VN',
         timeFormatter: (timestamp: number) => {
@@ -532,7 +547,6 @@ const TradingBinance: React.FC<Props> = ({
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
         visible: false,
-        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục (không có ngày/tháng)
         tickMarkFormatter: (time: UTCTimestamp) => {
           const date = new Date(time * 1000);
           return date.toLocaleTimeString('vi-VN', {
@@ -543,7 +557,6 @@ const TradingBinance: React.FC<Props> = ({
           });
         },
       },
-
       crosshair: {
         mode: 0,
         vertLine: {
@@ -583,7 +596,6 @@ const TradingBinance: React.FC<Props> = ({
         mouse: true,
         touch: true,
       },
-
     });
 
     chartRef.current = mainChart;
@@ -594,7 +606,6 @@ const TradingBinance: React.FC<Props> = ({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
-      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
       localization: {
         locale: 'vi-VN',
         timeFormatter: (timestamp: number) => {
@@ -639,7 +650,6 @@ const TradingBinance: React.FC<Props> = ({
         lockVisibleTimeRangeOnResize: true,
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
-        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục
         tickMarkFormatter: (time: UTCTimestamp) => {
           const date = new Date(time * 1000);
           return date.toLocaleTimeString('vi-VN', {
@@ -689,7 +699,6 @@ const TradingBinance: React.FC<Props> = ({
         mouse: true,
         touch: true,
       },
-
     });
 
     volumeChartRef.current = volumeChart;
@@ -848,14 +857,12 @@ const TradingBinance: React.FC<Props> = ({
 
     // Subscribe to BOLL redraw events
     mainChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-  if (mainVisible.boll && bollFillVisible) {
-    requestAnimationFrame(() => redrawBollFill()); // Smooth 60fps
-  }
-});
+      if (mainVisible.boll && bollFillVisible) {
+        redrawBollFill();
+      }
+    });
 
-    // ✅ Also redraw on crosshair move (for smooth updates)
-    let redrawTimeout: NodeJS.Timeout | null = null;
-    const handleCrosshairMove = (param: any) => {
+    mainChart.subscribeCrosshairMove((param) => {
       if (param.time && param.seriesData.has(candleSeries.current!)) {
         const price = param.seriesData.get(candleSeries.current!)?.close;
         if (typeof price === 'number') {
@@ -866,35 +873,9 @@ const TradingBinance: React.FC<Props> = ({
         setHoverPrice(null);
         setHoverTime(null);
       }
-
-      // Debounced redraw for BOLL fill
-      if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-  requestAnimationFrame(() => redrawBollFill()); // Instant, no debounce
-}
-    };
-
-    mainChart.subscribeCrosshairMove(handleCrosshairMove);
-
-    // ✅ Redraw BOLL fill on chart resize
-    const resizeObserver = new ResizeObserver(() => {
-      if (bollCanvasRef.current && chartRef.current) {
-        const mainEl = mainChartContainerRef.current;
-        if (mainEl) {
-          bollCanvasRef.current.width = mainEl.clientWidth;
-          bollCanvasRef.current.height = mainEl.clientHeight;
-        }
-      }
-      if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-        setTimeout(() => redrawBollFill(), 100);
-      }
     });
 
-    if (mainEl) {
-      resizeObserver.observe(mainEl);
-    }
-
     return () => {
-      resizeObserver.disconnect();
       mainChart.remove();
       volumeChart.remove();
     };
@@ -939,11 +920,9 @@ const TradingBinance: React.FC<Props> = ({
 
     const loadHistory = async () => {
       const path = market === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
-      const symbolUpper = selectedSymbol.toUpperCase().trim(); // ✅ FIX: Trim whitespace
-      const url = `${restBase}${path}?symbol=${symbolUpper}&interval=${selectedInterval}&limit=500`;
+      const url = `${restBase}${path}?symbol=${selectedSymbol.toUpperCase()}&interval=${selectedInterval}&limit=500`;
 
       console.log('[LoadHistory] 🔄 Fetching:', url);
-      console.log('[LoadHistory] 📌 Symbol:', symbolUpper, '| Market:', market, '| Interval:', selectedInterval);
 
       try {
         const res = await fetch(url, {
@@ -953,52 +932,25 @@ const TradingBinance: React.FC<Props> = ({
           }
         });
 
-        // ✅ FIX: Log response status chi tiết
-        console.log('[LoadHistory] 📡 Response:', res.status, res.statusText);
-
         if (!res.ok) {
-          const errorText = await res.text();
-          console.error('[LoadHistory] ❌ API Error:', errorText);
-          
-          // ✅ FIX: Parse Binance error
-          try {
-            const errJson = JSON.parse(errorText);
-            if (errJson.code === -1121) {
-              console.error(`[LoadHistory] ❌ Symbol "${symbolUpper}" KHÔNG TỒN TẠI trên ${market.toUpperCase()}!`);
-            }
-          } catch {}
-          
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
 
         const data = await res.json();
 
-        // ✅ FIX: Log data info
-        console.log('[LoadHistory] 📊 Data:', Array.isArray(data) ? `${data.length} klines` : typeof data);
-
         if (!Array.isArray(data)) {
-          console.error('[LoadHistory] ❌ Invalid response:', data);
-          // ✅ FIX: Check Binance error object
-          if (data && typeof data === 'object' && 'code' in data) {
-            console.error('[LoadHistory] ❌ Binance Error:', data.code, data.msg);
-          }
+          console.error('[LoadHistory] ❌ Invalid response type:', typeof data);
           throw new Error('Expected array of klines');
         }
 
         if (data.length === 0) {
-          console.warn('[LoadHistory] ⚠️ Empty data for', symbolUpper, '- Coin có thể không có trên', market);
+          console.warn('[LoadHistory] ⚠️ No data returned for', selectedSymbol);
           return;
         }
 
         if (sessionRef.current !== mySession) {
-          console.log('[LoadHistory] ⏭️ Stale session:', mySession, '→', sessionRef.current);
+          console.log('[LoadHistory] ⏭️ Skipping stale data (session changed)');
           return;
-        }
-
-        // ✅ FIX: Validate kline format
-        if (!Array.isArray(data[0]) || data[0].length < 6) {
-          console.error('[LoadHistory] ❌ Invalid kline format:', data[0]);
-          throw new Error('Invalid kline format');
         }
 
         const cs: Candle[] = data.map((d: any) => ({
@@ -1015,16 +967,10 @@ const TradingBinance: React.FC<Props> = ({
           color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
         }));
 
-        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles | Last:', cs[cs.length-1]?.close);
+        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles for', selectedSymbol);
 
-        // ✅ FIX: Check series refs before setData
-        if (!candleSeries.current || !volumeSeries.current) {
-          console.error('[LoadHistory] ❌ Chart series not ready!');
-          return;
-        }
-
-        candleSeries.current.setData(cs);
-        volumeSeries.current.setData(vs);
+        candleSeries.current!.setData(cs);
+        volumeSeries.current!.setData(vs);
         setVolumeData(vs);
 
         // ✅ Update indicators using hooks (no more duplication!)
@@ -1113,8 +1059,7 @@ const TradingBinance: React.FC<Props> = ({
           };
 
           if (candleSeries.current && volumeSeries.current) {
-            // ✅ Dùng hook để update series
-            updateSeriesData(candle);
+            candleSeries.current.update(candle);
             volumeSeries.current.update(vol);
 
             setVolumeData((prev) => {
@@ -1125,6 +1070,7 @@ const TradingBinance: React.FC<Props> = ({
 
               if (next.length > 500) next.shift();
 
+              // ✅ Update volume indicators
               updateVolumeIndicators(next);
 
               return next;
@@ -1155,6 +1101,7 @@ const TradingBinance: React.FC<Props> = ({
 
             if (next.length > 500) next.shift();
 
+            // ✅ Update main indicators (no more duplication!)
             updateMainIndicators(next);
             updateBollingerBands(next);
 
@@ -1171,16 +1118,7 @@ const TradingBinance: React.FC<Props> = ({
         };
 
       } catch (err) {
-        // ✅ FIX: Better error handling
-        if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            console.log('[LoadHistory] ⏹️ Request aborted (symbol changed)');
-            return; // Don't retry on abort
-          }
-          console.error('[LoadHistory] ❌ Error:', err.message);
-        } else {
-          console.error('[LoadHistory] ❌ Unknown error:', err);
-        }
+        console.error('[LoadHistory] ❌ Error:', err);
 
         if (sessionRef.current === mySession) {
           console.log('[LoadHistory] 🔄 Retrying in 3 seconds...');
@@ -1269,80 +1207,6 @@ const TradingBinance: React.FC<Props> = ({
     },
   ].filter(Boolean) as IndicatorValue[];
 
-// ✅ Listen for symbol change requests from Position component
-useEffect(() => {
-  const handler = (e: CustomEvent) => {
-    const { symbol } = e.detail;
-    console.log("📊 Chart received symbol change request:", symbol);
-    
-    if (onRequestSymbolChange) {
-      onRequestSymbolChange(symbol);
-    }
-  };
-  
-  window.addEventListener("chart-symbol-change-request", handler as EventListener);
-  return () => window.removeEventListener("chart-symbol-change-request", handler as EventListener);
-}, [onRequestSymbolChange]);
-
-useEffect(() => {
-  const hideLogo = (svg: Element) => {
-    if (svg.getAttribute('viewBox') === '0 0 35 19') {
-      (svg as HTMLElement).style.display = 'none';
-      
-      const parent = svg.parentElement;
-      if (parent) {
-        (parent as HTMLElement).style.display = 'none';
-      }
-      
-      console.log('✅ Đã ẩn logo TradingView');
-      return true;
-    }
-    return false;
-  };
-
-  const existingLogos = document.querySelectorAll('svg[viewBox="0 0 35 19"]');
-  existingLogos.forEach(hideLogo);
-
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) {
-          const element = node as Element;
-          
-          if (element.tagName === 'svg' && hideLogo(element)) {
-            return;
-          }
-          
-          const logos = element.querySelectorAll('svg[viewBox="0 0 35 19"]');
-          logos.forEach(hideLogo);
-        }
-      });
-    });
-  });
-
-  const mainContainer = mainChartContainerRef.current;
-  const volumeContainer = volumeChartContainerRef.current;
-
-  if (mainContainer) {
-    observer.observe(mainContainer, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  if (volumeContainer) {
-    observer.observe(volumeContainer, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  return () => {
-    observer.disconnect();
-  };
-}, []);
-
-
   return (
     <div className="relative w-full h-full bg-dark-900 text-dark-100 flex flex-col overflow-hidden">
       {mainIndicatorVisible && (
@@ -1378,76 +1242,43 @@ useEffect(() => {
         />
       )}
 
-      {mainVisible.boll && bollData?.upper?.length && (
-        <div
-          className="flex items-center gap-1.5 z-10"
-          style={{
-            position: 'absolute',
-            top: mainIndicatorVisible ? '34px' : '8px',
-            left: '8px'
+      {/* ⚠️ BollingerBandsIndicator có lỗi internal ở dòng 151
+          Các đường BOLL vẫn vẽ được trên chart, chỉ không có header
+          Cần fix file BollingerBandsIndicator.tsx dòng 151 để bật lại */}
+      {/* {mainVisible.boll && bollData?.upper?.length && (
+        <BollingerBandsIndicator
+          data={{
+            upper: bollData.upper || [],
+            middle: bollData.middle || [],
+            lower: bollData.lower || []
           }}
-        >
-          <LineIndicatorHeader
-            type="main"
-            noPosition={true}
-            indicators={[
-              {
-                name: 'BOLL',
-                period: indicatorPeriods.boll.period,
-                stdDev: indicatorPeriods.boll.stdDev,
-                value: bollData.upper[bollData.upper.length - 1]?.value || 0,
-                color: indicatorColors.boll.upper,
-                visible: mainVisible.boll,
-                label: 'UP',
-                extraValues: [
-                  {
-                    label: 'MID',
-                    value: bollData.middle[bollData.middle.length - 1]?.value || 0,
-                    color: indicatorColors.boll.middle,
-                  },
-                  {
-                    label: 'LOW',
-                    value: bollData.lower[bollData.lower.length - 1]?.value || 0,
-                    color: indicatorColors.boll.lower,
-                  }
-                ]
-              }
-            ]}
-            visible={mainVisible.boll}
-            onToggleVisible={() => {
-              setMainVisible({ ...mainVisible, boll: !mainVisible.boll });
-              bollUpperRef.current?.applyOptions({ visible: !mainVisible.boll });
-              bollMiddleRef.current?.applyOptions({ visible: !mainVisible.boll });
-              bollLowerRef.current?.applyOptions({ visible: !mainVisible.boll });
-              if (!mainVisible.boll) {
-                clearBollingerBands();
-              }
-            }}
-            onOpenSetting={() => setShowMainSettings(true)}
-            onClose={() => {
-              setMainVisible({ ...mainVisible, boll: false });
-              bollUpperRef.current?.applyOptions({ visible: false });
-              bollMiddleRef.current?.applyOptions({ visible: false });
-              bollLowerRef.current?.applyOptions({ visible: false });
+          visible={mainVisible.boll}
+          fillVisible={bollFillVisible}
+          period={indicatorPeriods.boll.period}
+          stdDev={indicatorPeriods.boll.stdDev}
+          colors={indicatorColors.boll}
+          onToggleVisible={() => {
+            setMainVisible({ ...mainVisible, boll: !mainVisible.boll });
+            bollUpperRef.current?.applyOptions({ visible: !mainVisible.boll });
+            bollMiddleRef.current?.applyOptions({ visible: !mainVisible.boll });
+            bollLowerRef.current?.applyOptions({ visible: !mainVisible.boll });
+            if (!mainVisible.boll) {
               clearBollingerBands();
-            }}
-          />
-
-          {/* Fill toggle button */}
-          <button
-            onClick={() => {
-  setBollFillVisible(!bollFillVisible);
-  requestAnimationFrame(() => redrawBollFill()); // Instant
-}}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${bollFillVisible
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-dark-800/80 text-dark-300 border border-dark-600/50 hover:bg-dark-700/80'
-              }`}
-          >
-            Fill
-          </button>
-        </div>
-      )}
+            }
+          }}
+          onToggleFill={() => {
+            setBollFillVisible(!bollFillVisible);
+            setTimeout(() => redrawBollFill(), 50);
+          }}
+          onClose={() => {
+            setMainVisible({ ...mainVisible, boll: false });
+            bollUpperRef.current?.applyOptions({ visible: false });
+            bollMiddleRef.current?.applyOptions({ visible: false });
+            bollLowerRef.current?.applyOptions({ visible: false });
+            clearBollingerBands();
+          }}
+        />
+      )} */}
 
       {showMainSettings && createPortal(
         <LineIndicatorSettings
@@ -1842,6 +1673,7 @@ useEffect(() => {
                   mavol1Ref.current?.applyOptions({ color: col.mavol1 });
                   mavol2Ref.current?.applyOptions({ color: col.mavol2 });
                 }
+
                 // ✅ Recalculate (no duplication!)
                 if (per && candles.length > 0) {
                   updateMainIndicators(candles);

@@ -14,7 +14,8 @@ import TriggerTypeSelect from "../modeltrading/TriggerTypeSelect";
 import { TpSlConverter } from "../../utils/TpSlConverter";
 import UnitSelectModal from "../modeltrading/UnitSelectModal";
 import TpSlTooltip from "../modeltrading/TpSlTooltip";
-
+import { binanceSymbolInfo } from "../../utils/BinanceSymbolInfo";
+import EstimatePanel from "../modeltrading/EstimatePanel";
 // ===== Types =====
 interface Props {
   selectedSymbol: string;
@@ -56,6 +57,7 @@ const DEFAULT_MMR = 0.004;
 
 const SYMBOL_META: Record<string, { tick: number; step: number }> = {
   "1000PEPEUSDT": { tick: 0.000001, step: 1 },
+  "DOGEUSDT": { tick: 0.00001, step: 1 }, // ✅ THÊM DÒNG NÀY
 };
 
 function estimate({
@@ -157,29 +159,38 @@ const TradingForm: React.FC<Props> = ({
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     null
   );
+  // Thêm constant cho các mốc % cho phép
+  const ALLOWED_PERCENTAGES = [0, 0.5, 1, 2, 3, 4];
 
+  // Hàm tìm mốc % gần nhất
+  const findNearestAllowedPercent = (value: number): number => {
+    return ALLOWED_PERCENTAGES.reduce((prev, curr) => {
+      return Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev;
+    });
+  };
   // Modes
   const [isMultiAssetsOpen, setIsMultiAssetsOpen] = useState(false);
   const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
   const [dualSide, setDualSide] = useState<boolean>(true);
-
+  const [stopPrice, setStopPrice] = useState("");
+  const [stopPriceType, setStopPriceType] = useState<"MARK" | "LAST">("MARK");
   const [tpTriggerType, setTpTriggerType] = useState<"MARK" | "LAST">("MARK");
   const [slTriggerType, setSlTriggerType] = useState<"MARK" | "LAST">("MARK");
   const [tpTooltipShow, setTpTooltipShow] = useState(false);
   const [slTooltipShow, setSlTooltipShow] = useState(false);
   const tpInputRef = useRef<HTMLInputElement>(null);
   const slInputRef = useRef<HTMLInputElement>(null);
-
+  const [minQtyError, setMinQtyError] = useState(false);
   const priceInitializedRef = useRef<string>("");
 
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<"base" | "quote">("base");
   const [usdtMode, setUsdtMode] = useState<"total" | "margin">("total");
-
+  const [maxRiskError, setMaxRiskError] = useState(false);
   // UI/Order state
   const [isPriceOverridden, setIsPriceOverridden] = useState(false);
   const [tradeSide, setTradeSide] = useState<Side>("buy");
-  const [orderType, setOrderType] = useState<OrderTypeBin>("limit");
+  const [orderType, setOrderType] = useState<OrderTypeBin>("market");
   const [priceValue, setPriceValue] = useState("");
   const [amount, setAmount] = useState("");
   const [percent, setPercent] = useState(0);
@@ -189,6 +200,9 @@ const TradingForm: React.FC<Props> = ({
     const saved = localStorage.getItem("tradingForm_tif");
     return (saved as "GTC" | "IOC" | "FOK") || "GTC";
   });
+
+
+
   // Thêm useEffect để lưu khi thay đổi
   useEffect(() => {
     localStorage.setItem("tradingForm_tif", tif);
@@ -263,9 +277,58 @@ const TradingForm: React.FC<Props> = ({
   const [confirmSide, setConfirmSide] = useState<ConfirmSide>("LONG");
   const [confirmOrder, setConfirmOrder] = useState<ConfirmOrder | null>(null);
 
-  const buildOrderPayload = (side: ConfirmSide): ConfirmOrder | null => {
-    const qty = parseFloat(amount || "0");
-    if (!Number.isFinite(qty) || qty <= 0) return null;
+  const canPlaceOrder = useMemo(() => {
+    // ✅ Check cả amount VÀ sliderQty
+    const qty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
+    if (!Number.isFinite(qty) || qty <= 0) return false;
+
+    if (orderType === "limit") {
+      const p = parseFloat(priceValue || "0");
+      if (!Number.isFinite(p) || p <= 0) return false;
+    }
+
+    if (orderType === "stop-limit") {
+      const sp = parseFloat(stopPrice || "0");
+      if (!Number.isFinite(sp) || sp <= 0) return false;
+    }
+
+    return true;
+  }, [amount, sliderQty, orderType, priceValue, stopPrice]); // ✅ Đã có stopPrice ở đây
+
+  const openConfirm = (side: ConfirmSide) => {
+    let finalQty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
+
+    if (!Number.isFinite(finalQty) || finalQty <= 0) {
+      alert("⚠️ Vui lòng nhập số lượng hoặc kéo thanh trượt");
+      return;
+    }
+
+    // ✅ Làm tròn quantity theo stepSize
+    finalQty = roundStep(finalQty, stepSize);
+
+    // ✅ DOUBLE CHECK
+    if (stepSize >= 1) {
+      finalQty = Math.floor(finalQty);
+    }
+
+    // ✅ CHECK MIN QUANTITY với animation
+    if (finalQty < minQuantity) {
+      setMinQtyError(true);
+      setTimeout(() => setMinQtyError(false), 2000);
+      return; // ✅ Return ở đây
+    }
+
+    // ✅ CHECK MAX RISK 5% - PHẢI Ở NGOÀI block minQtyError
+    if (orderRiskPercent > MAX_RISK_PERCENT) {
+      setMaxRiskError(true);
+      setTimeout(() => setMaxRiskError(false), 2000);
+      return;
+    }
+
+    if (finalQty <= 0) {
+      alert("⚠️ Số lượng quá nhỏ, vui lòng tăng lên");
+      return;
+    }
 
     let orderSide: "BUY" | "SELL";
     if (orderAction === "open") {
@@ -278,26 +341,32 @@ const TradingForm: React.FC<Props> = ({
       symbol: selectedSymbol,
       market: selectedMarket,
       side: orderSide,
-      quantity: qty,
+      quantity: finalQty,
       type:
         orderType === "market"
           ? "MARKET"
           : orderType === "limit"
-          ? "LIMIT"
-          : "STOP_MARKET",
+            ? "LIMIT"
+            : "STOP_MARKET",
     };
 
     if (base.type === "LIMIT") {
       const p = parseFloat(priceValue || "0");
-      if (!Number.isFinite(p) || p <= 0) return null;
-      base.price = p;
+      if (!Number.isFinite(p) || p <= 0) {
+        alert("⚠️ Vui lòng nhập giá hợp lệ");
+        return;
+      }
+      base.price = roundTick(p, tickSize);
       base.timeInForce = tif;
     }
 
     if (base.type === "STOP_MARKET") {
       const sp = parseFloat(stopPrice || "0");
-      if (!Number.isFinite(sp) || sp <= 0) return null;
-      base.stopPrice = sp;
+      if (!Number.isFinite(sp) || sp <= 0) {
+        alert("⚠️ Vui lòng nhập giá Stop hợp lệ");
+        return;
+      }
+      base.stopPrice = roundTick(sp, tickSize);
       base.workingType = stopPriceType;
     }
 
@@ -311,66 +380,63 @@ const TradingForm: React.FC<Props> = ({
       }
     }
 
-    return base;
-  };
 
-  const openConfirm = (side: ConfirmSide) => {
-    const payload = buildOrderPayload(side);
-    if (!payload) {
-      alert("Thiếu thông tin: số lượng/giá/stop…");
-      return;
-    }
 
     if (tpSl && orderAction === "open") {
-      const inlineOrders: any[] = [];
+  const inlineOrders: any[] = [];
+  
+  // ✅ FIX: Xác định side cho TP/SL dựa trên position side
+  const tpSlSide: Side = side === "LONG" ? "buy" : "sell";
 
-      if (tpSlValues.takeProfitEnabled && tpSlValues.takeProfitPrice) {
-        const tpPrice = TpSlConverter.toPrice(
-          tpMode,
-          tpSlValues.takeProfitPrice,
-          price,
-          parseFloat(amount || "0"),
-          tradeSide,
-          "tp",
-          leverage
-        );
+  if (tpSlValues.takeProfitEnabled && tpSlValues.takeProfitPrice) {
+    const tpPrice = TpSlConverter.toPrice(
+      tpMode,
+      tpSlValues.takeProfitPrice,
+      price,
+      finalQty,
+      tpSlSide,  // ✅ FIX: thay tradeSide bằng tpSlSide
+      "tp",
+      leverage
+    );
 
-        if (tpPrice && parseFloat(tpPrice) > 0) {
-          inlineOrders.push({
-            type: "TAKE_PROFIT_MARKET",
-            stopPrice: parseFloat(tpPrice),
-            triggerType: tpTriggerType,
-          });
-        }
-      }
-
-      if (tpSlValues.stopLossEnabled && tpSlValues.stopLossPrice) {
-        const slPrice = TpSlConverter.toPrice(
-          slMode,
-          tpSlValues.stopLossPrice,
-          price,
-          parseFloat(amount || "0"),
-          tradeSide,
-          "sl",
-          leverage
-        );
-
-        if (slPrice && parseFloat(slPrice) > 0) {
-          inlineOrders.push({
-            type: "STOP_MARKET",
-            stopPrice: parseFloat(slPrice),
-            triggerType: slTriggerType,
-          });
-        }
-      }
-
-      setTpSlOrders([...tpSlOrders, ...inlineOrders]);
+    if (tpPrice && parseFloat(tpPrice) > 0) {
+      inlineOrders.push({
+        type: "TAKE_PROFIT_MARKET",
+        stopPrice: roundTick(parseFloat(tpPrice), tickSize),
+        triggerType: tpTriggerType,
+      });
     }
+  }
+
+  if (tpSlValues.stopLossEnabled && tpSlValues.stopLossPrice) {
+    const slPrice = TpSlConverter.toPrice(
+      slMode,
+      tpSlValues.stopLossPrice,
+      price,
+      finalQty,
+      tpSlSide,  // ✅ FIX: thay tradeSide bằng tpSlSide
+      "sl",
+      leverage
+    );
+
+    if (slPrice && parseFloat(slPrice) > 0) {
+      inlineOrders.push({
+        type: "STOP_MARKET",
+        stopPrice: roundTick(parseFloat(slPrice), tickSize),
+        triggerType: slTriggerType,
+      });
+    }
+  }
+
+  setTpSlOrders([...tpSlOrders, ...inlineOrders]);
+}
 
     setConfirmSide(side);
-    setConfirmOrder(payload);
+    setConfirmOrder(base);
     setIsConfirmOpen(true);
   };
+
+
 
   // Balance tracking
   const [internalBalance, setInternalBalance] = useState<number>(propInternal);
@@ -385,7 +451,16 @@ const TradingForm: React.FC<Props> = ({
     val: number,
     source: BalanceSource | null | undefined
   ) => {
-    const s: BalanceSource = source ?? "none";
+    const s: BalanceSource = source ?? 'none';
+    console.log('💰 Balance Update Attempt:', {
+      newValue: val,
+      newSource: s,
+      currentValue: internalBalance,
+      currentSource: balanceSource,
+      willUpdate: RANK[s] > RANK[balanceSource],
+      timestamp: new Date().toISOString()
+    });
+
     if (RANK[s] > RANK[balanceSource]) {
       setInternalBalance(val);
       setBalanceSource(s);
@@ -403,8 +478,7 @@ const TradingForm: React.FC<Props> = ({
     takeProfitEnabled: true,
     stopLossEnabled: true,
   });
-  const [stopPrice, setStopPrice] = useState("");
-  const [stopPriceType, setStopPriceType] = useState<"MARK" | "LAST">("MARK");
+
 
   // ✅ Flag để track đã load localStorage chưa
   const tpSlLoadedRef = useRef(false);
@@ -424,7 +498,7 @@ const TradingForm: React.FC<Props> = ({
   ) => {
     try {
       localStorage.setItem(levKey(accId, market, symbol), String(lev));
-    } catch {}
+    } catch { }
   };
 
   const loadLeverageLS = (
@@ -480,11 +554,32 @@ const TradingForm: React.FC<Props> = ({
     return null;
   };
 
-  // Tick/Step per symbol
-  const { tick: tickSize, step: stepSize } = SYMBOL_META[selectedSymbol] ?? {
-    tick: DEFAULT_TICK,
-    step: DEFAULT_STEP,
-  };
+  // Tick/Step per symbol - Dynamic from Binance API
+  const { tick: tickSize, step: stepSize } = useMemo(() => {
+    // Priority 1: Binance API data
+    const info = binanceSymbolInfo.getSymbolInfo(selectedSymbol);
+    if (info) {
+      return {
+        tick: info.tickSize,
+        step: info.stepSize,
+      };
+    }
+
+    // Priority 2: Static config (fallback)
+    if (SYMBOL_META[selectedSymbol]) {
+      return {
+        tick: SYMBOL_META[selectedSymbol].tick,
+        step: SYMBOL_META[selectedSymbol].step,
+      };
+    }
+
+    // Priority 3: Defaults
+    return {
+      tick: DEFAULT_TICK,
+      step: DEFAULT_STEP,
+    };
+  }, [selectedSymbol]);
+
   const priceDecimals = decimalsFromTick(tickSize);
 
   const qtyNum = Number((amount || "").replace(",", ".")) || sliderQty || 0;
@@ -547,27 +642,54 @@ const TradingForm: React.FC<Props> = ({
       setSelectedUnit(savedUnit);
     }
   }, []);
+  // Thêm useMemo để tính min quantity
+  const minQuantity = useMemo(() => {
+    const info = binanceSymbolInfo.getSymbolInfo(selectedSymbol);
+    if (!info || !priceNum || priceNum <= 0) return 0;
 
-  // ✅ Load TP/SL settings khi đổi symbol
-  useEffect(() => {
-    // Reset flag khi đổi symbol
-    tpSlLoadedRef.current = false;
+    // Min notional / price = min quantity
+    const minQty = info.minNotional / priceNum;
 
-    const saved = loadTpSlSettings(selectedSymbol);
-    console.log(`🔄 Loading TP/SL settings for ${selectedSymbol}:`, saved);
-    if (saved) {
-      if (typeof saved.tpSl === "boolean") setTpSl(saved.tpSl);
-      if (saved.tpTriggerType) setTpTriggerType(saved.tpTriggerType);
-      if (saved.slTriggerType) setSlTriggerType(saved.slTriggerType);
-      if (saved.tpMode) setTpMode(saved.tpMode);
-      if (saved.slMode) setSlMode(saved.slMode);
-    }
+    // Làm tròn lên theo stepSize
+    return Math.ceil(minQty / stepSize) * stepSize;
+  }, [selectedSymbol, priceNum, stepSize]);
+ // ✅ Load TP/SL settings khi đổi symbol
+ 
+// ✅ Load TP/SL settings khi đổi symbol
+useEffect(() => {
+  // Reset flag khi đổi symbol
+  tpSlLoadedRef.current = false;
 
-    // Mark as loaded sau khi set tất cả state
-    setTimeout(() => {
-      tpSlLoadedRef.current = true;
-    }, 0);
-  }, [selectedSymbol]);
+  const saved = loadTpSlSettings(selectedSymbol);
+  console.log(`🔄 Loading TP/SL settings for ${selectedSymbol}:`, saved);
+  
+  if (saved) {
+    if (typeof saved.tpSl === "boolean") setTpSl(saved.tpSl);
+    if (saved.tpTriggerType) setTpTriggerType(saved.tpTriggerType);
+    if (saved.slTriggerType) setSlTriggerType(saved.slTriggerType);
+    if (saved.tpMode) setTpMode(saved.tpMode);
+    if (saved.slMode) setSlMode(saved.slMode);
+  } else {
+    setTpMode("roi");
+    setSlMode("roi");
+  }
+
+  // ✅ DELAY để các useEffect clear chạy xong TRƯỚC
+  // Sau đó mới set values và mark loaded
+  setTimeout(() => {
+    setTpSl(true);
+    setTpSlValues({
+      takeProfitPrice: "500",
+      stopLossPrice: "-300",
+      takeProfitEnabled: true,
+      stopLossEnabled: true,
+    });
+    
+    // Mark loaded SAU KHI đã set values
+    tpSlLoadedRef.current = true;
+  }, 50); // 50ms đủ để React batch xong
+  
+}, [selectedSymbol]);
 
   // ✅ Save TP/SL settings khi thay đổi (CHỈ SAU KHI ĐÃ LOAD)
   useEffect(() => {
@@ -604,41 +726,97 @@ const TradingForm: React.FC<Props> = ({
     if (!token) return;
 
     binanceWS.connect(token, (msg) => {
-      if (msg?.type === "accountInformation" && msg?.data) {
+      console.log('📨 WS Message:', msg?.type, msg);
+
+      // ===== BALANCE UPDATE =====
+      if (msg?.type === 'accountInformation' && msg?.data) {
         const liveAvail = Number(msg.data.availableBalance ?? 0);
         if (Number.isFinite(liveAvail))
-          setBalanceIfHigherPriority(liveAvail, "ws-live");
+          setBalanceIfHigherPriority(liveAvail, 'ws-live');
       }
 
       switch (msg.type) {
-        case "authenticated":
-          binanceWS.getMyBinanceAccounts();
-          binanceWS.getMultiAssetsMode((isMulti) =>
-            setMultiAssetsMode(isMulti)
-          );
-          binanceWS.getPositionMode((isDual) => setDualSide(isDual));
-          break;
-        case "changeMultiAssetsMode":
-          setMultiAssetsMode(!!msg.multiAssetsMargin);
-          break;
-        case "myBinanceAccounts": {
-          const first = msg.data?.accounts?.[0];
-          if (first?.id) {
-            binanceWS.selectAccount(first.id);
-            setSelectedAccountId(first.id);
+        // ===== AUTHENTICATED - SELECT ACCOUNT NGAY =====
+        case 'authenticated': {
+          console.log('✅ Authenticated');
+
+          // Check xem có saved account ID không
+          const savedId = localStorage.getItem('selectedBinanceAccountId');
+          if (savedId) {
+            const accountId = Number(savedId);
+            console.log('🔥 Auto-selecting saved account:', accountId);
+
+            // Set state trước
+            setSelectedAccountId(accountId);
+            binanceWS.setCurrentAccountId(accountId);
+
+            // Gọi selectAccount - server sẽ lưu context
+            binanceWS.selectAccount(accountId);
+
+            // ĐỢI accountSelected response rồi mới gọi API khác
+          } else {
+            // Không có saved ID - gọi getMyBinanceAccounts
+            console.log('⚠️ No saved account, fetching list...');
+            binanceWS.getMyBinanceAccounts();
           }
           break;
         }
-        case "futuresDataLoaded": {
-          const usdt = msg.data?.balances?.find((b: any) => b.asset === "USDT");
-          if (usdt)
-            setInternalBalance(parseFloat(usdt.availableBalance || "0"));
+
+        // ===== ACCOUNT SELECTED - GỌI API SAU KHI SELECT XONG =====
+        case 'accountSelected': {
+          console.log('✅ Account selected, calling APIs...');
+
+          // ✅ TĂNG DELAY lên 500ms
+          setTimeout(async () => {
+            await binanceWS.getMultiAssetsMode((isMulti) => {
+              setMultiAssetsMode(isMulti);
+            });
+
+            // ✅ DELAY thêm 200ms giữa các calls
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            await binanceWS.getPositionMode((isDual) => setDualSide(isDual));
+          }, 500);
           break;
         }
+
+        // ===== MY BINANCE ACCOUNTS (fallback) =====
+        case 'myBinanceAccounts': {
+          const first = msg.data?.accounts?.[0];
+          if (first?.id) {
+            console.log('📋 Got accounts list, selecting first:', first.id);
+
+            setSelectedAccountId(first.id);
+            binanceWS.setCurrentAccountId(first.id);
+            binanceWS.selectAccount(first.id);
+
+            // accountSelected sẽ trigger sau đó
+          }
+          break;
+        }
+
+        // ===== MULTI ASSETS MODE CHANGE =====
+        case 'changeMultiAssetsMode':
+          setMultiAssetsMode(!!msg.multiAssetsMargin);
+          break;
+
+        // ===== FUTURES DATA LOADED - IGNORE DATABASE CACHE =====
+        case "futuresDataLoaded": {
+          // ❌ SKIP - Don't use database cache, only use ws-live accountInformation
+          console.log('⏭️ Skipping futuresDataLoaded (database cache)');
+          break;
+        }
+
         default:
           break;
       }
     });
+
+    // ===== CLEANUP - DISCONNECT ON UNMOUNT =====
+    return () => {
+      console.log('🔌 Component unmounting, disconnecting WebSocket');
+      binanceWS.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -656,14 +834,17 @@ const TradingForm: React.FC<Props> = ({
     binanceWS.setCurrentAccountId(selectedAccountId);
     binanceWS.selectAccount(selectedAccountId);
 
-    binanceWS.getMultiAssetsMode((isMulti) => {
-      setMultiAssetsMode(isMulti);
-      localStorage.setItem(
-        `multiAssetsMode_${selectedAccountId}`,
-        String(isMulti)
-      );
-    });
-    binanceWS.getPositionMode((isDual) => setDualSide(isDual));
+    // ✅ DELAY ĐỂ selectAccount() HOÀN THÀNH
+    setTimeout(() => {
+      binanceWS.getMultiAssetsMode((isMulti) => {
+        setMultiAssetsMode(isMulti);
+        localStorage.setItem(
+          `multiAssetsMode_${selectedAccountId}`,
+          String(isMulti)
+        );
+      });
+      binanceWS.getPositionMode((isDual) => setDualSide(isDual));
+    }, 200); // ✅ TĂNG DELAY LÊN 200ms
   }, [selectedAccountId]);
 
   useEffect(() => {
@@ -837,8 +1018,13 @@ const TradingForm: React.FC<Props> = ({
     if (selectedUnit === "quote") {
     }
   };
-// ✅ Clear TP input khi đổi mode
-useEffect(() => {
+
+  // ✅ Clear TP input khi đổi mode - CHỈ KHI USER ĐỔI, KHÔNG PHẢI KHI LOAD
+const tpModeChangedByUser = useRef(false);
+
+ useEffect(() => {
+  if (!tpSlLoadedRef.current) return; // ✅ Skip khi đang load
+  
   setTpSlValues((prev) => ({
     ...prev,
     takeProfitPrice: '',
@@ -846,14 +1032,36 @@ useEffect(() => {
   }));
 }, [tpMode]);
 
-// ✅ Clear SL input khi đổi mode
+// ✅ Clear SL input khi đổi mode - CHỈ KHI USER ĐỔI, KHÔNG PHẢI KHI LOAD
 useEffect(() => {
+  if (!tpSlLoadedRef.current) return; // ✅ Skip khi đang load
+  
   setTpSlValues((prev) => ({
     ...prev,
     stopLossPrice: '',
     stopLossEnabled: false,
   }));
 }, [slMode]);
+
+  // ✅ Initialize Binance symbol info
+  useEffect(() => {
+    binanceSymbolInfo.initialize();
+  }, []);
+
+  // Tính % rủi ro của lệnh
+  const orderRiskPercent = useMemo(() => {
+    const qty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
+    if (!Number.isFinite(qty) || qty <= 0 || !priceNum || priceNum <= 0) return 0;
+
+    const notional = qty * priceNum;
+    const margin = selectedMarket === "futures" ? notional / leverage : notional;
+
+    if (internalBalance <= 0) return 0;
+
+    return (margin / internalBalance) * 100;
+  }, [sliderQty, amount, priceNum, internalBalance, leverage, selectedMarket]);
+
+  const MAX_RISK_PERCENT = 5; // 5% max
   // ===== Render =====
   return (
     <>
@@ -966,65 +1174,151 @@ useEffect(() => {
             estFee={est.fee}
             estLiqPrice={est.liqPrice}
             priceDecimals={priceDecimals}
-            onConfirm={(o) => {
-              console.log("📤 Final order from modal:", o);
-              binanceWS.placeOrder(o as any);
+           onConfirm={async (o) => {
+  console.log("📤 Final order from modal:", o);
+  
+  // ✅ Chuẩn bị TP/SL data TRƯỚC khi gửi order chính
+  const tpSlSide: Side = o.positionSide === "LONG" ? "buy" : "sell";
 
-              const tpPriceToSend = TpSlConverter.toPrice(
-                tpMode,
-                tpSlValues.takeProfitPrice,
-                price,
-                parseFloat(amount || "0"),
-                tradeSide,
-                "tp",
-                leverage
-              );
+  const tpPriceToSend = TpSlConverter.toPrice(
+    tpMode,
+    tpSlValues.takeProfitPrice,
+    price,
+    o.quantity,
+    tpSlSide,
+    "tp",
+    leverage
+  );
 
-              const slPriceToSend = TpSlConverter.toPrice(
-                slMode,
-                tpSlValues.stopLossPrice,
-                price,
-                parseFloat(amount || "0"),
-                tradeSide,
-                "sl",
-                leverage
-              );
+  const slPriceToSend = TpSlConverter.toPrice(
+    slMode,
+    tpSlValues.stopLossPrice,
+    price,
+    o.quantity,
+    tpSlSide,
+    "sl",
+    leverage
+  );
 
-              tpSlOrders.forEach((child) => {
-                let finalStopPrice = child.stopPrice;
+  // ✅ Tạo danh sách TP/SL orders để gửi sau
+  const pendingTpSlOrders = tpSlOrders.map((child) => {
+    let finalStopPrice = child.stopPrice;
 
-                if (child.type === "TAKE_PROFIT_MARKET" && tpPriceToSend) {
-                  finalStopPrice = parseFloat(tpPriceToSend);
-                } else if (child.type === "STOP_MARKET" && slPriceToSend) {
-                  finalStopPrice = parseFloat(slPriceToSend);
-                }
+    if (child.type === "TAKE_PROFIT_MARKET" && tpPriceToSend) {
+      finalStopPrice = parseFloat(tpPriceToSend);
+    } else if (child.type === "STOP_MARKET" && slPriceToSend) {
+      finalStopPrice = parseFloat(slPriceToSend);
+    }
 
-                finalStopPrice = roundTick(finalStopPrice, tickSize);
+    finalStopPrice = roundTick(finalStopPrice, tickSize);
+    const priceDecimalsCount = decimalsFromTick(tickSize);
+    finalStopPrice = parseFloat(finalStopPrice.toFixed(priceDecimalsCount));
 
-                const tpslOrder = {
-                  symbol: selectedSymbol,
-                  market: selectedMarket,
-                  side: o.side === "BUY" ? "SELL" : "BUY",
-                  type: child.type,
-                  stopPrice: finalStopPrice,
-                  workingType:
-                    child.type === "TAKE_PROFIT_MARKET"
-                      ? tpTriggerType
-                      : slTriggerType,
-                  quantity: o.quantity,
-                  positionSide:
-                    selectedMarket === "futures"
-                      ? (o.positionSide as any)
-                      : undefined,
-                };
+    return {
+      symbol: selectedSymbol,
+      market: selectedMarket,
+      side: o.side === "BUY" ? "SELL" : "BUY",
+      type: child.type,
+      stopPrice: finalStopPrice,
+      workingType: child.type === "TAKE_PROFIT_MARKET" ? tpTriggerType : slTriggerType,
+      quantity: o.quantity,
+      positionSide: selectedMarket === "futures" ? o.positionSide : undefined,
+    };
+  });
 
-                console.log("📤 Final TP/SL with converted price:", tpslOrder);
-                binanceWS.placeOrder(tpslOrder as any);
-              });
+  // ✅ Function để gửi TP/SL sau khi order chính thành công
+  const placeTpSlOrders = () => {
+    pendingTpSlOrders.forEach((tpslOrder) => {
+      console.log("📤 Placing TP/SL after main order success:", tpslOrder);
+      binanceWS.placeOrder(tpslOrder as any);
+    });
+  };
 
-              setTpSlOrders([]);
-              setIsConfirmOpen(false);
-            }}
+  // ✅ Tạo listener để đợi order thành công
+  let orderHandled = false;
+  const timeoutId = setTimeout(() => {
+    if (!orderHandled) {
+      console.warn("⏰ Order timeout - TP/SL not placed");
+      binanceWS.removeMessageHandler(orderResultHandler);
+    }
+  }, 10000); // Timeout 10 giây
+
+  const orderResultHandler = (msg: any) => {
+    // ✅ Check ORDER_TRADE_UPDATE event
+    if (msg?.e === "ORDER_TRADE_UPDATE" && msg?.o) {
+      const orderData = msg.o;
+      
+      // Check nếu là order của symbol đang trade
+      if (orderData.s !== selectedSymbol) return;
+      
+      // Check nếu là order mới đặt (cùng side, cùng quantity)
+      const isSameOrder = 
+        orderData.S === o.side && // BUY/SELL
+        Math.abs(parseFloat(orderData.q) - o.quantity) < 0.0001; // quantity gần bằng
+      
+      if (!isSameOrder) return;
+
+      const status = orderData.X; // Order status: NEW, FILLED, PARTIALLY_FILLED, CANCELED, REJECTED
+      
+      console.log("📥 Order status update:", status, orderData);
+
+      if (status === "FILLED" || status === "PARTIALLY_FILLED") {
+        // ✅ Order thành công → Gửi TP/SL
+        orderHandled = true;
+        clearTimeout(timeoutId);
+        binanceWS.removeMessageHandler(orderResultHandler);
+        
+        if (pendingTpSlOrders.length > 0) {
+          console.log("✅ Main order filled, placing TP/SL orders...");
+          // Delay nhỏ để đảm bảo position đã được cập nhật
+          setTimeout(() => {
+            placeTpSlOrders();
+          }, 500);
+        }
+      } else if (status === "REJECTED" || status === "CANCELED" || status === "EXPIRED") {
+        // ❌ Order thất bại → Không gửi TP/SL
+        orderHandled = true;
+        clearTimeout(timeoutId);
+        binanceWS.removeMessageHandler(orderResultHandler);
+        console.error("❌ Main order failed, TP/SL NOT placed. Status:", status);
+      }
+    }
+
+    // ✅ Check response type từ server (fallback)
+    if (msg?.type === "orderPlaced" && msg?.data?.symbol === selectedSymbol) {
+      orderHandled = true;
+      clearTimeout(timeoutId);
+      binanceWS.removeMessageHandler(orderResultHandler);
+      
+      console.log("✅ Order placed confirmation received");
+      if (pendingTpSlOrders.length > 0) {
+        setTimeout(() => {
+          placeTpSlOrders();
+        }, 500);
+      }
+    }
+
+    // ✅ Check error response
+    if (msg?.type === "error" || msg?.type === "orderFailed") {
+      if (msg?.symbol === selectedSymbol || msg?.data?.symbol === selectedSymbol) {
+        orderHandled = true;
+        clearTimeout(timeoutId);
+        binanceWS.removeMessageHandler(orderResultHandler);
+        console.error("❌ Order error, TP/SL NOT placed:", msg?.message || msg?.data?.message);
+      }
+    }
+  };
+
+  // ✅ Đăng ký listener TRƯỚC khi gửi order
+  binanceWS.onMessage(orderResultHandler);
+
+  // ✅ Gửi order chính
+  binanceWS.placeOrder(o as any);
+
+  // ✅ Cleanup
+  setTpSlOrders([]);
+  setIsConfirmOpen(false);
+}}
           />,
           document.body
         )}
@@ -1081,9 +1375,8 @@ useEffect(() => {
           </button>
           <button
             onClick={() => setIsMultiAssetsOpen(true)}
-            className={`text-xs px-2 py-1 rounded ${
-              multiAssetsMode ? "bg-warning-700" : "bg-dark-700"
-            } hover:ring-1 ring-primary-500`}
+            className={`text-xs px-2 py-1 rounded ${multiAssetsMode ? "bg-warning-700" : "bg-dark-700"
+              } hover:ring-1 ring-primary-500`}
             title={multiAssetsMode ? "Hedge (M)" : "One-way (S)"}
           >
             {multiAssetsMode ? "M" : "S"}
@@ -1093,30 +1386,27 @@ useEffect(() => {
         {/* Tab Mở/Đóng */}
         <div className="relative flex bg-dark-800/50 rounded-lg p-0.5 border border-dark-700/50">
           <div
-            className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-dark-600 rounded-md shadow-lg transition-all duration-200 ease-out ${
-              orderAction === "close"
+            className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-dark-600 rounded-md shadow-lg transition-all duration-200 ease-out ${orderAction === "close"
                 ? "translate-x-[calc(100%+4px)]"
                 : "translate-x-0"
-            }`}
+              }`}
           />
 
           <button
             onClick={() => setOrderAction("open")}
-            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${
-              orderAction === "open"
+            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${orderAction === "open"
                 ? "text-white"
                 : "text-dark-400 hover:text-dark-200"
-            }`}
+              }`}
           >
             Mở
           </button>
           <button
             onClick={() => setOrderAction("close")}
-            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${
-              orderAction === "close"
+            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${orderAction === "close"
                 ? "text-white"
                 : "text-dark-400 hover:text-dark-200"
-            }`}
+              }`}
           >
             Đóng
           </button>
@@ -1127,18 +1417,17 @@ useEffect(() => {
           {(["limit", "market", "stop-limit"] as OrderTypeBin[]).map((t) => (
             <button
               key={t}
-              className={`px-3 py-1 rounded ${
-                orderType === t
+              className={`px-3 py-1 rounded ${orderType === t
                   ? "bg-primary-500 text-white"
                   : "text-dark-400 hover:text-white"
-              }`}
+                }`}
               onClick={() => setOrderType(t)}
             >
               {t === "limit"
                 ? "Giới hạn"
                 : t === "market"
-                ? "Thị trường"
-                : "Stop Limit"}
+                  ? "Thị trường"
+                  : "Stop Limit"}
             </button>
           ))}
         </div>
@@ -1192,149 +1481,238 @@ useEffect(() => {
         )}
 
         {/* Số lượng */}
-       <div>
-  <label className="form-label">Số lượng</label>
-  
-  {/* ✅ QUICK PERCENTAGE BUTTONS 
-  <div className="grid grid-cols-5 gap-1.5 mb-2">
-    {[1, 2, 3, 4, 5].map(p => (
-      <button
-        key={p}
-        onClick={() => setPercent(p)}
-        className={`px-2 py-1.5 text-xs rounded transition-colors ${
-          percent === p 
-            ? 'bg-blue-600 text-white' 
-            : 'bg-dark-700 text-slate-300 hover:bg-dark-600'
-        }`}
-      >
-        {p}%
-      </button>
-    ))}
-  </div>
-  
-  {/* ✅ QUICK USDT BUTTONS 
-  <div className="grid grid-cols-5 gap-1.5 mb-2">
-    {[1, 2, 5, 10, 20].map(usd => (
-      <button
-        key={usd}
-        onClick={() => {
-          // Tính % dựa trên balance
-          const availableBalance = Number(internalBalance || 0);
-          if (availableBalance > 0) {
-            const pct = (usd / availableBalance) * 100;
-            setPercent(Math.min(100, Math.round(pct)));
-          }
-        }}
-        className="px-2 py-1.5 text-xs rounded bg-dark-700 text-slate-300 hover:bg-dark-600 transition-colors"
-      >
-        {usd}$
-      </button>
-    ))}
-  </div>
-*/}
-  <div className="relative">
-    <input
-      type="text"
-      className="form-input w-full pl-16 pr-20"
-      value={amount}
-      onChange={(e) => {
-        const value = e.target.value.replace(/[^\d.]/g, "");
-        const parts = value.split(".");
-        const filtered =
-          parts.length > 2
-            ? parts[0] + "." + parts.slice(1).join("")
-            : value;
-        handleAmountChange(filtered);
-      }}
-    />
+        <div>
+          <label className="form-label">Số lượng</label>
 
-    {/* Badge % - Trái */}
-    {percent > 0 && (
-      <div className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-0.5 text-dark-300 text-xs font-medium">
-        {percent}%
-      </div>
-    )}
+          <div className="relative">
+            <input
+              type="text"
+              className="form-input w-full pl-16 pr-20"
+              value={amount}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^\d.]/g, "");
+                const parts = value.split(".");
+                const filtered =
+                  parts.length > 2
+                    ? parts[0] + "." + parts.slice(1).join("")
+                    : value;
+                handleAmountChange(filtered);
+              }}
+            />
 
-    {/* Unit button - Phải */}
-    <button
-      onClick={() => setIsUnitModalOpen(true)}
-      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-dark-400 hover:text-white transition-colors px-2 py-1 hover:bg-dark-700 rounded flex items-center gap-1"
-    >
-      {selectedUnit === "base" ? baseAsset : "USDT"}
-      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-        <path
-          fillRule="evenodd"
-          d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-          clipRule="evenodd"
-        />
-      </svg>
-    </button>
-  </div>
-</div>
-        {/* Slider */}
-        <div className="pt-3">
-          {percent > 0 && amount === "" && (
-            <div className="flex justify-between items-center mb-3 text-xs">
-              <span className="text-dark-400">
-                Mua{" "}
-                <span className="text-white font-medium">
-                  {Math.floor(buyAmount).toLocaleString()}{" "}
-                  {selectedUnit === "base" ? baseAsset : "USDT"}
-                </span>
-              </span>
+            {/* Badge % - Trái */}
+            {percent > 0 && (
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-0.5 text-dark-300 text-xs font-medium">
+                {percent}%
+              </div>
+            )}
 
-              <span className="text-dark-400">
-                Bán{" "}
-                <span className="text-white font-medium">
-                  {Math.floor(sellAmount).toLocaleString()}{" "}
-                  {selectedUnit === "base" ? baseAsset : "USDT"}
+            {/* Unit button - Phải */}
+            <button
+              onClick={() => setIsUnitModalOpen(true)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-dark-400 hover:text-white transition-colors px-2 py-1 hover:bg-dark-700 rounded flex items-center gap-1"
+            >
+              {selectedUnit === "base" ? baseAsset : "USDT"}
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* ✅ MIN QUANTITY BADGE với shake + background đỏ */}
+          {minQuantity > 0 && (
+            <div
+              className={`mt-1.5 flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 transition-all duration-300 ${minQtyError
+                  ? 'bg-red-500/20 border border-red-500 text-red-400 animate-pulse shadow-lg shadow-red-500/50'
+                  : 'bg-transparent text-dark-400'
+                }`}
+              style={minQtyError ? {
+                animation: 'pulse 1s ease-in-out 3, shake 0.5s ease-in-out'
+              } : {}}
+            >
+              <svg
+                className={`w-4 h-4 ${minQtyError ? 'text-red-400' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d={minQtyError
+                    ? "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    : "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  }
+                />
+              </svg>
+              <span className={`${minQtyError ? 'font-bold' : 'font-normal'}`}>
+                Số lượng tối thiểu là{" "}
+                <span className={`font-semibold ${minQtyError ? 'text-red-300' : 'text-white'
+                  }`}>
+                  {minQuantity.toLocaleString(undefined, {
+                    maximumFractionDigits: qtyDecimals(stepSize)
+                  })} {baseAsset}
                 </span>
               </span>
             </div>
           )}
 
-          <div className="relative mb-2">
-            <Slider.Root
-              className="relative flex items-center select-none w-full h-5"
-              value={[percent]}
-              onValueChange={([v]) => setPercent(v)}
-              min={0}
-              max={100}
-              step={1}
+          {/* ✅ MAX RISK 5% WARNING BADGE - CHỈ HIỆN KHI ERROR */}
+          {maxRiskError && (
+            <div
+              className="mt-1.5 flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 bg-orange-500/20 border border-orange-500 text-orange-400 animate-pulse shadow-lg shadow-orange-500/50 transition-all duration-300"
+              style={{
+                animation: 'pulse 1s ease-in-out 3, shake 0.5s ease-in-out'
+              }}
             >
-              <Slider.Track className="bg-dark-700 relative grow rounded-full h-[3px]">
-                <Slider.Range className="absolute bg-primary-500 rounded-full h-full" />
-              </Slider.Track>
-
-              <Slider.Thumb className="block w-4 h-4 bg-primary-500 rounded-full shadow-lg hover:bg-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all cursor-grab active:cursor-grabbing active:scale-110" />
-            </Slider.Root>
-
-            <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none">
-              {[0, 25, 50, 75, 100].map((mark) => (
-                <div
-                  key={mark}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    percent >= mark ? "bg-primary-500" : "bg-dark-600"
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-between text-[10px] text-dark-500 px-0.5">
-            {[0, 25, 50, 75, 100].map((mark) => (
-              <button
-                key={mark}
-                onClick={() => setPercent(mark)}
-                className={`hover:text-primary-400 transition-colors ${
-                  percent === mark ? "text-primary-400 font-medium" : ""
-                }`}
+              <svg
+                className="w-4 h-4 text-orange-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {mark}%
-              </button>
-            ))}
-          </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <span className="font-bold">
+                Rủi ro lệnh không được quá{" "}
+                <span className="font-semibold text-orange-300">5% tài khoản</span>
+              </span>
+            </div>
+          )}
         </div>
+        <div className="pt-3">
+  {percent > 0 && amount === "" && (
+    <div className="flex justify-between items-center mb-3 text-xs">
+      <span className="text-dark-400">
+        Mua{" "}
+        <span className="text-white font-medium">
+          {Math.floor(buyAmount).toLocaleString()}{" "}
+          {selectedUnit === "base" ? baseAsset : "USDT"}
+        </span>
+      </span>
+
+      <span className="text-dark-400">
+        Bán{" "}
+        <span className="text-white font-medium">
+          {Math.floor(sellAmount).toLocaleString()}{" "}
+          {selectedUnit === "base" ? baseAsset : "USDT"}
+        </span>
+      </span>
+    </div>
+  )}
+
+  {/* ✅ MODERN SLIDER với thumb position mapping - NO TEXT SELECTION */}
+  <div className="relative mb-3 py-1.5 select-none">  {/* ✅ THÊM select-none */}
+    {/* ✅ Hidden slider chỉ để control logic */}
+    <Slider.Root
+      className="relative flex items-center select-none w-full h-2 opacity-0 absolute inset-0 pointer-events-none"
+      value={[percent]}
+      onValueChange={([v]) => {
+        const snapped = findNearestAllowedPercent(v);
+        setPercent(snapped);
+      }}
+      min={0}
+      max={4}
+      step={0.5}
+    />
+
+    {/* ✅ Visual slider track */}
+    <div className="relative w-full h-2 bg-dark-700/50 rounded-full border border-dark-600 select-none">  {/* ✅ THÊM select-none */}
+      {/* Progress fill */}
+      <div 
+        className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full shadow-lg shadow-blue-500/20 transition-all duration-200"
+        style={{
+          width: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 5) * 100}%`
+        }}
+      />
+
+      {/* ✅ Dots */}
+      {ALLOWED_PERCENTAGES.map((mark, index) => (
+        <div
+          key={mark}
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-1 rounded-full transition-all duration-300 select-none ${  /* ✅ THÊM select-none */
+            percent >= mark 
+              ? 'bg-blue-400 shadow-lg shadow-blue-400/50 scale-110 z-10' 
+              : 'bg-dark-600 shadow-inner'
+          }`}
+          style={{
+            left: `${(index / 5) * 100}%`
+          }}
+        >
+          {percent >= mark && (
+            <span className="absolute inset-0 rounded-full bg-blue-300/50 animate-pulse"></span>
+          )}
+        </div>
+      ))}
+
+      {/* ✅ Custom draggable thumb */}
+      <div
+        className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full shadow-xl shadow-blue-500/50 hover:shadow-blue-400/70 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all cursor-grab active:cursor-grabbing active:scale-125 border-2 border-white/20 hover:border-white/40 z-20 select-none" 
+        style={{
+          left: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 5) * 100}%`
+        }}
+        onMouseDown={(e) => {
+          e.preventDefault(); // ✅ THÊM preventDefault
+          
+          const track = e.currentTarget.parentElement;
+          if (!track) return;
+
+          const handleMove = (moveEvent: MouseEvent) => {
+            moveEvent.preventDefault(); // ✅ THÊM preventDefault
+            
+            const rect = track.getBoundingClientRect();
+            const x = moveEvent.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(1, x / rect.width));
+            
+            // Map to nearest allowed index
+            const targetIndex = Math.round(percentage * 5);
+            const snapped = ALLOWED_PERCENTAGES[targetIndex] || 0;
+            setPercent(snapped);
+          };
+
+          const handleUp = () => {
+            document.removeEventListener('mousemove', handleMove);
+            document.removeEventListener('mouseup', handleUp);
+          };
+
+          document.addEventListener('mousemove', handleMove);
+          document.addEventListener('mouseup', handleUp);
+        }}
+      >
+        <span className="absolute inset-0 rounded-full bg-blue-400/30 animate-ping opacity-0 group-active:opacity-100"></span>
+      </div>
+    </div>
+  </div>
+{/* ✅ Labels */}
+<div className="relative text-[10px] text-dark-500 h-4 mb-1 select-none">
+  {ALLOWED_PERCENTAGES.map((mark, index) => (
+    <button
+      key={mark}
+      onClick={() => setPercent(mark)}
+      className={`absolute -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 font-medium select-none ${
+  percent === mark 
+    ? 'text-blue-400 bg-blue-500/10 shadow-lg shadow-blue-500/20 scale-105'
+    : 'text-dark-400 hover:text-blue-300 hover:bg-dark-700/50'
+}`}
+      style={{
+        left: `${(index / 5) * 100}%`
+      }}
+    >
+      {mark}%
+    </button>
+  ))}
+</div>
+</div>
 
         {/* TP/SL Section */}
         {orderAction === "open" && (
@@ -1342,11 +1720,36 @@ useEffect(() => {
             <div className="flex items-center justify-between">
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
-                  type="checkbox"
-                  checked={tpSl}
-                  onChange={() => setTpSl(!tpSl)}
-                  className="form-checkbox"
-                />
+  type="checkbox"
+  checked={tpSl}
+  onChange={() => {
+    const newValue = !tpSl;
+    setTpSl(newValue);
+
+    // ✅ Khi tick vào (enable TP/SL), set default values
+    if (newValue) {
+      const saved = loadTpSlSettings(selectedSymbol);
+      
+      // Set mode về ROI
+      if (!saved || !saved.tpMode) {
+        setTpMode("roi");
+      }
+      if (!saved || !saved.slMode) {
+        setSlMode("roi");
+      }
+
+      // ✅ THÊM: Set default TP = 500%, SL = -300% nếu chưa có giá trị
+      setTpSlValues((prev) => ({
+        ...prev,
+        takeProfitPrice: prev.takeProfitPrice || "500",
+        stopLossPrice: prev.stopLossPrice || "-300",
+        takeProfitEnabled: true,
+        stopLossEnabled: true,
+      }));
+    }
+  }}
+  className="form-checkbox"
+/>
                 <span className="font-semibold">TP/SL</span>
               </label>
               <button
@@ -1368,13 +1771,7 @@ useEffect(() => {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs text-slate-400 font-medium">
-                      Take Profit (
-                      {tpMode === "price"
-                        ? "Price"
-                        : tpMode === "pnl"
-                        ? "PnL"
-                        : "ROI%"}
-                      )
+                      Take Profit 
                     </label>
                     <div className="flex items-center gap-1.5">
                       <TriggerTypeSelect
@@ -1410,8 +1807,8 @@ useEffect(() => {
                       {tpMode === "price"
                         ? "USDT"
                         : tpMode === "pnl"
-                        ? "USDT"
-                        : "%"}
+                          ? "USDT"
+                          : "%"}
                     </span>
                   </div>
                 </div>
@@ -1420,13 +1817,7 @@ useEffect(() => {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs text-slate-400 font-medium">
-                      Stop Loss (
-                      {slMode === "price"
-                        ? "Price"
-                        : slMode === "pnl"
-                        ? "PnL"
-                        : "ROI%"}
-                      )
+                      Stop Loss 
                     </label>
                     <div className="flex items-center gap-1.5">
                       <TriggerTypeSelect
@@ -1438,37 +1829,37 @@ useEffect(() => {
                   </div>
                   <div className="relative">
                     <input
-  ref={slInputRef}
-  onFocus={() => setSlTooltipShow(true)}
-  onBlur={() => setSlTooltipShow(false)}
-  type="text"
-  className="form-input w-full text-sm pr-12"
-  placeholder={TpSlConverter.getPlaceholder(slMode, "sl")}
-  value={tpSlValues.stopLossPrice}
-  onChange={(e) => {
-    let inputValue = e.target.value;
-    
-    // Chỉ cho phép số và dấu chấm
-    inputValue = inputValue.replace(/[^\d.]/g, '');
-    
-    // ✅ CHỈ thêm dấu trừ khi mode là PnL hoặc ROI
-    if (inputValue && (slMode === "pnl" || slMode === "roi")) {
-      inputValue = '-' + inputValue;
-    }
-    
-    setTpSlValues((prev) => ({
-      ...prev,
-      stopLossPrice: inputValue,
-      stopLossEnabled: inputValue !== '',
-    }));
-  }}
-/>
+                      ref={slInputRef}
+                      onFocus={() => setSlTooltipShow(true)}
+                      onBlur={() => setSlTooltipShow(false)}
+                      type="text"
+                      className="form-input w-full text-sm pr-12"
+                      placeholder={TpSlConverter.getPlaceholder(slMode, "sl")}
+                      value={tpSlValues.stopLossPrice}
+                      onChange={(e) => {
+                        let inputValue = e.target.value;
+
+                        // Chỉ cho phép số và dấu chấm
+                        inputValue = inputValue.replace(/[^\d.]/g, '');
+
+                        // ✅ CHỈ thêm dấu trừ khi mode là PnL hoặc ROI
+                        if (inputValue && (slMode === "pnl" || slMode === "roi")) {
+                          inputValue = '-' + inputValue;
+                        }
+
+                        setTpSlValues((prev) => ({
+                          ...prev,
+                          stopLossPrice: inputValue,
+                          stopLossEnabled: inputValue !== '',
+                        }));
+                      }}
+                    />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-400 pointer-events-none">
                       {slMode === "price"
                         ? "USDT"
                         : slMode === "pnl"
-                        ? "USDT"
-                        : "%"}
+                          ? "USDT"
+                          : "%"}
                     </span>
                   </div>
                 </div>
@@ -1536,14 +1927,16 @@ useEffect(() => {
           {orderAction === "open" ? (
             <>
               <button
-                className="flex-1 btn btn-success"
+                className="flex-1 btn btn-success disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => openConfirm("LONG")}
+                disabled={!canPlaceOrder}
               >
                 Mở lệnh Long
               </button>
               <button
-                className="flex-1 btn btn-danger"
+                className="flex-1 btn btn-danger disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => openConfirm("SHORT")}
+                disabled={!canPlaceOrder}
               >
                 Mở lệnh Short
               </button>
@@ -1551,14 +1944,16 @@ useEffect(() => {
           ) : (
             <>
               <button
-                className="flex-1 btn btn-danger"
+                className="flex-1 btn btn-danger disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => openConfirm("SHORT")}
+                disabled={!canPlaceOrder}
               >
                 Đóng Short
               </button>
               <button
-                className="flex-1 btn btn-success"
+                className="flex-1 btn btn-success disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => openConfirm("LONG")}
+                disabled={!canPlaceOrder}
               >
                 Đóng Long
               </button>
@@ -1566,51 +1961,15 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Estimate Panel */}
-        <div className="mt-2 rounded-xl border border-dark-600 bg-dark-800 p-3">
-          <div className="mt-2 grid grid-cols-2 gap-6 text-xs">
-            <div className="space-y-1">
-              <div className="text-dark-400">Giá thanh lý (ước tính)</div>
-              <div className="font-medium text-white">
-                {selectedMarket === "futures" && est.liqPrice
-                  ? `${est.liqPrice.toLocaleString(undefined, {
-                      maximumFractionDigits: Math.max(0, priceDecimals),
-                    })} USDT`
-                  : "-- USDT"}
-              </div>
-              <div className="text-dark-400 mt-2">Chi phí</div>
-              <div className="font-medium">
-                {selectedMarket === "futures"
-                  ? `${est.initMargin.toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                    })} USDT`
-                  : "—"}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-dark-400">Phí (ước tính)</div>
-              <div className="font-medium">
-                {est.fee.toLocaleString(undefined, {
-                  maximumFractionDigits: 6,
-                })}{" "}
-                USDT
-              </div>
-              <div className="text-dark-400 mt-2">
-                Tối đa {selectedSymbol.replace("USDT", "")}
-              </div>
-              <div className="font-medium">
-                {est.maxQty.toLocaleString(undefined, {
-                  maximumFractionDigits: 8,
-                })}{" "}
-                {selectedSymbol.replace("USDT", "")}
-              </div>
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] text-dark-400">
-            % Mức phí: {(getFeeRate(orderType) * 100).toFixed(3)}%{" "}
-            {orderType === "market" ? "(Taker)" : "(Maker)"}
-          </div>
-        </div>
+        {/* Estimate Panel with Smooth Animations */}
+<EstimatePanel
+  est={est}
+  selectedMarket={selectedMarket}
+  priceDecimals={priceDecimals}
+  selectedSymbol={selectedSymbol}
+  orderType={orderType}
+  getFeeRate={getFeeRate}
+/>
       </div>
     </>
   );

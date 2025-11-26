@@ -62,26 +62,32 @@
   padding: 0.5rem;
 }
 
-/* Custom scrollbar for orderbook */
+/* ✅ HIDE SCROLLBAR - Keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
+/* Custom scrollbar for orderbook (LEGACY - now hidden) */
 .orderbook-asks::-webkit-scrollbar,
 .orderbook-bids::-webkit-scrollbar {
-  width: 4px;
+  display: none; /* ✅ CHANGED: Hide scrollbar */
 }
 
-.orderbook-asks::-webkit-scrollbar-track,
-.orderbook-bids::-webkit-scrollbar-track {
-  background: transparent;
+/* Firefox */
+.orderbook-asks,
+.orderbook-bids {
+  scrollbar-width: none; /* ✅ ADDED: Hide scrollbar in Firefox */
 }
 
-.orderbook-asks::-webkit-scrollbar-thumb,
-.orderbook-bids::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.5);
-  border-radius: 2px;
-}
-
-.orderbook-asks::-webkit-scrollbar-thumb:hover,
-.orderbook-bids::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+/* IE/Edge */
+.orderbook-asks,
+.orderbook-bids {
+  -ms-overflow-style: none; /* ✅ ADDED: Hide scrollbar in IE/Edge */
 }
 
 /* ===== ORDER ROWS ===== */
@@ -261,4 +267,3 @@
   z-index: var(--z-orderbook-mobile);
   backdrop-filter: blur(12px);
 }
-

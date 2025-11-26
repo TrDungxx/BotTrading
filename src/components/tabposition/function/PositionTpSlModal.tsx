@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import { binanceWS, OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../../binancewebsocket/BinanceWebSocketService";
-// ^^^ nhớ export OPEN_ORDERS_LS_KEY/OPEN_ORDERS_EVENT ở BinanceWebSocketService.ts như đã trao đổi
 
 type TriggerType = "MARK" | "LAST";
 type InputMode = "price" | "pnl_abs" | "roi_pct";
@@ -13,7 +12,7 @@ export interface PositionTpSlModalProps {
   symbol: string;
   entryPrice: number;
   markPrice: number;
-  positionAmt: number; // >0 LONG, <0 SHORT (base)
+  positionAmt: number;
 
   getPriceTick?: (symbol: string) => number;
 
@@ -49,6 +48,30 @@ function optimisticAddOpenOrder(row: any) {
   writeOpenOrdersLS([row, ...list]);
 }
 
+// ---------- helpers LS cho settings ----------
+const getSettingsKey = (symbol: string) => `position_tpsl_settings_${symbol}`;
+
+interface TpSlSettings {
+  trigger: TriggerType;
+  mode: InputMode;
+  tpInput: string;
+  slInput: string;
+}
+
+function loadSettings(symbol: string): Partial<TpSlSettings> {
+  try {
+    const saved = localStorage.getItem(getSettingsKey(symbol));
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return {};
+}
+
+function saveSettings(symbol: string, settings: TpSlSettings) {
+  try {
+    localStorage.setItem(getSettingsKey(symbol), JSON.stringify(settings));
+  } catch {}
+}
+
 const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   isOpen,
   onClose,
@@ -60,16 +83,35 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   leverage,
   onSubmit,
 }) => {
-  const [trigger, setTrigger] = React.useState<TriggerType>("MARK");
-  const [mode, setMode] = React.useState<InputMode>("pnl_abs"); // mặc định PnL như Binance
-  const [tpInput, setTpInput] = React.useState<string>("");
-  const [slInput, setSlInput] = React.useState<string>("");
+  // Load saved settings
+  const savedSettings = React.useMemo(() => loadSettings(symbol), [symbol]);
+
+  const [trigger, setTrigger] = React.useState<TriggerType>(savedSettings.trigger || "MARK");
+  const [mode, setMode] = React.useState<InputMode>(savedSettings.mode || "pnl_abs");
+  const [tpInput, setTpInput] = React.useState<string>(savedSettings.tpInput || "");
+  const [slInput, setSlInput] = React.useState<string>(savedSettings.slInput || "");
+
+  // Reset khi đổi symbol
+  useEffect(() => {
+    const settings = loadSettings(symbol);
+    setTrigger(settings.trigger || "MARK");
+    setMode(settings.mode || "pnl_abs");
+    setTpInput(settings.tpInput || "");
+    setSlInput(settings.slInput || "");
+  }, [symbol]);
+
+  // Auto-save settings khi thay đổi
+  useEffect(() => {
+    if (isOpen) {
+      saveSettings(symbol, { trigger, mode, tpInput, slInput });
+    }
+  }, [isOpen, symbol, trigger, mode, tpInput, slInput]);
 
   if (!isOpen) return null;
 
   const isLong = positionAmt > 0;
   const qty = Math.abs(positionAmt);
-  const safeQty = Math.max(qty, 1e-12); // tránh chia 0
+  const safeQty = Math.max(qty, 1e-12);
   const tick = getPriceTick?.(symbol) ?? 0.0001;
   const lev = leverage && leverage > 0 ? leverage : 1;
   const positionSide = (isLong ? "LONG" : "SHORT") as "LONG" | "SHORT";
@@ -112,15 +154,13 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
 
   // ---------- đặt lệnh + optimistic ----------
   const handleConfirm = () => {
-    // gọi callback cũ nếu bạn vẫn dùng
     onSubmit?.({ tpPrice, slPrice, trigger });
 
     const base = {
       market: "futures" as const,
       symbol,
-      quantity: safeQty, // server làm tròn bước qty; nếu cần bạn có stepSize thì round ở đây
+      quantity: safeQty,
       workingType: trigger,
-      reduceOnly: true as const,
       positionSide,
     };
 
@@ -181,48 +221,74 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
     onClose();
   };
 
+  const getModeLabel = () => {
+    switch (mode) {
+      case "pnl_abs": return "PnL USDT";
+      case "roi_pct": return "ROI %";
+      case "price": return "Giá USDT";
+    }
+  };
+
+  const getPlaceholder = (type: "tp" | "sl") => {
+   
+    return "Nhập giá";
+  };
+
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-full max-w-md rounded-2xl bg-dark-800 border border-dark-700 shadow-xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-dark-700">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-[#1e2329] border border-[#2b3139] shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2b3139]">
           <div className="font-semibold text-[16px] text-white">TP/SL cho toàn bộ vị thế</div>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-white">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#2b3139] transition-colors">
             <X size={18} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-4 text-sm">
-          <div className="rounded-lg bg-dark-700/40 p-3">
-            <div className="flex items-center justify-between text-gray-300">
-              <span>Mã</span>
-              <span className="text-white">
-                {symbol} • {isLong ? "Long" : "Short"} {lev ? `• ${lev}x` : ""}
+        <div className="px-5 py-4 space-y-5">
+          {/* Position Info */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-gray-400">Mã</span>
+              <span className="text-white font-medium">
+                {symbol} • <span className={isLong ? "text-[#0ecb81]" : "text-[#f6465d]"}>{isLong ? "Long" : "Short"}</span> • {lev}x
               </span>
             </div>
-            <div className="flex items-center justify-between text-gray-300">
-              <span>Giá vào lệnh</span>
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-gray-400">Giá vào lệnh</span>
               <span className="text-white">{fmt(entryPrice)} USDT</span>
             </div>
-            <div className="flex items-center justify-between text-gray-300">
-              <span>Giá đánh dấu</span>
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-gray-400">Giá đánh dấu</span>
               <span className="text-white">{fmt(markPrice)} USDT</span>
             </div>
           </div>
 
+          {/* Divider */}
+          <div className="border-t border-[#2b3139]" />
+
           {/* Trigger + Mode */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <div className="text-gray-300 mb-1">Trigger</div>
-              <div className="flex rounded-lg overflow-hidden border border-dark-600">
+              <label className="text-[12px] text-gray-400 mb-2 block">Trigger</label>
+              <div className="flex rounded-lg overflow-hidden border border-[#2b3139]">
                 <button
-                  className={`px-3 py-2 flex-1 ${"MARK" === trigger ? "bg-primary/20 text-primary" : "bg-dark-700 text-gray-300"}`}
+                  className={`flex-1 px-3 py-2 text-[13px] font-medium transition-colors ${
+                    trigger === "MARK" 
+                      ? "bg-[#fcd535] text-black" 
+                      : "bg-transparent text-gray-300 hover:bg-[#2b3139]"
+                  }`}
                   onClick={() => setTrigger("MARK")}
                 >
                   Mark
                 </button>
                 <button
-                  className={`px-3 py-2 flex-1 ${"LAST" === trigger ? "bg-primary/20 text-primary" : "bg-dark-700 text-gray-300"}`}
+                  className={`flex-1 px-3 py-2 text-[13px] font-medium transition-colors ${
+                    trigger === "LAST" 
+                      ? "bg-[#fcd535] text-black" 
+                      : "bg-transparent text-gray-300 hover:bg-[#2b3139]"
+                  }`}
                   onClick={() => setTrigger("LAST")}
                 >
                   Last
@@ -231,101 +297,112 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
             </div>
 
             <div>
-              <div className="text-gray-300 mb-1">Nhập theo</div>
+              <label className="text-[12px] text-gray-400 mb-2 block">Nhập theo</label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as InputMode)}
-                className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white outline-none"
+                className="w-full bg-transparent border border-[#2b3139] rounded-lg px-3 py-2 text-[13px] text-white outline-none focus:border-[#fcd535] transition-colors cursor-pointer"
               >
-                <option value="pnl_abs">PnL</option>
-                <option value="roi_pct">ROI%</option>
-                <option value="price">Giá</option>
+                <option value="pnl_abs" className="bg-[#1e2329]">PnL</option>
+                <option value="roi_pct" className="bg-[#1e2329]">ROI%</option>
+                <option value="price" className="bg-[#1e2329]">Giá</option>
               </select>
             </div>
           </div>
 
-          {/* TP */}
+          {/* Take Profit */}
           <div>
-            <div className="mb-1 text-gray-300">
-              Take Profit{" "}
-              <span className="text-xs text-gray-500">
-                ({mode === "pnl_abs" ? "PnL USDT" : mode === "roi_pct" ? "ROI %" : "Giá USDT"})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                value={tpInput}
-                onChange={(e) => setTpInput(e.target.value)}
-                className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white outline-none"
-                placeholder={mode === "pnl_abs" ? "Nhập PnL (vd 5)" : mode === "roi_pct" ? "Nhập ROI% (vd 10)" : "Nhập giá (USDT)"}
-                inputMode="decimal"
-              />
-              <div className="text-xs text-gray-400 min-w-[190px]">
-                Ước tính:&nbsp;
+            <label className="text-[12px] text-gray-400 mb-2 block">
+              Take Profit <span className="text-gray-500">({getModeLabel()})</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                {/* Prefix "+" cho PnL/ROI mode */}
+                {mode !== "price" && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0ecb81] text-[13px] font-medium">
+                    +
+                  </span>
+                )}
+                <input
+                  value={tpInput}
+                  onChange={(e) => {
+                    // Chỉ cho phép số và dấu chấm
+                    const cleaned = e.target.value.replace(/[^0-9.]/g, '');
+                    setTpInput(cleaned);
+                  }}
+                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-[13px] text-white outline-none focus:border-[#0ecb81] transition-colors placeholder:text-gray-500 ${
+                    mode !== "price" ? "pl-7 pr-3" : "px-3"
+                  }`}
+                  placeholder={getPlaceholder("tp")}
+                  inputMode="decimal"
+                />
+              </div>
+              <div className="text-[11px] text-gray-400 min-w-[140px] text-right">
                 {tpPrice ? (
-                  <>
-                    <span className="text-white">{fmt(tpPrice)} </span>
-                    {" • "}
-                    <span className={tpEst.pnlVal >= 0 ? "text-success-400" : "text-danger-400"}>
-                      {fmt(tpEst.pnlVal, 4)} USDT
-                    </span>
-                    {" ("}
-                    {Number.isFinite(tpEst.roiPct) ? fmt(tpEst.roiPct, 2) : "--"}
-                    {"%)"}
-                  </>
+                  <div className="space-y-0.5">
+                    <div className="text-white">{fmt(tpPrice, 5)} USDT</div>
+                    <div className={tpEst.pnlVal >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]"}>
+                      {fmt(tpEst.pnlVal, 2)} USDT ({fmt(tpEst.roiPct, 2)}%)
+                    </div>
+                  </div>
                 ) : (
-                  "--"
+                  <span className="text-gray-500">Ước tính: --</span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* SL */}
+          {/* Stop Loss */}
           <div>
-            <div className="mb-1 text-gray-300">
-              Stop Loss{" "}
-              <span className="text-xs text-gray-500">
-                ({mode === "pnl_abs" ? "PnL USDT" : mode === "roi_pct" ? "ROI %" : "Giá USDT"})
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                value={slInput}
-                onChange={(e) => setSlInput(e.target.value)}
-                className="flex-1 bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white outline-none"
-                placeholder={mode === "pnl_abs" ? "Nhập -PnL (vd 3)" : mode === "roi_pct" ? "Nhập -ROI% (vd 5)" : "Nhập giá (USDT)"}
-                inputMode="decimal"
-              />
-              <div className="text-xs text-gray-400 min-w-[190px]">
-                Ước tính:&nbsp;
+            <label className="text-[12px] text-gray-400 mb-2 block">
+              Stop Loss <span className="text-gray-500">({getModeLabel()})</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 relative">
+                {/* Prefix "-" cho PnL/ROI mode */}
+                {mode !== "price" && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#f6465d] text-[13px] font-medium">
+                    -
+                  </span>
+                )}
+                <input
+                  value={slInput}
+                  onChange={(e) => {
+                    // Chỉ cho phép số và dấu chấm
+                    const cleaned = e.target.value.replace(/[^0-9.]/g, '');
+                    setSlInput(cleaned);
+                  }}
+                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-[13px] text-white outline-none focus:border-[#f6465d] transition-colors placeholder:text-gray-500 ${
+                    mode !== "price" ? "pl-7 pr-3" : "px-3"
+                  }`}
+                  placeholder={getPlaceholder("sl")}
+                  inputMode="decimal"
+                />
+              </div>
+              <div className="text-[11px] text-gray-400 min-w-[140px] text-right">
                 {slPrice ? (
-                  <>
-                    <span className="text-white">{fmt(slPrice)} USDT</span>
-                    {" • "}
-                    <span className={slEst.pnlVal >= 0 ? "text-success-400" : "text-danger-400"}>
-                      {fmt(slEst.pnlVal, 4)} USDT
-                    </span>
-                    {" ("}
-                    {Number.isFinite(slEst.roiPct) ? fmt(slEst.roiPct, 2) : "--"}
-                    {"%)"}
-                  </>
+                  <div className="space-y-0.5">
+                    <div className="text-white">{fmt(slPrice, 5)} USDT</div>
+                    <div className={slEst.pnlVal >= 0 ? "text-[#0ecb81]" : "text-[#f6465d]"}>
+                      {fmt(slEst.pnlVal, 2)} USDT ({fmt(slEst.roiPct, 2)}%)
+                    </div>
+                  </div>
                 ) : (
-                  "--"
+                  <span className="text-gray-500">Ước tính: --</span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="pt-1 text-[12px] text-gray-400">
-            Lệnh TP dùng <span className="text-white">TAKE_PROFIT_MARKET</span>, SL dùng{" "}
-            <span className="text-white">STOP_MARKET</span>
-          </div>
+         
         </div>
 
-        <div className="px-5 py-4 border-t border-dark-700">
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-[#2b3139]">
           <button
             onClick={handleConfirm}
-            className="w-full rounded-xl bg-[#fcd535] text-black font-semibold py-2.5 hover:opacity-90"
+            disabled={!tpPrice && !slPrice}
+            className="w-full rounded-xl bg-[#fcd535] text-black font-semibold py-3 hover:bg-[#e5c22d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Xác nhận
           </button>

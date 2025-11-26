@@ -87,8 +87,9 @@ interface LineIndicatorSettingsProps {
 const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
   type,
   defaultTab = 1, // Mặc định mở tab 1
-  mainVisible = { ma7: true, ma25: true, ma99: true, ema12: false, ema26: false, boll: false },
-  volumeVisible = { mavol1: true, mavol2: true },
+  // ✅ FIX: Change default values to false
+  mainVisible = { ma7: false, ma25: false, ma99: false, ema12: false, ema26: false, boll: false },
+  volumeVisible = { mavol1: false, mavol2: false },
   subVisible = {
     vol: true,
     macd: false,
@@ -162,12 +163,13 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
     onClose();
   };
 
+  // ✅ FIX: Reset về false thay vì true
   const handleReset = () => {
     // Reset Main indicators
-    setLocalMainVis({ ma7: true, ma25: true, ma99: true, ema12: false, ema26: false, boll: false });
+    setLocalMainVis({ ma7: false, ma25: false, ma99: false, ema12: false, ema26: false, boll: false });
     
     // Reset Volume indicators
-    setLocalVolVis({ mavol1: true, mavol2: true });
+    setLocalVolVis({ mavol1: false, mavol2: false });
     
     // Reset all periods
     setLocalPeriods({
@@ -764,8 +766,8 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col relative z-[10000]">
         {/* Header with Tabs */}
         <div className="border-b border-dark-600">
           <div className="flex items-center justify-between p-4">

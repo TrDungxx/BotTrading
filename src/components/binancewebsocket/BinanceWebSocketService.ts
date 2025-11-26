@@ -66,6 +66,7 @@ function writeOpenOrdersLS(list: any[]) {
 class BinanceWebSocketService {
   private socket: WebSocket | null = null;
   private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
+  private onMaintenanceCallback: (() => void) | null = null;
 
   // ===== NEW: anti-spam / idempotent helpers =====
   private lastSelectSent?: { id: number; ts: number };
@@ -83,7 +84,8 @@ class BinanceWebSocketService {
     this.authedOnceKeys.add(key);
     this.authedQueue.push(msg);
   }
-
+private pendingApiCalls = new Map<string, number>(); // Track pending calls
+private apiDebounceMs = 200; // 200ms debounce
   private noPositionRiskSupport = true;
 
   // ===== State & queues =====
@@ -92,6 +94,10 @@ class BinanceWebSocketService {
   private authResolvers: Array<() => void> = [];
   private preAuthQueue: any[] = []; // gửi khi state >= 'open'
   private authedQueue: any[] = [];  // gửi khi state === 'authenticated'
+  
+  // ===== Account Selection Tracking =====
+  private accountSelectedResolvers: Array<() => void> = [];
+  private accountSelected: boolean = false;
 
   // ===== Handlers & caches =====
   private messageHandlers: ((data: any) => void)[] = [];
@@ -200,7 +206,57 @@ class BinanceWebSocketService {
     if (this.state === 'authenticated') return Promise.resolve();
     return new Promise(res => this.authResolvers.push(res));
   }
-
+  
+  private waitForAccountSelected(): Promise<void> {
+    if (this.accountSelected) return Promise.resolve();
+    return new Promise(res => this.accountSelectedResolvers.push(res));
+  }
+public setMaintenanceCallback(callback: (() => void) | null) {
+  this.onMaintenanceCallback = callback;
+  console.log('🔧 Maintenance callback registered:', !!callback);
+  
+  // ✅ NẾU ĐÃ CÓ WEBSOCKET ĐANG CHẠY, THÊM CALLBACK VÀO ĐÓ LUÔN
+  if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    console.log('🔧 Attaching callback to existing WebSocket connection');
+    
+    const existingWs = this.socket;
+    
+    // Backup existing handlers
+    const originalOnError = existingWs.onerror;
+    const originalOnClose = existingWs.onclose;
+    
+    // Replace with new handlers that include callback
+    existingWs.onerror = (event) => {
+      console.error('❌ WebSocket error (existing connection):', event);
+      
+      if (this.onMaintenanceCallback) {
+        console.log('🚨 Triggering maintenance modal from existing connection error');
+        this.onMaintenanceCallback();
+      }
+      
+      // Call original handler if exists
+      if (originalOnError && originalOnError !== existingWs.onerror) {
+        originalOnError.call(existingWs, event);
+      }
+    };
+    
+    existingWs.onclose = (event) => {
+      console.warn('🔌 WebSocket closed (existing connection):', event.code, event.reason);
+      
+      if (event.code !== 1000 && event.code !== 1001) {
+        if (this.onMaintenanceCallback) {
+          console.log('🚨 Triggering maintenance modal from existing connection close');
+          this.onMaintenanceCallback();
+        }
+      }
+      
+      // Call original handler if exists
+      if (originalOnClose && originalOnClose !== existingWs.onclose) {
+        originalOnClose.call(existingWs, event);
+      }
+    };
+  }
+}
   // Client fallback: server không support -> dùng futures snapshot
   public requestPositionRisk(symbols?: string[]) {
     this.getFuturesAccount(); // kéo leverage/isolatedWallet qua snapshot
@@ -284,6 +340,8 @@ class BinanceWebSocketService {
     this.callbacks.clear();
     this.subscriptions.clear();
     this.pendingRiskSymbols.clear();
+      this.accountSelected = false;
+   this.accountSelectedResolvers = [];
     if (this.riskDebounceTimer != null) {
       clearTimeout(this.riskDebounceTimer);
       this.riskDebounceTimer = null;
@@ -355,15 +413,27 @@ class BinanceWebSocketService {
           });
         }
 
-        // Detect “account selected” shape (from your logs)
+        // Detect "account selected" shape (from your logs)
         if (data && typeof data.id === 'number' && data.BinanceId && data.internalAccountId) {
           if (!this.currentAccountId) this.currentAccountId = Number(data.id);
-          this.ensureInitialSnapshot(120);
+          
+          // ✅ MARK ACCOUNT AS SELECTED
+          console.log('✅ Account selected:', data.id, data.Name);
+          this.accountSelected = true;
+          this.accountSelectedResolvers.splice(0).forEach(r => r());
+          
+          // Forward to message handlers để TradingForm biết
+          this.messageHandlers.forEach(h => h({ type: 'accountSelected', account: data }));
+          
+          // ❌ FIX: Don't auto-trigger snapshot - wait for explicit API calls
+          // this.ensureInitialSnapshot(120);
+          return;
         }
 
         // Futures/spot data loaded — safe to ensure initial once
         if (data?.type === 'futuresDataLoaded' || data?.type === 'spotDataLoaded') {
-          this.ensureInitialSnapshot(0);
+          // ❌ FIX: Don't auto-trigger snapshot
+          //           this.ensureInitialSnapshot(0);
         }
 
         // FORWARD SNAPSHOT POSITIONS
@@ -639,6 +709,14 @@ writePositionsLS(merged);
           return;
         }
 
+         // ===== ERROR HANDLING - CHECK TRƯỚC KHI FORWARD =====
+        if (data?.type === 'error' && data?.message) {
+          console.log('🚨 Error from BinanceWS:', data);
+          // Forward error để TradingTerminal bắt được
+          this.messageHandlers.forEach(h => h(data));
+          return;
+        }
+
         // ===== Forward còn lại =====
         this.messageHandlers.forEach(h => h(data));
       } catch (error) {
@@ -648,12 +726,26 @@ writePositionsLS(merged);
 
     sock.onerror = (event) => {
       console.error('❌ WebSocket error:', event);
+      
+      // ✅ THÊM - Trigger maintenance modal
+      if (this.onMaintenanceCallback) {
+        console.log('🚨 Triggering maintenance modal from WebSocket error');
+        this.onMaintenanceCallback();
+      }
     };
 
     sock.onclose = (event) => {
-      console.warn('🔌 WebSocket closed:', event.reason || 'no reason');
+      console.warn('🔌 WebSocket closed:', event.code, event.reason || 'no reason');
       this.state = 'closed';
-      // giữ queue để reconnect sau vẫn flush được (tuỳ ý)
+      
+      // ✅ THÊM - Trigger maintenance modal nếu đóng bất thường
+      // Code 1000 = Normal closure, 1001 = Going away
+      if (event.code !== 1000 && event.code !== 1001) {
+        if (this.onMaintenanceCallback) {
+          console.log('🚨 Triggering maintenance modal (abnormal close, code:', event.code, ')');
+          this.onMaintenanceCallback();
+        }
+      }
     };
   }
 
@@ -774,46 +866,90 @@ writePositionsLS(merged);
     this.sendAuthed({ action: 'getBalances', market });
   }
 
-  public getPositions(binanceAccountId?: number) {
-    // throttle snapshots to avoid bursts
-    const now = Date.now();
-    if (now - this.lastPositionsPullAt < this.snapshotCooldownMs) {
-      return console.debug('[WS] getPositions suppressed (cooldown)');
+  public async getPositions(binanceAccountId?: number) {
+  if (!this.accountSelected) {
+    console.warn('⚠️ getPositions called before account selected, waiting...');
+    await this.waitForAccountSelected();
+  }
+  
+  // ✅ DEBOUNCE: Skip if called recently  
+  const callKey = 'getPositions';
+  const lastCall = this.pendingApiCalls.get(callKey) || 0;
+  const now = Date.now();
+  
+  if (now - lastCall < this.apiDebounceMs) {
+    console.log('⏭️ Skipping getPositions (debounced)');
+    return;
+  }
+  
+  this.pendingApiCalls.set(callKey, now);
+  
+  // throttle snapshots to avoid bursts
+  if (now - this.lastPositionsPullAt < this.snapshotCooldownMs) {
+    return console.debug('[WS] getPositions suppressed (cooldown)');
+  }
+  this.lastPositionsPullAt = now;
+
+  const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
+  const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
+  const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
+  if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
+  this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
+}
+
+  public async getFuturesAccount(id?: number) {
+  if (!this.accountSelected) {
+    console.warn('⚠️ getFuturesAccount called before account selected, waiting...');
+    await this.waitForAccountSelected();
+  }
+  
+  // ✅ DEBOUNCE: Skip if called recently
+  const callKey = 'getFuturesAccount';
+  const lastCall = this.pendingApiCalls.get(callKey) || 0;
+  const now = Date.now();
+  
+  if (now - lastCall < this.apiDebounceMs) {
+    console.log('⏭️ Skipping getFuturesAccount (debounced)');
+    return;
+  }
+  
+  this.pendingApiCalls.set(callKey, now);
+  
+  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
+  this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
+}
+  public async getSpotAccount(id?: number) {
+  // ✅ GUARD: Wait for account selected
+  if (!this.accountSelected) {
+    console.warn('⚠️ getSpotAccount called before account selected, waiting...');
+    await this.waitForAccountSelected();
+  }
+  
+  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
+  this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
+}
+
+  public async getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
+  // ✅ GUARD: Wait for account selected
+  if (!this.accountSelected) {
+    console.warn('⚠️ getMultiAssetsMode called before account selected, waiting...');
+    await this.waitForAccountSelected();
+  }
+  
+  this.sendAuthed({ action: 'getMultiAssetsMode' });
+  if (!onResult) return;
+
+  const once = (msg: any) => {
+    if (msg?.type === 'getMultiAssetsMode') {
+      const isMulti = !!msg.multiAssetsMargin;
+      onResult(isMulti, msg);
+      this.removeMessageHandler(once);
     }
-    this.lastPositionsPullAt = now;
-
-    const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
-    const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
-    const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
-    if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
-    this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
-  }
-
-  public getFuturesAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
-  }
-
-  public getSpotAccount(id?: number) {
-    const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
-    this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
-  }
-
-  public getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'getMultiAssetsMode' });
-    if (!onResult) return;
-
-    const once = (msg: any) => {
-      if (msg?.type === 'getMultiAssetsMode') {
-        const isMulti = !!msg.multiAssetsMargin;
-        onResult(isMulti, msg);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
+  };
+  this.onMessage(once);
+}
 
   // ========= Orders =========
   public placeOrder(payload: PlaceOrderPayload) {
@@ -822,11 +958,29 @@ writePositionsLS(merged);
 }
 
   /** Lấy danh sách lệnh mở theo market (và optional symbol) */
-  public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {
-    const payload: any = { action: 'getOpenOrders', market };
-    if (symbol) payload.symbol = symbol;
-    this.sendAuthed(payload);
+  public getOpenOrders(market: 'spot' | 'futures', symbol?: string, onResult?: (orders: any[]) => void) {
+  const payload: any = { action: 'getOpenOrders', market };
+  if (symbol) payload.symbol = symbol;
+  
+  if (onResult) {
+    const requestId = `getOpenOrders_${Date.now()}`;
+    const handler = (msg: any) => {
+      // Check nếu là response cho getOpenOrders
+      if (msg?.type === 'openOrders' || msg?.type === 'getOpenOrders' || 
+          (Array.isArray(msg) && (msg.length === 0 || msg[0]?.orderId !== undefined))) {
+        const orders = Array.isArray(msg) ? msg : (Array.isArray(msg?.data) ? msg.data : []);
+        onResult(orders);
+        this.removeMessageHandler(handler);
+      }
+    };
+    this.onMessage(handler);
+    
+    // Timeout để cleanup handler
+    setTimeout(() => this.removeMessageHandler(handler), 5000);
   }
+  
+  this.sendAuthed(payload);
+}
 
   /** Huỷ 1 lệnh theo orderId/symbol/market */
   public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
@@ -844,15 +998,21 @@ writePositionsLS(merged);
   private accountSubActive = false;
 
   // ========= Realtime account updates =========
-  public subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
-    if (this.accountSubActive) return;
-    this.accountSubActive = true;
-    this.orderUpdateHandler = onOrderUpdate;
-    this.sendAuthed({ action: 'subscribeAccountUpdates', types });
-
-    // Pull initial snapshot once after subscribe to ensure UI has data
-    this.ensureInitialSnapshot(160);
+  public async subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
+  // ✅ GUARD: Wait for account selected
+  if (!this.accountSelected) {
+    console.warn('⚠️ subscribeAccountUpdates called before account selected, waiting...');
+    await this.waitForAccountSelected();
   }
+  
+  if (this.accountSubActive) return;
+  this.accountSubActive = true;
+  this.orderUpdateHandler = onOrderUpdate;
+  this.sendAuthed({ action: 'subscribeAccountUpdates', types });
+
+  // ❌ FIX: Don't auto-trigger snapshot - prevents spam
+  // this.ensureInitialSnapshot(160);
+}
 
   public unsubscribeAccountUpdates(types: string[] = []) {
     const payload = { action: 'unsubscribeAccountUpdates', types };
@@ -955,21 +1115,22 @@ writePositionsLS(merged);
 
   // ===== App init helper (optional use) =====
   public async initAfterConnect() {
-    await this.waitUntilAuthenticated();
+  await this.waitUntilAuthenticated();
 
-    const saved = localStorage.getItem('selectedBinanceAccountId');
-    if (saved) {
-      await this.selectAccountAndWait(Number(saved), 200);
-    }
+  const saved = localStorage.getItem('selectedBinanceAccountId');
+  if (saved) {
+    await this.selectAccountAndWait(Number(saved), 200);
+    
+    // ✅ AWAIT để guards chặn spam
+    await this.subscribeAccountUpdates((orders) => {
+      writeOpenOrdersLS(orders || []);
+      this.orderUpdateHandler?.(orders || []);
+    });
 
-    this.subscribeAccountUpdates((orders) => {
-  writeOpenOrdersLS(orders || []);         // <— thay cho setItem trực tiếp
-  this.orderUpdateHandler?.(orders || []);
-});
-
-    this.getFuturesAccount();
-    this.getPositions();
+    await this.getFuturesAccount();
+    await this.getPositions();
   }
+}
 
   // ===== Ensure initial snapshot once per account =====
   private ensureInitialSnapshot(delayMs = 150) {
@@ -983,6 +1144,8 @@ writePositionsLS(merged);
       this.getOpenOrders('futures');
     }, delayMs);
   }
+  
+ 
 }
 
 export const binanceWS = new BinanceWebSocketService();

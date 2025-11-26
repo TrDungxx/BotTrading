@@ -13,10 +13,26 @@ export interface Kline {
 export async function fetchHistoricalKlines(
   symbol: string,
   interval: string = '1m',
-  limit: number = 500
+  limit: number = 500,
+  market: 'spot' | 'futures' = 'spot'  // ✅ THÊM PARAM NÀY
 ): Promise<Kline[]> {
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  // ✅ Chọn đúng endpoint theo market
+  const baseUrl = market === 'futures'
+    ? 'https://fapi.binance.com/fapi/v1/klines'   // Futures
+    : 'https://api.binance.com/api/v3/klines';    // Spot
+    
+  const url = `${baseUrl}?symbol=${symbol.toUpperCase()}&interval=${interval}&limit=${limit}`;
+  
+  console.log('[fetchKlines]', market.toUpperCase(), symbol, interval);
+  
   const res = await fetch(url);
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('[fetchKlines] ❌ Error:', res.status, errorText);
+    throw new Error(`Failed to fetch klines: ${res.status}`);
+  }
+  
   const rawData = await res.json();
 
   return rawData.map((candle: any[]) => ({
