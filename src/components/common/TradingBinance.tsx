@@ -16,15 +16,13 @@ import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import { copyPrice } from '../clickchart/CopyPrice';
 import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
-import AlertModal from '../clickchart/AlertModal';
-import NewOrderModal from '../clickchart/NewOrderModal';
 // import BollingerBandsIndicator from './functionchart/BollingerBandsIndicator'; // ⚠️ Disabled - has internal error
 import '../../style/Hidetradingviewlogo.css';
 import LineIndicatorHeader from './popupchart/LineIndicatorHeader';
 import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
 import { IndicatorValue } from './popupchart/LineIndicatorHeader';
 import { MainIndicatorConfig, VolumeIndicatorConfig, IndicatorPeriods, IndicatorColors } from './popupchart/LineIndicatorSettings';
-
+import ChartContextMenu from '../clickchart/ChartContextMenu';
 // ✅ Import refactored modules
 import { calculateMA, calculateEMA, calculateBollingerBands, calculateVolumeMA } from './utils/calculations';
 import { useIndicators } from './hooks/useIndicators';
@@ -244,9 +242,7 @@ const TradingBinance: React.FC<Props> = ({
   const ctxClickPriceRef = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   type PresetType = 'LIMIT' | 'STOP';
-  const [orderOpen, setOrderOpen] = useState(false);
-  const [orderSeedPrice, setOrderSeedPrice] = useState<number | null>(null);
-  const [orderPresetType, setOrderPresetType] = useState<PresetType>('LIMIT');
+
   const syncSourceRef = useRef<'main' | 'volume' | null>(null);
   const { updateSeriesData } = useChartType({
     chartType,
@@ -278,6 +274,59 @@ const TradingBinance: React.FC<Props> = ({
     return Number((Math.round(price / tick) * tick).toFixed(precision));
   };
   const [alertOpen, setAlertOpen] = useState(false);
+  
+  // ===== BALANCE & LEVERAGE STATE =====
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const [leverage, setLeverage] = useState<number>(10); // Default 10x
+
+  // ===== SUBSCRIBE TO BALANCE UPDATES =====
+  useEffect(() => {
+    const handleMessage = (msg: any) => {
+      // Balance update từ accountInformation
+      if (msg?.type === 'accountInformation' && msg?.data) {
+        const bal = Number(msg.data.availableBalance ?? 0);
+        if (Number.isFinite(bal) && bal >= 0) {
+          setAvailableBalance(bal);
+        }
+      }
+    };
+
+    binanceWS.onMessage(handleMessage);
+    return () => binanceWS.removeMessageHandler(handleMessage);
+  }, []);
+
+  // ===== LOAD & SYNC LEVERAGE FROM LOCALSTORAGE =====
+  useEffect(() => {
+    const loadLeverage = () => {
+      try {
+        const accId = binanceWS.getCurrentAccountId();
+        const accountKey = accId ?? 'na';
+        
+        const savedLeverage = localStorage.getItem(`tw_leverage_${accountKey}_${market}_${selectedSymbol}`);
+        if (savedLeverage) {
+          const lev = Number(savedLeverage);
+          if (Number.isFinite(lev) && lev >= 1 && lev <= 125) {
+            setLeverage(prev => {
+              if (prev !== lev) {
+                console.log('[TradingBinance] Leverage synced:', lev);
+              }
+              return lev;
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[TradingBinance] Failed to load leverage:', e);
+      }
+    };
+
+    // Load initial
+    loadLeverage();
+
+    // Poll every 1 second to sync with TradingForm changes
+    const interval = setInterval(loadLeverage, 1000);
+    
+    return () => clearInterval(interval);
+  }, [market, selectedSymbol]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -345,29 +394,40 @@ const TradingBinance: React.FC<Props> = ({
     ctxOpenRef.current = ctxOpen;
   }, [ctxOpen]);
 
-  const openCtxMenu = (e: React.MouseEvent) => {
+  const openCtxMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (!chartRef.current || !candleSeries.current) return;
 
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    // Lấy bounding rect từ element được click (e.currentTarget)
+    const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
 
-    ctxClickYRef.current = y;
+    console.log('[Context Menu] Click position:', {
+      clientY: e.clientY,
+      rectTop: rect.top,
+      rectBottom: rect.bottom,
+      rectHeight: rect.height,
+      relativeY: y
+    });
 
-    const coordinate = chartRef.current.timeScale().coordinateToTime(x);
-    const priceCoord = candleSeries.current.coordinateToPrice(y);
-
-    if (priceCoord !== null && typeof priceCoord === 'number' && !isNaN(priceCoord)) {
-      ctxClickPriceRef.current = priceCoord;
-    } else {
-      ctxClickPriceRef.current = null;
-    }
-
-    if (!coordinate) {
-      ctxClickPriceRef.current = null;
+    // Tính giá trực tiếp từ Y coordinate
+    try {
+      const price = candleSeries.current.coordinateToPrice(y);
+      
+      if (price !== null && Number.isFinite(price)) {
+        ctxClickPriceRef.current = price;
+        console.log('[Context Menu] ✅ Price from coordinateToPrice:', price);
+      } else {
+        // Fallback
+        const fallbackPrice = candles.at(-1)?.close ?? null;
+        ctxClickPriceRef.current = fallbackPrice;
+        console.log('[Context Menu] ⚠️ Using fallback price:', fallbackPrice);
+      }
+    } catch (err) {
+      console.warn('[Context Menu] ❌ coordinateToPrice error:', err);
+      ctxClickPriceRef.current = candles.at(-1)?.close ?? null;
     }
 
     setCtxPos({ x: e.clientX, y: e.clientY });
@@ -466,9 +526,9 @@ const TradingBinance: React.FC<Props> = ({
 
   // ✅ Auto redraw BOLL fill when data changes
   useEffect(() => {
-  if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-    requestAnimationFrame(() => redrawBollFill()); // Instant
-  }
+    if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
+      requestAnimationFrame(() => redrawBollFill()); // Instant
+    }
   }, [bollData, mainVisible.boll, bollFillVisible, redrawBollFill]);
 
   // Main chart initialization
@@ -848,29 +908,53 @@ const TradingBinance: React.FC<Props> = ({
 
     // Subscribe to BOLL redraw events
     mainChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-  if (mainVisible.boll && bollFillVisible) {
-    requestAnimationFrame(() => redrawBollFill()); // Smooth 60fps
-  }
-});
+      if (mainVisible.boll && bollFillVisible) {
+        requestAnimationFrame(() => redrawBollFill()); // Smooth 60fps
+      }
+    });
 
     // ✅ Also redraw on crosshair move (for smooth updates)
     let redrawTimeout: NodeJS.Timeout | null = null;
     const handleCrosshairMove = (param: any) => {
-      if (param.time && param.seriesData.has(candleSeries.current!)) {
+      // Lấy giá từ Y coordinate (chính xác cho mọi vị trí trên chart)
+      if (param.point && param.point.y !== undefined && candleSeries.current) {
+        try {
+          const price = candleSeries.current.coordinateToPrice(param.point.y);
+          if (price !== null && Number.isFinite(price)) {
+            setHoverPrice(price);
+          }
+        } catch (e) {
+          // Fallback: lấy từ candle data
+          if (param.time && param.seriesData.has(candleSeries.current)) {
+            const candlePrice = param.seriesData.get(candleSeries.current)?.close;
+            if (typeof candlePrice === 'number') {
+              setHoverPrice(candlePrice);
+            }
+          } else {
+            setHoverPrice(null);
+          }
+        }
+      } else if (param.time && param.seriesData.has(candleSeries.current!)) {
+        // Fallback cũ: lấy từ candle
         const price = param.seriesData.get(candleSeries.current!)?.close;
         if (typeof price === 'number') {
           setHoverPrice(price);
         }
-        setHoverTime(param.time as UTCTimestamp);
       } else {
         setHoverPrice(null);
+      }
+
+      // Update hover time
+      if (param.time) {
+        setHoverTime(param.time as UTCTimestamp);
+      } else {
         setHoverTime(null);
       }
 
       // Debounced redraw for BOLL fill
       if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-  requestAnimationFrame(() => redrawBollFill()); // Instant, no debounce
-}
+        requestAnimationFrame(() => redrawBollFill()); // Instant, no debounce
+      }
     };
 
     mainChart.subscribeCrosshairMove(handleCrosshairMove);
@@ -959,15 +1043,15 @@ const TradingBinance: React.FC<Props> = ({
         if (!res.ok) {
           const errorText = await res.text();
           console.error('[LoadHistory] ❌ API Error:', errorText);
-          
+
           // ✅ FIX: Parse Binance error
           try {
             const errJson = JSON.parse(errorText);
             if (errJson.code === -1121) {
               console.error(`[LoadHistory] ❌ Symbol "${symbolUpper}" KHÔNG TỒN TẠI trên ${market.toUpperCase()}!`);
             }
-          } catch {}
-          
+          } catch { }
+
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
 
@@ -1015,7 +1099,7 @@ const TradingBinance: React.FC<Props> = ({
           color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
         }));
 
-        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles | Last:', cs[cs.length-1]?.close);
+        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles | Last:', cs[cs.length - 1]?.close);
 
         // ✅ FIX: Check series refs before setData
         if (!candleSeries.current || !volumeSeries.current) {
@@ -1269,78 +1353,78 @@ const TradingBinance: React.FC<Props> = ({
     },
   ].filter(Boolean) as IndicatorValue[];
 
-// ✅ Listen for symbol change requests from Position component
-useEffect(() => {
-  const handler = (e: CustomEvent) => {
-    const { symbol } = e.detail;
-    console.log("📊 Chart received symbol change request:", symbol);
-    
-    if (onRequestSymbolChange) {
-      onRequestSymbolChange(symbol);
-    }
-  };
-  
-  window.addEventListener("chart-symbol-change-request", handler as EventListener);
-  return () => window.removeEventListener("chart-symbol-change-request", handler as EventListener);
-}, [onRequestSymbolChange]);
+  // ✅ Listen for symbol change requests from Position component
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const { symbol } = e.detail;
+      console.log("📊 Chart received symbol change request:", symbol);
 
-useEffect(() => {
-  const hideLogo = (svg: Element) => {
-    if (svg.getAttribute('viewBox') === '0 0 35 19') {
-      (svg as HTMLElement).style.display = 'none';
-      
-      const parent = svg.parentElement;
-      if (parent) {
-        (parent as HTMLElement).style.display = 'none';
+      if (onRequestSymbolChange) {
+        onRequestSymbolChange(symbol);
       }
-      
-      console.log('✅ Đã ẩn logo TradingView');
-      return true;
-    }
-    return false;
-  };
+    };
 
-  const existingLogos = document.querySelectorAll('svg[viewBox="0 0 35 19"]');
-  existingLogos.forEach(hideLogo);
+    window.addEventListener("chart-symbol-change-request", handler as EventListener);
+    return () => window.removeEventListener("chart-symbol-change-request", handler as EventListener);
+  }, [onRequestSymbolChange]);
 
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType === 1) {
-          const element = node as Element;
-          
-          if (element.tagName === 'svg' && hideLogo(element)) {
-            return;
-          }
-          
-          const logos = element.querySelectorAll('svg[viewBox="0 0 35 19"]');
-          logos.forEach(hideLogo);
+  useEffect(() => {
+    const hideLogo = (svg: Element) => {
+      if (svg.getAttribute('viewBox') === '0 0 35 19') {
+        (svg as HTMLElement).style.display = 'none';
+
+        const parent = svg.parentElement;
+        if (parent) {
+          (parent as HTMLElement).style.display = 'none';
         }
+
+        console.log('✅ Đã ẩn logo TradingView');
+        return true;
+      }
+      return false;
+    };
+
+    const existingLogos = document.querySelectorAll('svg[viewBox="0 0 35 19"]');
+    existingLogos.forEach(hideLogo);
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) {
+            const element = node as Element;
+
+            if (element.tagName === 'svg' && hideLogo(element)) {
+              return;
+            }
+
+            const logos = element.querySelectorAll('svg[viewBox="0 0 35 19"]');
+            logos.forEach(hideLogo);
+          }
+        });
       });
     });
-  });
 
-  const mainContainer = mainChartContainerRef.current;
-  const volumeContainer = volumeChartContainerRef.current;
+    const mainContainer = mainChartContainerRef.current;
+    const volumeContainer = volumeChartContainerRef.current;
 
-  if (mainContainer) {
-    observer.observe(mainContainer, {
-      childList: true,
-      subtree: true,
-    });
-  }
+    if (mainContainer) {
+      observer.observe(mainContainer, {
+        childList: true,
+        subtree: true,
+      });
+    }
 
-  if (volumeContainer) {
-    observer.observe(volumeContainer, {
-      childList: true,
-      subtree: true,
-    });
-  }
+    if (volumeContainer) {
+      observer.observe(volumeContainer, {
+        childList: true,
+        subtree: true,
+      });
+    }
 
-  return () => {
-    observer.disconnect();
-  };
-}, []);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
 
   return (
@@ -1436,12 +1520,12 @@ useEffect(() => {
           {/* Fill toggle button */}
           <button
             onClick={() => {
-  setBollFillVisible(!bollFillVisible);
-  requestAnimationFrame(() => redrawBollFill()); // Instant
-}}
+              setBollFillVisible(!bollFillVisible);
+              requestAnimationFrame(() => redrawBollFill()); // Instant
+            }}
             className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${bollFillVisible
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-dark-800/80 text-dark-300 border border-dark-600/50 hover:bg-dark-700/80'
+              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+              : 'bg-dark-800/80 text-dark-300 border border-dark-600/50 hover:bg-dark-700/80'
               }`}
           >
             Fill
@@ -1514,247 +1598,31 @@ useEffect(() => {
         offset={12}
       />
 
-      {ctxOpen && (
-        <div
-          ref={menuRef}
-          className="absolute z-50 rounded-2xl border border-dark-600 bg-dark-800/95 shadow-2xl backdrop-blur-md select-none"
-          style={{ left: ctxPos.x, top: ctxPos.y, width: 280 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="py-2 text-sm text-dark-100">
-            <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
-              onClick={() => {
-                const base =
-                  ctxClickPriceRef.current ??
-                  hoverPrice ??
-                  candles.at(-1)?.close ??
-                  null;
+      <ChartContextMenu
+  open={ctxOpen}
+  position={ctxPos}
+  menuRef={menuRef}
+  hoverPrice={hoverPrice}
+  ctxClickPrice={ctxClickPriceRef.current}
+  lastCandleClose={candles.at(-1)?.close ?? null}
+  candleSeries={candleSeries.current}
+  selectedSymbol={selectedSymbol}
+  market={market}
+  tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize ?? 0.01}
+  precision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision ?? 2}
+  subMenuOpen={ctxSubOpen}
+  onSubMenuOpen={setCtxSubOpen}
+  onClose={() => setCtxOpen(false)}
+  onRefreshChart={() => {
+    console.log('Refresh chart');
+  }}
+  hlineKey={hlineKey(selectedSymbol, market)}
+  snapToTick={snapToTick}
+  availableBalance={availableBalance}
+  leverage={leverage}
+/>
 
-                const snapped = base != null ? snapToTick(base) : null;
 
-                setCtxOpen(false);
-                setOrderPresetType('LIMIT');
-                setOrderSeedPrice(snapped);
-                setOrderOpen(true);
-              }}
-            >
-              Đặt lệnh mới
-            </button>
-
-            <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
-              onClick={async () => {
-                const ok = await copyPrice(hoverPrice);
-                setCtxOpen(false);
-                if (!ok) console.warn('[Copy] Không copy được giá');
-              }}
-            >
-              Sao chép giá{' '}
-              {hoverPrice != null
-                ? hoverPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                : '--'}
-            </button>
-
-            <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const series = candleSeries.current;
-
-                let price: number | null = null;
-                if (ctxClickPriceRef.current != null && Number.isFinite(ctxClickPriceRef.current)) {
-                  price = ctxClickPriceRef.current;
-                }
-                if (price == null && hoverPrice != null && Number.isFinite(hoverPrice)) {
-                  price = hoverPrice;
-                }
-                if (price == null) price = candles.at(-1)?.close ?? null;
-
-                if (!series || price == null || !Number.isFinite(price)) {
-                  console.warn('[HLINE] missing series/price after all fallbacks', {
-                    seriesOk: !!series,
-                    price,
-                  });
-                  setCtxOpen(false);
-                  return;
-                }
-
-                const cacheKey = `${market}:${selectedSymbol.toUpperCase()}`;
-                let tick =
-                  symbolMetaCache.get(cacheKey)?.tickSize ??
-                  heuristicMetaFromPrice(price).tickSize;
-
-                if (price < 10 && tick >= 0.05) tick = heuristicMetaFromPrice(price).tickSize;
-
-                const snapped = Math.round(price / tick) * tick;
-                console.log('[HLINE] creating from menu', {
-                  priceAtOpen: ctxClickPriceRef.current,
-                  hoverPrice,
-                  finalPrice: price,
-                  tick,
-                  snapped,
-                });
-
-                addHLine(series, snapped);
-
-                try {
-                  const k = hlineKey(selectedSymbol, market);
-                  const raw = localStorage.getItem(k);
-                  const arr: number[] = raw ? JSON.parse(raw) : [];
-                  arr.push(snapped);
-                  localStorage.setItem(k, JSON.stringify(arr));
-                } catch { }
-
-                addHLine(series, snapped);
-                setCtxOpen(false);
-              }}
-            >
-              Vẽ đường kẻ ngang trên{' '}
-              {hoverPrice != null
-                ? hoverPrice.toLocaleString('vi-VN', {
-                  minimumFractionDigits: hoverPrice >= 100 ? 2 : 4,
-                  maximumFractionDigits: hoverPrice >= 100 ? 2 : 4,
-                })
-                : '--'}
-            </button>
-
-            <div
-              className="relative group"
-              onMouseEnter={() => setCtxSubOpen(true)}
-              onMouseLeave={() => setCtxSubOpen(false)}
-            >
-              <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="i-lucide-settings-2 shrink-0" /> Thêm cài đặt
-                </div>
-                <span className="i-lucide-chevron-right opacity-60" />
-              </button>
-
-              {ctxSubOpen && (
-                <div className="absolute left-[calc(100%+6px)] top-0 min-w-[220px] rounded-xl border border-dark-600 bg-dark-800/95 shadow-xl p-1">
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
-                    Ẩn thanh công cụ
-                  </button>
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
-                    Khóa bản vẽ
-                  </button>
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
-                    Hiển thị lưới
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="my-2 h-px bg-dark-600" />
-
-            <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
-              onClick={() => {
-                if (candleSeries.current) {
-                  clearAllHLines(candleSeries.current);
-                  try {
-                    localStorage.removeItem(hlineKey(selectedSymbol, market));
-                  } catch { }
-                }
-                setCtxOpen(false);
-              }}
-            >
-              Xóa bản vẽ
-            </button>
-
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
-              <span className="i-lucide-sliders-horizontal shrink-0" /> Xóa chỉ báo
-            </button>
-
-            <div className="my-2 h-px bg-dark-600" />
-
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
-              <span className="i-lucide-clock shrink-0" /> Công cụ thời gian
-            </button>
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
-              <span className="i-lucide-monitor-cog shrink-0" /> Cài đặt đồ thị
-            </button>
-          </div>
-        </div>
-      )}
-
-      <NewOrderModal
-        open={orderOpen}
-        onClose={() => setOrderOpen(false)}
-        defaultPrice={orderSeedPrice ?? undefined}
-        defaultType={orderPresetType}
-        tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize}
-        pricePrecision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision}
-        symbol={selectedSymbol}
-        onSubmit={(p) => {
-          const meta = symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`);
-          const step = meta?.stepSize ?? 0.00000001;
-          const stepDec = String(step).includes('.') ? String(step).split('.')[1]!.length : 0;
-
-          const roundQty = (q: number) =>
-            Number((Math.floor(q / step) * step).toFixed(stepDec));
-
-          const qty = roundQty(p.qty);
-          const isFutures = market === 'futures';
-
-          const positionSide = isFutures
-            ? (p.side === 'BUY' ? 'LONG' : 'SHORT')
-            : 'BOTH';
-
-          if (p.type === 'LIMIT') {
-            if (!p.price) return;
-            binanceWS.placeOrder({
-              market,
-              symbol: selectedSymbol,
-              side: p.side,
-              type: 'LIMIT',
-              quantity: qty,
-              price: p.price,
-              timeInForce: 'GTC',
-              ...(isFutures ? { positionSide } : {})
-            });
-          } else {
-            if (isFutures) {
-              if (!('stopPrice' in p) || !p.stopPrice) return;
-              binanceWS.placeOrder({
-                market: 'futures',
-                symbol: selectedSymbol,
-                side: p.side,
-                type: 'STOP_MARKET',
-                stopPrice: p.stopPrice,
-                quantity: qty,
-                positionSide,
-                workingType: 'MARK'
-              });
-            } else {
-              if (!('stopPrice' in p) || !p.stopPrice) return;
-              binanceWS.placeOrder({
-                market: 'spot',
-                symbol: selectedSymbol,
-                side: p.side,
-                type: 'STOP_LOSS_LIMIT',
-                stopPrice: p.stopPrice,
-                price: p.stopPrice,
-                quantity: qty,
-                timeInForce: 'GTC'
-              });
-            }
-          }
-        }}
-      />
-
-      <AlertModal
-        open={alertOpen}
-        onClose={() => setAlertOpen(false)}
-        defaultPrice={hoverPrice}
-        symbol={selectedSymbol}
-        onCreate={(a) => {
-          console.log('[CREATE ALERT]', a);
-        }}
-      />
 
       <div className="relative w-full h-full flex flex-col">
         <div

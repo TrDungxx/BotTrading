@@ -1,1052 +1,2183 @@
-// BinanceWebSocketService.ts
-// Clean API: state machine + 2 queues (preAuth/authed), no generic send(), full wrappers
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import {
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  ChevronUp,
+  ChevronDown,
+  Clock,
+  DollarSign,
+  BarChart,
+  RefreshCw,
+  Share2,
+  Star,
+  Settings,
+  Maximize2,
+  TrendingUp,
+  Volume2,
+  Activity,
+  Wifi,
+  WifiOff,
+  X,
+  Menu,
+} from "lucide-react";
+import TradingBinance from "../components/common/TradingBinance";
+import MaintenanceModal from "../components/common/popuptradingterminal/MaintenanceModal";
 
-type MarketType = 'spot' | 'futures';
-type WsState = 'closed' | 'connecting' | 'open' | 'authenticated';
-type PositionsCb = (rows: any[]) => void;
-export const OPEN_ORDERS_LS_KEY = 'openOrders';
-export const OPEN_ORDERS_EVENT  = 'tw:open-orders-changed';
-// ==== Types for placing orders ====
-export type WorkingType = 'MARK' | 'LAST';
-export const POSITIONS_LS_KEY = 'positions';
-export const POSITIONS_EVENT  = 'tw:positions-changed';
+import { ErrorPopup } from "../components/common/popuptradingterminal/ErrorPopup";
+import { fetchHistoricalKlines } from "../utils/fetchKline";
+import { ExtendedCandle } from "../utils/types";
+import { Order } from "../utils/types";
+import SymbolDropdown from "../components/symboldropdown/SymbolDropdown";
+import symbolList from "../utils/symbolList";
+import TradingForm from "../components/common/TradingForm";
+import { useMiniTickerStore } from "../utils/miniTickerStore";
+import { binanceWS,OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../components/binancewebsocket/BinanceWebSocketService";
+import { toast } from "react-toastify";
 
-function readPositionsLS(): any[] {
-  try { return JSON.parse(localStorage.getItem(POSITIONS_LS_KEY) || '[]'); }
-  catch { return []; }
-}
-function writePositionsLS(list: any[]) {
-  localStorage.setItem(POSITIONS_LS_KEY, JSON.stringify(list));
-  window.dispatchEvent(new CustomEvent(POSITIONS_EVENT, { detail: { list } }));
-}
-// ✅ THÊM MỚI:
-export type PlaceOrderType =
-  | 'MARKET'
-  | 'LIMIT'
-  | 'STOP_MARKET'         // futures
-  | 'TAKE_PROFIT_MARKET'  // futures
-  | 'STOP_LOSS_LIMIT'     // spot
-  | 'TAKE_PROFIT_LIMIT';  // spot (để dành, nếu cần)
 
-export interface PlaceOrderPayload {
+import SettingControl from "../components/common/controlsetting/SetiingControl";
+import { BinanceAccount } from "../utils/types";
+import BinanceAccountSelector from "../components/common/BinanceAccountSelector";
+import { useAuth } from "../context/AuthContext";
+import { User } from "../utils/types";
+import { PositionData, FloatingInfo } from "../utils/types";
+import PositionFunction from "../components/common/PositionFunction";
+import "../style/trading/trading.css";
+import "../style/trading/trading-variables.css";
+import "../style/trading/trading-header.css";
+import "../style/trading/trading-chart.css";
+import "../style/trading/trading-orderbook.css";
+import "../style/trading/trading-positions.css";
+import "../../src/style/trading/position-mobile-layout.css"
+
+import "../style/trading/trading-layout.css";
+
+
+import "../style/trading/trading-form.css";
+
+
+
+import "../style/trading/sidebar.css";
+
+import ChartTypePanel, {
+  ChartType,
+} from "../components/layoutchart/Charttypepanel";
+// ✅ THÊM
+import TimeframeModalWrapper from "./layout panel/Timeframemodalwrapper";
+// Trạng thái kết nối WS
+type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error" | "maintenance";
+
+
+// Loại thị trường
+type MarketType = "spot" | "futures";
+
+export type ChartSettings = {
+  quickOrder: boolean; // Lệnh nhanh
+  pendingOrders: boolean; // Lệnh chờ
+  positionTag: boolean; // Vị thế (Floating)
+  orderHistory: boolean; // Lịch sử đặt lệnh
+  breakEven: boolean; // Giá hòa vốn
+  liquidation: boolean; // Giá thanh lý
+  alerts: boolean; // Cảnh báo giá
+  priceLine: boolean; // Đường giá
+  scale: boolean; // Thang đo
+};
+
+// Dữ liệu thị trường
+interface KlineData {
   symbol: string;
-  side: 'BUY' | 'SELL';
-  type: PlaceOrderType;                 // ⬅️ đổi từ union cũ sang type mới
-  market: 'futures' | 'spot';
-
-  // qty/price
-  quantity?: number;
-  price?: number;     // LIMIT, *_LIMIT (Spot)
-  stopPrice?: number; // *_MARKET (Futures), *_LIMIT (Spot)
-
-  // futures-only (optional)
-  reduceOnly?: boolean;
-  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
-  timeInForce?: 'GTC' | 'IOC' | 'FOK';
-
-  // trigger theo Binance Futures
-  workingType?: WorkingType; // 'MARK' | 'LAST'
+  interval: string;
+  openTime: number;
+  closeTime: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  trades: number;
+  baseAssetVolume: string;
+  quoteAssetVolume: string;
 }
 
-// === OpenOrders LS + Event bus ===
-
-
-function readOpenOrdersLS(): any[] {
-  try { return JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]'); }
-  catch { return []; }
+interface TickerData {
+  symbol: string;
+  priceChange: string;
+  priceChangePercent: string;
+  weightedAvgPrice: string;
+  prevClosePrice: string;
+  lastPrice: string;
+  lastQty: string;
+  bidPrice: string;
+  askPrice: string;
+  openPrice: string;
+  highPrice: string;
+  lowPrice: string;
+  volume: string;
+  quoteVolume: string;
+  openTime: number;
+  closeTime: number;
+  count: number;
 }
 
-function writeOpenOrdersLS(list: any[]) {
-  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(list));
-  // Thông báo cho toàn app (OpenOrder.tsx sẽ lắng nghe)
-  window.dispatchEvent(new CustomEvent('tw:open-orders-changed', { detail: { list } }));
+interface OrderBookEntry {
+  price: string;
+  quantity: string;
+  total?: number;
+}
+
+interface OrderBookData {
+  symbol: string;
+  lastUpdateId: number;
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+}
+
+interface TradeData {
+  symbol: string;
+  tradeId: number;
+  price: string;
+  qty: string;
+  time: number;
+  isBuyerMaker: boolean;
+}
+
+interface BookTickerData {
+  symbol: string;
+  bidPrice: string;
+  bidQty: string;
+  askPrice: string;
+  askQty: string;
+  updateId: number;
+}
+
+interface MiniTickerData {
+  symbol: string;
+  close: string;
+  open: string;
+  high: string;
+  low: string;
+  volume: string;
+  quoteVolume: string;
+  eventTime: number;
+  percentChange: string;
 }
 
 
-class BinanceWebSocketService {
-  private socket: WebSocket | null = null;
-  private wsUrl = 'ws://45.77.33.141/w-binance-trading/signalr/connect';
 
-  // ===== NEW: anti-spam / idempotent helpers =====
-  private lastSelectSent?: { id: number; ts: number };
-  private initialPulled = new Set<number>();       // per-account initial snapshot guard
-  private snapshotCooldownMs = 250;
-  private lastPositionsPullAt = 0;
 
-  private lastAccountInfoEmit: number = 0;
-  private refreshTimer: any = null;
 
-  private authInFlight = false;
-  private authedOnceKeys = new Set<string>();
-  private pushAuthedUnique(key: string, msg: any) {
-    if (this.authedOnceKeys.has(key)) return;
-    this.authedOnceKeys.add(key);
-    this.authedQueue.push(msg);
-  }
+interface Subscription {
+  id: string;
+  action: string;
+  symbol?: string;
+  market?: MarketType;
+  interval?: string;
+  levels?: string;
+  speed?: string;
+  connectionId?: string;
+  timestamp: number;
+}
+interface SymbolItem {
+  symbol: string;
+  price: number;
+  percentChange: number;
+  volume: number;
+}
 
-  private noPositionRiskSupport = true;
 
-  // ===== State & queues =====
-  private state: WsState = 'closed';
-  private openResolvers: Array<() => void> = [];
-  private authResolvers: Array<() => void> = [];
-  private preAuthQueue: any[] = []; // gửi khi state >= 'open'
-  private authedQueue: any[] = [];  // gửi khi state === 'authenticated'
-  
-  // ===== Account Selection Tracking =====
-  private accountSelectedResolvers: Array<() => void> = [];
-  private accountSelected: boolean = false;
+interface Order {
+  orderId: number;
+  symbol: string;
+  status: string;
+  positionSide: "LONG" | "SHORT" | "BOTH";
+}
 
-  // ===== Handlers & caches =====
-  private messageHandlers: ((data: any) => void)[] = [];
-  private currentAccountId: number | null = null;
-  private orderUpdateHandler: ((orders: any[]) => void) | null = null;
-  private positionUpdateHandler: ((positions: any[]) => void) | null = null;
-
-  // Subscriptions / callbacks cho stream
-  private subscriptions: Map<string, any> = new Map();
+// WS public tuỳ chỉnh cho bảng phụ (kline/ticker/depth/trade/miniTicker)
+class CustomWebSocketService {
+  private ws: WebSocket | null = null;
+  private subscriptions: Map<string, Subscription> = new Map();
   private callbacks: Map<string, (data: any) => void> = new Map();
+  private isAuthenticated = false;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private authToken: string | null = null;
+  private binanceAccountId: number | null = null;
+  private isConnected = false;
+  public onStatusChange: (status: ConnectionStatus) => void = () => { };
 
-  // ==== NEW: coalesce risk requests ====
-  private pendingRiskSymbols = new Set<string>();
-  private riskDebounceTimer: number | null = null;
-
-  // ---- cache leverage theo symbol ----
-  private symbolLeverage = new Map<string, number>(); // ex: "DOGEUSDT" -> 10
-
-  // ====== LocalStorage helpers cho Leverage ======
-  private levKey(accountId: number | null | undefined, market: MarketType, symbol: string) {
-    return `tw_leverage_${accountId ?? 'na'}_${market}_${symbol.toUpperCase()}`;
+  constructor() {
+    this.connect();
   }
 
-  private saveLeverageLS(symbol: string, lev: number, market: MarketType = 'futures') {
-    try {
-      const key = this.levKey(this.currentAccountId, market, symbol);
-      localStorage.setItem(key, String(lev));
-    } catch {}
-  }
+  private messageQueue: any[] = [];
 
-  private hydrateLeverageCacheFromLS(market: MarketType = 'futures') {
-    if (!this.currentAccountId) return;
-    const prefix = `tw_leverage_${this.currentAccountId}_${market}_`;
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k || !k.startsWith(prefix)) continue;
-      const sym = k.slice(prefix.length).toUpperCase();
-      const v = localStorage.getItem(k);
-      const n = v ? Number(v) : NaN;
-      if (sym && Number.isFinite(n) && n > 0) {
-        this.symbolLeverage.set(sym, n);
-      }
-    }
-  }
+  private connect() {
+  try {
+    this.onStatusChange("connecting");
 
-  private loadLeverageLS(symbol: string, market: MarketType = 'futures'): number | undefined {
-    try {
-      const key = this.levKey(this.currentAccountId, market, symbol);
-      const v = localStorage.getItem(key);
-      const n = v ? Number(v) : NaN;
-      return Number.isFinite(n) && n > 0 ? n : undefined;
-    } catch {
-      return undefined;
-    }
-  }
+    this.ws = new WebSocket(
+      "ws://45.77.33.141/w-binance-socket/signalr/connect"
+    );
 
-  private setLeverageFor(symbol: string, lev: any, market: MarketType = 'futures') {
-    const n = Number(lev);
-    if (Number.isFinite(n) && n > 0) {
-      const sym = symbol.toUpperCase();
-      this.symbolLeverage.set(sym, n);
-      this.saveLeverageLS(sym, n, market);   // persist
-      console.log('LEV CACHE SET ✅', sym, n);
-    }
-  }
+    this.ws.onopen = () => {
+      console.log("✅ WebSocket connected");
+      this.onStatusChange("connected");
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
 
-  // ========= Account info emitter =========
-  private emitAccountInformation(payload: {
-    availableBalance?: number;
-    totalWalletBalance?: number;
-    totalMarginBalance?: number;
-    totalUnrealizedProfit?: number;
-    multiAssetsMargin?: boolean;
-    source: 'ws-live' | 'snapshot' | 'database-cache';
-  }) {
-    const toNum = (v: any) => (typeof v === 'string' ? parseFloat(v) : Number(v ?? 0));
-    const info = {
-      availableBalance: toNum(payload.availableBalance),
-      totalWalletBalance: toNum(payload.totalWalletBalance),
-      totalMarginBalance: toNum(payload.totalMarginBalance),
-      totalUnrealizedProfit: toNum(payload.totalUnrealizedProfit),
-      multiAssetsMargin: !!payload.multiAssetsMargin,
-      source: payload.source,
-    };
-    this.lastAccountInfoEmit = Date.now();
-    this.messageHandlers.forEach(h => h({ type: 'accountInformation', data: info }));
-  }
+      // gửi lại các message đã queue
+      this.messageQueue.forEach((msg) => {
+        if (this.ws?.readyState === WebSocket.OPEN) {
+          this.ws.send(JSON.stringify(msg));
+        }
+      });
+      this.messageQueue = [];
 
-  // Debounce refresh snapshot (hạn chế spam)
-  private scheduleAccountRefresh(ms = 350) {
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-    this.refreshTimer = setTimeout(() => {
-      this.getFuturesAccount();
-    }, ms);
-  }
-
-  // ========= Helpers =========
-  private waitForOpen(): Promise<void> {
-    if (this.state === 'open' || this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.openResolvers.push(res));
-  }
-  private waitForAuth(): Promise<void> {
-    if (this.state === 'authenticated') return Promise.resolve();
-    return new Promise(res => this.authResolvers.push(res));
-  }
-  
-  private waitForAccountSelected(): Promise<void> {
-    if (this.accountSelected) return Promise.resolve();
-    return new Promise(res => this.accountSelectedResolvers.push(res));
-  }
-
-  // Client fallback: server không support -> dùng futures snapshot
-  public requestPositionRisk(symbols?: string[]) {
-    this.getFuturesAccount(); // kéo leverage/isolatedWallet qua snapshot
-  }
-  public getAccountInformation() {
-    this.getFuturesAccount();
-  }
-  private _sendGetPositionRisk(symbols?: string[]) {
-    // no-op
-  }
-
-  public setCurrentAccountId(id: number) {
-    this.currentAccountId = id;
-  }
-  public getCurrentAccountId(): number | null {
-    return this.currentAccountId;
-  }
-
-  public setPositionUpdateHandler(handler: (positions: any[]) => void) {
-    this.positionUpdateHandler = handler;
-    if (Array.isArray(this.lastPositions) && this.lastPositions.length) {
-      try { handler(this.lastPositions); } catch {}
-    }
-  }
-  public setOrderUpdateHandler(handler: ((orders: any[]) => void) | null) {
-    this.orderUpdateHandler = handler;
-  }
-
-  public onMessage(handler: (data: any) => void) {
-    this.messageHandlers.push(handler);
-  }
-  public removeMessageHandler(handler: (data: any) => void) {
-    this.messageHandlers = this.messageHandlers.filter(h => h !== handler);
-  }
-
-  public isConnected() {
-    return this.socket?.readyState === WebSocket.OPEN;
-  }
-
-  // ========= Position mode =========
-  public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
-
-    if (!onDone) return;
-    const once = (m: any) => {
-      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onDone(true, m);
-        this.removeMessageHandler(once);
-      } else if (m?.success === false && m?.error) {
-        onDone(false, m);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  public getPositionMode(onResult?: (dual: boolean) => void) {
-    this.sendAuthed({ action: 'getPositionMode' });
-    if (!onResult) return;
-    const once = (m: any) => {
-      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onResult(m.dualSidePosition);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
-
-  // Public: đóng WS + dọn state
-  public disconnect(reason?: string) {
-    try { this.socket?.close(1000, reason || 'client disconnect'); } catch {}
-    this.socket = null;
-    this.state = 'closed';
-    this.authInFlight = false;
-    this.openResolvers.splice(0);
-    this.authResolvers.splice(0);
-    this.preAuthQueue = [];
-    this.authedQueue = [];
-    this.accountSubActive = false;
-    this.messageHandlers = [];
-    this.callbacks.clear();
-    this.subscriptions.clear();
-    this.pendingRiskSymbols.clear();
-    if (this.riskDebounceTimer != null) {
-      clearTimeout(this.riskDebounceTimer);
-      this.riskDebounceTimer = null;
-    }
-  }
-
-  // Public: chờ tới khi AUTHENTICATED (dùng được cho select)
-  public async waitUntilAuthenticated() {
-    if (this.state === 'authenticated') return;
-    await this.waitForOpen();
-    await this.waitForAuth();
-  }
-
-  // Public: gửi select rồi chờ 1 nhịp cho server “ghi” account
-  public async selectAccountAndWait(id: number, settleMs = 160) {
-    this.selectAccount(id);
-    await new Promise(res => setTimeout(res, settleMs));
-  }
-
-  // ========= Connect (idempotent) =========
-  public connect(token: string, onMessage: (data: any) => void) {
-    if (this.socket && (this.socket.readyState === WebSocket.CONNECTING || this.socket.readyState === WebSocket.OPEN)) {
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-      if (token) this.authenticate(token);
-      return;
-    }
-
-    this.state = 'connecting';
-    const sock = new WebSocket(this.wsUrl);
-    this.socket = sock;
-
-    sock.onopen = () => {
-      if (this.socket !== sock) return;
-      this.state = 'open';
-      console.log('✅ WebSocket connected');
-
-      this.openResolvers.splice(0).forEach(r => r());
-      this.flushPreAuth();
-
-      if (token) this.authenticate(token);
-
-      if (!this.messageHandlers.includes(onMessage)) this.messageHandlers.push(onMessage);
-
-      const saved = localStorage.getItem('selectedBinanceAccountId');
-      if (saved !== null) {
-        const parsed = Number(saved);
-        if (!Number.isNaN(parsed)) this.setCurrentAccountId(parsed);
-      }
+      // đăng ký mặc định tối thiểu
+      const subs = [
+        { action: "subscribePublicTicker", symbol: "BTCUSDT" },
+        { action: "subscribePublicKline", symbol: "BTCUSDT", interval: "1m" },
+        { action: "subscribePublicTrade", symbol: "BTCUSDT" },
+      ];
+      subs.forEach((msg) => this.sendMessage(msg));
     };
 
-    sock.onmessage = (event) => {
-      if (this.socket !== sock) return;
-      console.log('📥 RAW WS MSG:', event.data);
+    this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-
-        // EARLY: futures account-like packet (emit account info)
-        if (
-          (typeof (data as any)?.availableBalance === 'string' || typeof (data as any)?.availableBalance === 'number') &&
-          ((data as any)?.multiAssetsMargin !== undefined || (data as any)?.totalWalletBalance !== undefined || (data as any)?.assets !== undefined)
-        ) {
-          this.emitAccountInformation({
-            availableBalance: (data as any).availableBalance,
-            totalWalletBalance: (data as any).totalWalletBalance,
-            totalMarginBalance: (data as any).totalMarginBalance,
-            totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-            multiAssetsMargin: !!(data as any).multiAssetsMargin,
-            source: 'ws-live',
-          });
-        }
-
-        // Detect "account selected" shape (from your logs)
-        if (data && typeof data.id === 'number' && data.BinanceId && data.internalAccountId) {
-          if (!this.currentAccountId) this.currentAccountId = Number(data.id);
-          
-          // ✅ MARK ACCOUNT AS SELECTED
-          console.log('✅ Account selected:', data.id, data.Name);
-          this.accountSelected = true;
-          this.accountSelectedResolvers.splice(0).forEach(r => r());
-          
-          // Forward to message handlers để TradingForm biết
-          this.messageHandlers.forEach(h => h({ type: 'accountSelected', account: data }));
-          
-          // ❌ FIX: Don't auto-trigger snapshot - wait for explicit API calls
-          // this.ensureInitialSnapshot(120);
-          return;
-        }
-
-        // Futures/spot data loaded — safe to ensure initial once
-        if (data?.type === 'futuresDataLoaded' || data?.type === 'spotDataLoaded') {
-          // ❌ FIX: Don't auto-trigger snapshot
-          //           this.ensureInitialSnapshot(0);
-        }
-
-        // FORWARD SNAPSHOT POSITIONS
-        if (Array.isArray(data) && data.length && data[0] && typeof data[0].symbol === 'string' && data[0].positionAmt !== undefined) {
-          console.log('📥 WS positions[] snapshot:', data);
-          this.lastPositions = data;
-           writePositionsLS(data);
-          this.positionUpdateHandler?.(data);
-          this.onPositions?.(data);
-          return;
-        }
-        if (data && Array.isArray((data as any).positions)) {
-          const rows = (data as any).positions;
-          console.log('📥 WS positions snapshot (wrapped):', rows);
-          this.lastPositions = rows;
-          writePositionsLS(rows); 
-          this.positionUpdateHandler?.(rows);
-          this.onPositions?.(rows);
-          // ➕ emit snapshot event cho UI (Map store sẽ applySnapshot)
-  this.messageHandlers.forEach(h => h({ type: 'positionsSnapshot', data: rows }));
-          return;
-        }
-        if ((data?.type === 'getPositions' || data?.type === 'positions' || data?.type === 'futuresPositions') &&
-            Array.isArray((data as any).data)) {
-          const rows = (data as any).data;
-          console.log('📥 WS positions snapshot (data):', rows);
-          this.lastPositions = rows;
-           writePositionsLS(rows); 
-          this.positionUpdateHandler?.(rows);
-          this.onPositions?.(rows);
-           // ➕ emit snapshot event cho UI (Map store sẽ applySnapshot)
-  this.messageHandlers.forEach(h => h({ type: 'positionsSnapshot', data: rows }));
-          return;
-        }
-
-        if (data?.symbol && Number.isFinite(data?.leverage)) {
-          this.setLeverageFor(data.symbol, data.leverage);
-          this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol: data.symbol, leverage: data.leverage }));
-        }
-
-        console.log('📥 WS Parsed:', data);
-
-        // Forward snapshot futures account để UI merge leverage/iw
-        if ((data?.type === 'getFuturesAccount' || data?.type === 'futuresAccount')) {
-          if (Array.isArray(data.positions)) {
-            for (const r of data.positions) {
-              const sym = String(r.symbol ?? r.s ?? '');
-              if (!sym) continue;
-              const lev = Number(r.leverage ?? r.l);
-              if (Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev, 'futures');
-            }
-          }
-
-          this.emitAccountInformation({
-            availableBalance: (data as any).availableBalance,
-            totalWalletBalance: (data as any).totalWalletBalance,
-            totalMarginBalance: (data as any).totalMarginBalance,
-            totalUnrealizedProfit: (data as any).totalUnrealizedProfit,
-            multiAssetsMargin: !!(data as any).multiAssetsMargin,
-            source: 'snapshot',
-          });
-
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // Fallback when server doesn't support getPositionRisk
-        if (data?.type === 'error' && data?.action === 'getPositionRisk') {
-          this.noPositionRiskSupport = true;
-          console.warn('[WS] getPositionRisk not supported → fallback to getFuturesAccount()');
-          this.getFuturesAccount();
-          return;
-        }
-
-        // ===== AUTHENTICATED =====
-        if (data?.type === 'authenticated') {
-          this.state = 'authenticated';
-          this.authInFlight = false;
-          this.authResolvers.splice(0).forEach(r => r());
-          this.flushAuthed();
-          return;
-        }
-
-        // ===== RAW array positions with leverage backfill =====
-        if (Array.isArray(data) && data[0]?.symbol && data[0]?.positionAmt) {
-          try {
-            for (const r of data) {
-              const sym = String(r.symbol ?? '');
-              const lev = Number(r.leverage ?? r.l);
-              if (sym && Number.isFinite(lev) && lev > 0) this.setLeverageFor(sym, lev);
-            }
-          } catch {}
-
-          if (this.positionUpdateHandler) this.positionUpdateHandler(data);
-
-          try {
-            const symbols = Array.from(new Set(data.map((p: any) => p.symbol))).filter(Boolean);
-            if (symbols.length) {
-              if (this.noPositionRiskSupport) this.getFuturesAccount();
-              else this.requestPositionRisk(symbols);
-            }
-          } catch {}
-
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ===== MiniTicker (public) =====
-        if (data.e === '24hrMiniTicker' || data.action === 'miniTickerUpdate') {
-          const id = `miniTicker_${data.s || data.symbol}`;
-          const cb = this.callbacks.get(id);
-          if (cb) cb(data);
-          else console.warn('⚠️ Không có callback cho miniTicker:', id);
-          return;
-        }
-
-        // ===== MarkPrice Update (custom action) =====
-        if (data.action === 'markPriceUpdate') {
-          this.handleMarkPriceData(data);
-          return;
-        }
-
-        /// ===== ORDER UPDATE (futures) =====
-if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
-  this.scheduleAccountRefresh(350);
-
-  const o = data.o;
-  const order = {
-    orderId: o.i,
-    symbol: o.s,
-    side: o.S,
-    type: o.o,
-    price: o.p,
-    origQty: o.q,
-    executedQty: o.z ?? o.q ?? '0',
-    status: o.X,
-    stopPrice: o.sp,
-    workingType: o.wt,
-    time: o.T ?? data.T ?? Date.now(),
-    updateTime: data.T ?? o.T ?? Date.now(),
-  };
-
-  // Đọc LS hiện tại
-  let currentOrders: typeof order[] = readOpenOrdersLS();
-
-  // Auto-cancel lệnh đối ứng khi 1 cái FILLED
-  if (['TAKE_PROFIT_MARKET', 'STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
-    const oppositeType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
-    const opposite = currentOrders.find(
-      (x) => x.symbol === order.symbol && x.type === oppositeType && x.status === 'NEW'
-    );
-    if (opposite) {
-      console.log('🤖 Huỷ lệnh đối ứng TP/SL:', oppositeType, 'orderId:', opposite.orderId);
-      this.sendAuthed({ action: 'cancelOrder', symbol: order.symbol, orderId: opposite.orderId, market: 'futures' });
-    }
-  }
-
-  // ===== Reconcile với optimistic tmp_* nếu cần =====
-  let idx = currentOrders.findIndex((x) => String(x.orderId) === String(order.orderId));
-  if (idx < 0) {
-    idx = currentOrders.findIndex((x: any) =>
-      x._optimistic &&
-      x.symbol === order.symbol &&
-      x.type === order.type &&
-      x.side === order.side &&
-      String(x.stopPrice ?? x.price) === String(order.stopPrice ?? order.price) &&
-      String(x.origQty) === String(order.origQty)
-    );
-  }
-
-  // Cập nhật danh sách theo status
-  if (['FILLED', 'CANCELED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
-    // remove
-    currentOrders = currentOrders.filter((x, i) => i !== idx && x.orderId !== order.orderId);
-  } else {
-    if (idx !== -1) currentOrders[idx] = { ...currentOrders[idx], ...order, _optimistic: undefined };
-    else currentOrders.unshift(order);
-  }
-
-  console.log('📦 Final openOrders:', currentOrders);
-  writeOpenOrdersLS(currentOrders);            // <— phát sự kiện cho UI
-  this.orderUpdateHandler?.(currentOrders); 
-  setTimeout(() => this.getPositions(), 300);   // giữ callback cũ
-  // (tiếp tục forward nếu bạn muốn)
-}
-
-
-        // ===== ACCOUNT UPDATE (Spot/Futures) =====
-        if (data?.type === 'update' && data?.channel === 'account') {
-          if (data.availableBalance !== undefined || data.totalWalletBalance !== undefined) {
-            this.emitAccountInformation({
-              availableBalance: data.availableBalance,
-              totalWalletBalance: data.totalWalletBalance,
-              totalMarginBalance: data.totalMarginBalance,
-              totalUnrealizedProfit: data.totalUnrealizedProfit,
-              multiAssetsMargin: data.multiAssetsMargin,
-              source: 'ws-live',
-            });
-          } else {
-            this.scheduleAccountRefresh(350);
-          }
-
-          if (data.orders && this.orderUpdateHandler) {
-  console.log('🟢 [WS] Gửi orders từ server về UI:', data.orders);
-  writeOpenOrdersLS(data.orders);          // <— thay cho setItem
-  this.orderUpdateHandler(data.orders);
-}
-
-
-          if (Array.isArray(data?.a?.P) && this.positionUpdateHandler) {
-            const positions = data.a.P.map((p: any) => {
-              const sym = String(p.s);
-              const levFromPacket = Number(p.l);
-              const lev = (Number.isFinite(levFromPacket) && levFromPacket > 0)
-                ? levFromPacket
-                : (this.getLeverage(p.s, 'futures') || undefined);
-
-              return {
-                symbol: sym,
-                positionAmt: p.pa,
-                entryPrice: p.ep,
-                breakEvenPrice: p.bep,
-                marginType: (p.mt || '').toString().toLowerCase(),
-                isolatedWallet: typeof p.iw === 'number' ? p.iw : undefined,
-                positionSide: p.ps,
-                leverage: lev,
-              };
-            });
-
-            console.log('ACCOUNT_UPDATE ENRICH', positions.map(p => ({ s: p.symbol, lev: p.leverage })));
-            this.positionUpdateHandler(positions);
-  // gửi delta event để UI merge từng phần
-  this.messageHandlers.forEach(h => h({ type: 'positionsDelta', data: positions }));
-const merged = positions; // (tuỳ bạn merge với lastPositions; tạm thời replace)
-writePositionsLS(merged);
-            try {
-              const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
-              if (needBackfill) this.getFuturesAccount();
-            } catch (e) {
-              console.warn('position backfill check err:', e);
-            }
-          }
-
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        if (data.e === 'ACCOUNT_CONFIG_UPDATE' && data.ac) {
-          const { s: symbol, l: leverage } = data.ac || {};
-          if (symbol && Number.isFinite(leverage)) {
-            this.setLeverageFor(symbol, leverage, 'futures');
-            this.messageHandlers.forEach(h => h({ type: 'leverageUpdate', symbol, leverage }));
-          }
-          return;
-        }
-
-        // ===== Multi Assets Mode =====
-        if (data.type === 'getMultiAssetsMode' || data.type === 'changeMultiAssetsMode') {
-          console.log('📥 [WS] Nhận multiAssetsMode:', data);
-          if (data.positions) {
-            if (data.positions) writePositionsLS(data.positions);
-          }
-          if (data.multiAssetsMargin !== undefined && this.currentAccountId) {
-            localStorage.setItem(`multiAssetsMode_${this.currentAccountId}`, String(data.multiAssetsMargin));
-          }
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ===== POSITION RISK (backfill leverage/IM) =====
-        if (data?.type === 'positionRisk' && Array.isArray(data.data)) {
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
-
-        // ===== Forward còn lại =====
-        this.messageHandlers.forEach(h => h(data));
+        this.handleMessage(data);
       } catch (error) {
-        console.error('❌ WS parse error:', error);
+        console.error("❌ Error parsing message:", error);
       }
     };
 
-    sock.onerror = (event) => {
-      console.error('❌ WebSocket error:', event);
+    this.ws.onerror = (error) => {
+      console.error("❌ WebSocket error:", error);
+      
+      // ✅ HIỆN MODAL NGAY LẬP TỨC KHI CÓ LỖI
+      this.onStatusChange("maintenance");
+      this.isConnected = false;
+      this.reconnectAttempts++;
     };
 
-    sock.onclose = (event) => {
-      console.warn('🔌 WebSocket closed:', event.reason || 'no reason');
-      this.state = 'closed';
-      // giữ queue để reconnect sau vẫn flush được (tuỳ ý)
-    };
-  }
-
-  // ========= Low-level senders =========
-  private sendOpen(data: any) {
-    if (!this.socket) {
-      console.warn('⛔ WS null, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-      return;
-    }
-    if (this.socket.readyState === WebSocket.OPEN && (this.state === 'open' || this.state === 'authenticated')) {
-      console.log('📤 WS Sending (open):', data);
-      this.socket.send(JSON.stringify(data));
-    } else {
-      console.warn('⛔ WS not open, queue preAuth:', data);
-      this.preAuthQueue.push(data);
-    }
-  }
-
-  private sendAuthed(data: any) {
-    if (!this.socket || this.state !== 'authenticated' || this.socket.readyState !== WebSocket.OPEN) {
-      if (data?.action === 'selectBinanceAccount') {
-        this.authedQueue = [data, ...this.authedQueue.filter(m => m.action !== 'selectBinanceAccount')];
+    this.ws.onclose = (event) => {
+      console.warn("🔌 WebSocket closed:", event.code, event.reason);
+      
+      // ✅ NẾU ĐÓNG BẤT THƯỜNG (không phải close bình thường)
+      if (event.code !== 1000 && event.code !== 1001) {
+        this.onStatusChange("maintenance");
       } else {
-        this.authedQueue.push(data);
+        this.onStatusChange("disconnected");
       }
-      return;
-    }
-    console.log('📤 WS Sending (authed):', data);
-    this.socket.send(JSON.stringify(data));
-  }
-
-  private flushPreAuth() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    const q = this.preAuthQueue;
-    this.preAuthQueue = [];
-    q.forEach(msg => {
-      try { this.socket!.send(JSON.stringify(msg)); }
-      catch { this.preAuthQueue.push(msg); }
-    });
-  }
-
-  private flushAuthed() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') return;
-
-    const q = this.authedQueue;
-    this.authedQueue = [];
-
-    const selects = q.filter(m => m.action === 'selectBinanceAccount');
-    const subs    = q.filter(m => m.action === 'subscribeAccountUpdates');
-    const others  = q.filter(m => m.action !== 'selectBinanceAccount' && m.action !== 'subscribeAccountUpdates');
-
-    const send = (m: any) => this.socket!.send(JSON.stringify(m));
-
-    if (selects.length) {
-      selects.forEach(send);
-      setTimeout(() => {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN || this.state !== 'authenticated') {
-          this.authedQueue.push(...subs, ...others);
-          return;
-        }
-        subs.forEach(send);
-        others.forEach(send);
-      }, 120);
-    } else {
-      [...subs, ...others].forEach(send);
-    }
-  }
-
-  // ========= Auth & session =========
-  public authenticate(token: string) {
-    if (this.state === 'authenticated' || this.authInFlight) return;
-    this.authInFlight = true;
-
-    this.sendOpen({ action: 'authenticate', token });
-
-    // Queue ONLY ONCE
-    this.pushAuthedUnique('getMyBinanceAccounts', { action: 'getMyBinanceAccounts' });
-    this.pushAuthedUnique('getFuturesAccount',    { action: 'getFuturesAccount' });
-  }
-
-  public getMyBinanceAccounts() {
-    this.sendAuthed({ action: 'getMyBinanceAccounts' });
-  }
-
-  // ========= Accounts / Positions (wrappers sạch) =========
-  public selectAccount(id: number) {
-    // Guard duplicate select within short window
-    if (this.currentAccountId === id && this.lastSelectSent && (Date.now() - this.lastSelectSent.ts) < 1500) {
-      console.debug('[WS] selectAccount suppressed (same id, cooldown)');
-      return;
-    }
-
-    console.log('⚙️ Selecting account with ID:', id);
-    this.currentAccountId = id;
-    localStorage.setItem('selectedBinanceAccountId', String(id));
-    this.hydrateLeverageCacheFromLS('futures');
-
-    this.lastSelectSent = { id, ts: Date.now() };
-    this.sendAuthed({ action: 'selectBinanceAccount', binanceAccountId: id });
-  }
-
-  public getLeverage(symbol: string, market: MarketType = 'futures', fallback = 2): number {
-    const sym = symbol.toUpperCase();
-    const cache = this.symbolLeverage.get(sym);
-    if (Number.isFinite(cache) && (cache as number) > 0) return cache as number;
-
-    const fromLS = this.loadLeverageLS(sym, market);
-    if (Number.isFinite(fromLS) && (fromLS as number) > 0) {
-      this.symbolLeverage.set(sym, fromLS as number);
-      return fromLS as number;
-    }
-    return fallback;
-  }
-
-  public getBalances(market: 'spot' | 'futures' | 'both') {
-    console.log('🔎 Getting balances for market:', market);
-    this.sendAuthed({ action: 'getBalances', market });
-  }
-
-  public async getPositions(binanceAccountId?: number) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getPositions called before account selected, waiting...');
-    await this.waitForAccountSelected();
-  }
-  
-  // throttle snapshots to avoid bursts
-  const now = Date.now();
-  if (now - this.lastPositionsPullAt < this.snapshotCooldownMs) {
-    return console.debug('[WS] getPositions suppressed (cooldown)');
-  }
-  this.lastPositionsPullAt = now;
-
-  const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
-  const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
-  const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
-  if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
-  this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
-}
-
-  public async getFuturesAccount(id?: number) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getFuturesAccount called before account selected, waiting...');
-    await this.waitForAccountSelected();
-  }
-  
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
-  this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
-}
-
-  public async getSpotAccount(id?: number) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getSpotAccount called before account selected, waiting...');
-    await this.waitForAccountSelected();
-  }
-  
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
-  this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
-}
-
-  public async getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getMultiAssetsMode called before account selected, waiting...');
-    await this.waitForAccountSelected();
-  }
-  
-  this.sendAuthed({ action: 'getMultiAssetsMode' });
-  if (!onResult) return;
-
-  const once = (msg: any) => {
-    if (msg?.type === 'getMultiAssetsMode') {
-      const isMulti = !!msg.multiAssetsMargin;
-      onResult(isMulti, msg);
-      this.removeMessageHandler(once);
-    }
-  };
-  this.onMessage(once);
-}
-
-  // ========= Orders =========
-  public placeOrder(payload: PlaceOrderPayload) {
-  this.sendAuthed({ action: 'placeOrder', ...payload });
-  setTimeout(() => this.getPositions(), 400);   // ⬅️ ép kéo snapshot nhẹ
-}
-
-  /** Lấy danh sách lệnh mở theo market (và optional symbol) */
-  public getOpenOrders(market: 'spot' | 'futures', symbol?: string) {
-    const payload: any = { action: 'getOpenOrders', market };
-    if (symbol) payload.symbol = symbol;
-    this.sendAuthed(payload);
-  }
-
-  /** Huỷ 1 lệnh theo orderId/symbol/market */
-  public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelOrder', symbol, orderId, market };
-    console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  public cancelAllOrders(symbol: string, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelAllOrders', symbol, market };
-    console.log('🛑 Gửi yêu cầu huỷ tất cả lệnh:', payload);
-    this.sendAuthed(payload);
-  }
-
-  private accountSubActive = false;
-
-  // ========= Realtime account updates =========
-  public async subscribeAccountUpdates(onOrderUpdate: (orders: any[]) => void, types = ['orders', 'positions', 'balance']) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ subscribeAccountUpdates called before account selected, waiting...');
-    await this.waitForAccountSelected();
-  }
-  
-  if (this.accountSubActive) return;
-  this.accountSubActive = true;
-  this.orderUpdateHandler = onOrderUpdate;
-  this.sendAuthed({ action: 'subscribeAccountUpdates', types });
-
-  // ❌ FIX: Don't auto-trigger snapshot - prevents spam
-  // this.ensureInitialSnapshot(160);
-}
-
-  public unsubscribeAccountUpdates(types: string[] = []) {
-    const payload = { action: 'unsubscribeAccountUpdates', types };
-    console.log('🔕 Hủy đăng ký cập nhật real-time:', payload);
-    this.sendAuthed(payload);
-    this.accountSubActive = false;
-  }
-
-  public changeMultiAssetsMode(
-    multiAssetsMargin: boolean,
-    onSuccess?: (res: any) => void,
-    onError?: (err: string) => void
-  ) {
-    const payload = { action: 'changeMultiAssetsMode', multiAssetsMargin };
-    this.sendAuthed(payload);
-
-    const tempHandler = (msg: any) => {
-      if (msg?.msg === 'success' && typeof msg.multiAssetsMargin === 'boolean') {
-        onSuccess?.(msg);
-        this.removeMessageHandler(tempHandler);
-      } else if (msg?.success === false && msg?.error) {
-        onError?.(msg.error);
-        this.removeMessageHandler(tempHandler);
-      }
+      
+      this.isConnected = false;
+      this.attemptReconnect();
     };
-    this.onMessage(tempHandler);
+  } catch (error) {
+    console.error("❌ Failed to connect WebSocket:", error);
+    
+    // ✅ HIỆN MODAL NGAY KHI KHÔNG TẠO ĐƯỢC WEBSOCKET
+    this.onStatusChange("maintenance");
+    this.reconnectAttempts++;
+  }
+}
+
+  private handleMessage(data: any) {
+    if (data.action) {
+      switch (data.action) {
+        case "klineUpdate":
+          this.handleKlineData(data);
+          break;
+        case "tickerUpdate":
+          this.handleTickerData(data);
+          break;
+        case "depthUpdate":
+          this.handleDepthData(data);
+          break;
+        case "tradeUpdate":
+          this.handleTradeData(data);
+          break;
+        case "bookTickerUpdate":
+          this.handleBookTickerData(data);
+          break;
+        case "miniTickerUpdate":
+          this.handleMiniTickerData(data);
+          break;
+        case "accountUpdate":
+          this.handleAccountData(data);
+          break;
+        case "orderUpdate":
+          this.handleOrderData(data);
+          break;
+        case "subscriptionList":
+          this.handleSubscriptionList(data);
+          break;
+        default:
+          // không cần cảnh báo
+          break;
+      }
+    } else if (data.type) {
+      switch (data.type) {
+        case "kline":
+          this.handleKlineData(data);
+          break;
+        case "ticker":
+          this.handleTickerData(data);
+          break;
+        case "depth":
+          this.handleDepthData(data);
+          break;
+        case "trade":
+          this.handleTradeData(data);
+          break;
+        case "bookTicker":
+          this.handleBookTickerData(data);
+          break;
+        case "miniTicker":
+          this.handleMiniTickerData(data);
+          break;
+        case "account":
+          this.handleAccountData(data);
+          break;
+        case "order":
+          this.handleOrderData(data);
+          break;
+        case "connection_status":
+          break;
+        case "welcome":
+          break;
+        default:
+          break;
+      }
+    }
   }
 
-  // ========= Public/Futures streams =========
-  private handleMarkPriceData(data: any) {
-    const subscriptionId = `markPrice_${data.symbol}_${data.market}`;
-    console.log('Handle MarkPriceData for subscriptionId:', subscriptionId);
-    const callback = this.callbacks.get(subscriptionId);
-    if (callback) {
-      console.log('Callback found, calling with data:', data);
-      callback(data);
+  private handleKlineData(data: any) {
+    const callback = this.callbacks.get("kline");
+    if (!callback) return;
+
+    const kline = data.data;
+
+    if (
+      kline &&
+      kline.open !== undefined &&
+      kline.high !== undefined &&
+      kline.low !== undefined &&
+      kline.close !== undefined &&
+      kline.volume !== undefined
+    ) {
+      callback({
+        symbol: kline.symbol || "",
+        interval: kline.interval || "",
+        openTime: kline.openTime,
+        closeTime: kline.closeTime,
+        open: kline.open,
+        high: kline.high,
+        low: kline.low,
+        close: kline.close,
+        volume: kline.volume,
+        trades: kline.trades || 0,
+        baseAssetVolume: kline.baseAssetVolume || "",
+        quoteAssetVolume: kline.quoteAssetVolume || "",
+      });
     } else {
-      console.warn('No callback found for subscriptionId:', subscriptionId);
+      console.warn("⚠️ Invalid kline data received:", kline);
     }
   }
 
-  public subscribeMarkPrice(symbol: string, market: MarketType = 'futures', callback?: (data: any) => void) {
-    const subscriptionId = `markPrice_${symbol}_${market}`;
+  private handleTickerData(data: any) {
+    const callback = this.callbacks.get("ticker");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
 
-    // Guard: already subscribed
-    if (this.subscriptions.has(subscriptionId)) {
-      if (callback) this.callbacks.set(subscriptionId, callback);
-      return subscriptionId;
+  private handleDepthData(data: any) {
+    const callback = this.callbacks.get("depth");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleTradeData(data: any) {
+    const callback = this.callbacks.get("trade");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleBookTickerData(data: any) {
+    const callback = this.callbacks.get("bookTicker");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleMiniTickerData(data: any) {
+    const symbol = data?.data?.symbol;
+    const callback = this.callbacks.get(`miniTicker_${symbol}`);
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleAccountData(data: any) {
+    const callback = this.callbacks.get("account");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleOrderData(data: any) {
+    const callback = this.callbacks.get("orders");
+    if (callback && data.data) {
+      callback(data.data);
+    }
+  }
+
+  private handleSubscriptionList(data: any) {
+    console.log("📋 Active subscriptions:", data.subscriptions);
+  }
+
+  private attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      const delay = this.reconnectDelay * this.reconnectAttempts;
+      console.log(
+        `🔄 Reconnecting... Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`
+      );
+      setTimeout(() => {
+        this.connect();
+      }, delay);
+    } else {
+      console.error("❌ Max reconnection attempts reached");
+      this.onStatusChange("error");
+    }
+  }
+
+
+
+  private sendMessage(message: any) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      this.messageQueue.push(message);
+    }
+  }
+
+  public setStatusCallback(callback: (status: ConnectionStatus) => void) {
+    this.onStatusChange = callback;
+  }
+
+  public setAuthToken(token: string, binanceAccountId: number) {
+    this.authToken = token;
+    this.binanceAccountId = binanceAccountId;
+    this.isAuthenticated = true;
+  }
+
+  // PUBLIC STREAMS
+  public subscribeKline(
+    symbol: string,
+    interval: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `kline_${symbol}_${interval}_${market}`;
+    const message = {
+      action: "subscribeKline",
+      market,
+      symbol,
+      interval,
+    };
+
+    if (callback) {
+      this.callbacks.set("kline", callback);
     }
 
-    const message = { action: 'subscribeMarkPrice', market, symbol };
-    console.log('📤 Gửi subscribeMarkPrice:', message);
-
-    if (callback) this.callbacks.set(subscriptionId, callback);
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
-      action: 'subscribeMarkPrice',
+      action: "subscribeKline",
+      symbol,
+      market,
+      interval,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `ticker_${symbol}_${market}`;
+    const message = {
+      action: "subscribeTicker",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("ticker", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeTicker",
       symbol,
       market,
       timestamp: Date.now(),
     });
 
-    this.sendAuthed(message);
+    this.sendMessage(message);
     return subscriptionId;
   }
 
-  public subscribePublicMiniTicker(symbol: string, callback: (data: any) => void) {
-    const id = `miniTicker_${symbol}`;
-    if (this.subscriptions.has(id)) {
-      this.callbacks.set(id, callback);
-      return id;
-    }
-    this.callbacks.set(id, callback);
-
-    const message = { action: 'subscribePublicMiniTicker', symbol };
-    console.log('📤 Gửi subscribePublicMiniTicker:', message);
-
-    this.subscriptions.set(id, { id, action: 'miniTicker', symbol, timestamp: Date.now() });
-    this.sendAuthed(message);
-    return id;
-  }
-
-  // ===== Positions cache & subscription =====
-  private lastPositions: any[] = [];
-  public onPositions?: PositionsCb;
-
-  private handlePositions(msg: any) {
-    const rows = Array.isArray(msg.positions) ? msg.positions : [];
-    this.lastPositions = rows;
-    this.onPositions?.(rows);
-  }
-
-  public subscribePositions(cb: PositionsCb) {
-    this.onPositions = cb;
-    if (this.lastPositions.length) cb(this.lastPositions);
-    return () => {
-      if (this.onPositions === cb) this.onPositions = undefined;
+  public subscribeDepth(
+    symbol: string,
+    levels: string = "20",
+    speed: string = "1000ms",
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `depth_${symbol}_${levels}_${speed}_${market}`;
+    const message = {
+      action: "subscribePublicDepth",
+      symbol,
+      levels,
+      speed,
     };
-  }
 
-  // ===== App init helper (optional use) =====
-  public async initAfterConnect() {
-  await this.waitUntilAuthenticated();
+    if (callback) {
+      this.callbacks.set("depth", callback);
+    }
 
-  const saved = localStorage.getItem('selectedBinanceAccountId');
-  if (saved) {
-    await this.selectAccountAndWait(Number(saved), 200);
-    
-    // ✅ AWAIT để guards chặn spam
-    await this.subscribeAccountUpdates((orders) => {
-      writeOpenOrdersLS(orders || []);
-      this.orderUpdateHandler?.(orders || []);
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicDepth",
+      symbol,
+      market,
+      levels,
+      speed,
+      timestamp: Date.now(),
     });
 
-    await this.getFuturesAccount();
-    await this.getPositions();
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTrade(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `trade_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicTrade",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("trade", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicTrade",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeBookTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `bookTicker_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicBookTicker",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("bookTicker", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicBookTicker",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeMiniTicker(
+    symbol: string,
+    market: MarketType = "spot",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `miniTicker_${symbol}_${market}`;
+    const message = {
+      action: "subscribePublicMiniTicker",
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set(`miniTicker_${symbol}`, callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePublicMiniTicker",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // FUTURES
+  public subscribeMarkPrice(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `markPrice_${symbol}_${market}`;
+    const message = {
+      action: "subscribeMarkPrice",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("markPrice", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeMarkPrice",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeFundingRate(
+    symbol: string,
+    market: MarketType = "futures",
+    callback?: (data: any) => void
+  ) {
+    const subscriptionId = `fundingRate_${symbol}_${market}`;
+    const message = {
+      action: "subscribeFundingRate",
+      market,
+      symbol,
+    };
+
+    if (callback) {
+      this.callbacks.set("fundingRate", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribeFundingRate",
+      symbol,
+      market,
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // PRIVATE STREAMS (auth)
+  public subscribeAccount(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `account_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateAccount",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("account", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateAccount",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeOrders(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `orders_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateOrders",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("orders", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateOrders",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  public subscribeTrades(callback?: (data: any) => void) {
+    if (!this.isAuthenticated || !this.authToken || !this.binanceAccountId) {
+      console.error("❌ Authentication required for private streams");
+      return null;
+    }
+
+    const subscriptionId = `trades_${this.binanceAccountId}`;
+    const message = {
+      action: "subscribePrivateTrades",
+      token: this.authToken,
+      binanceAccountId: this.binanceAccountId,
+    };
+
+    if (callback) {
+      this.callbacks.set("trades", callback);
+    }
+
+    this.subscriptions.set(subscriptionId, {
+      id: subscriptionId,
+      action: "subscribePrivateTrades",
+      timestamp: Date.now(),
+    });
+
+    this.sendMessage(message);
+    return subscriptionId;
+  }
+
+  // Điều khiển
+  public getSubscriptions() {
+    const message = {
+      action: "getSubscriptions",
+    };
+    this.sendMessage(message);
+    return Array.from(this.subscriptions.values());
+  }
+
+  public unsubscribe(connectionId?: string) {
+    const message = {
+      action: "unsubscribe",
+      ...(connectionId && { connectionId }),
+    };
+
+    if (connectionId) {
+      this.subscriptions.delete(connectionId);
+      this.callbacks.delete(connectionId);
+    } else {
+      this.subscriptions.clear();
+      this.callbacks.clear();
+    }
+
+    this.sendMessage(message);
+  }
+
+  public disconnect() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.subscriptions.clear();
+    this.callbacks.clear();
+    this.onStatusChange("disconnected");
+    console.log("🔌 WebSocket disconnected");
   }
 }
 
-  // ===== Ensure initial snapshot once per account =====
-  private ensureInitialSnapshot(delayMs = 150) {
-    const id = this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-    if (!id || this.initialPulled.has(id)) return;
-    this.initialPulled.add(id);
+const DEFAULT_SETTINGS: ChartSettings = {
+  quickOrder: false,
+  pendingOrders: false,
+  positionTag: true, // đang dùng
+  orderHistory: false,
+  breakEven: false,
+  liquidation: false,
+  alerts: false,
+  priceLine: false,
+  scale: false,
+};
 
-    setTimeout(() => {
-      this.getFuturesAccount(id);
-      this.getPositions(id);
-      this.getOpenOrders('futures');
-    }, delayMs);
-  }
+export default function TradingTerminal() {
+
+
+
+  const hasConnectedRef = React.useRef(false);
+  const [isTradingFormOpen, setIsTradingFormOpen] = useState(false);
+  const [isPositionPanelOpen, setIsPositionPanelOpen] = useState(true); // Default open
+  const [showPositionTab, setShowPositionTab] = useState(false);
+
+  const symbolDropdownWrapperRef = useRef<HTMLDivElement>(null);
+  // Calculate dropdown position with absolute coordinates
+  const getDropdownPosition = () => {
+    if (!symbolButtonRef.current) return null;
+
+    const rect = symbolButtonRef.current.getBoundingClientRect();
+    const buttonMiddle = rect.top + rect.height / 2;
+    const screenMiddle = window.innerHeight / 2;
+
+    const openUpward = buttonMiddle > screenMiddle;
+
+    return {
+      position: openUpward ? "top" : "bottom",
+      left: rect.left,
+      top: openUpward ? undefined : rect.bottom + 8,
+      bottom: openUpward ? window.innerHeight - rect.top + 8 : undefined,
+      width: rect.width,
+    };
+  };
+  const [openOrders, setOpenOrders] = useState<Order[]>([]);
+  const [livePrice, setLivePrice] = useState<number>(0);
+  const [positions, setPositions] = useState<PositionData[]>([]);
+
+  const [showSettings, setShowSettings] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingRef = useRef<HTMLDivElement>(null);
+
+  const [selectedAccount, setSelectedAccount] = useState<BinanceAccount | null>(
+    null
+  );
+  const [candles, setCandles] = useState<ExtendedCandle[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [allSymbols, setAllSymbols] = useState<SymbolItem[]>([]);
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [activeSymbolTab, setActiveSymbolTab] = useState<"all" | "favorites">(
+    "all"
+  );
+  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const token = localStorage.getItem("token") || "";
+
+const [errorPopup, setErrorPopup] = useState<{
+  show: boolean;
+  message: string;
+}>({
+  show: false,
+  message: ''
+});
+  // State chính
+  const [selectedSymbol, setSelectedSymbol] = useState(() => {
+    return localStorage.getItem("selectedSymbol") || "BTCUSDT";
+  });
+  const [selectedMarket, setSelectedMarket] = useState<MarketType>("futures");
+  // ✅ MỚI:
+  const [selectedInterval, setSelectedInterval] = useState(() => {
+    return localStorage.getItem("selectedInterval") || "1m";
+  });
+
+  useEffect(() => {
+    if (selectedInterval) {
+      localStorage.setItem("selectedInterval", selectedInterval);
+    }
+  }, [selectedInterval]);
+
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("connecting");
+  const [wsService] = useState(() => new CustomWebSocketService());
+  const miniTickerMap = useMiniTickerStore((state) => state.miniTickerMap);
+  const selectedPrice = miniTickerMap[selectedSymbol]?.lastPrice || 0;
+  const [chartType, setChartType] = useState<ChartType>("Candles");
+
+  // ✅ NEW: State cho TimeframeSelector
+  const [showTimeframeSelector, setShowTimeframeSelector] = useState(false);
+
+  const [pinnedTimeframes, setPinnedTimeframes] = useState<string[]>(() => {
+    const stored = localStorage.getItem("pinnedTimeframes");
+    return stored
+      ? JSON.parse(stored)
+      : ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+  });
+  const handleSaveTimeframes = useCallback((selectedTimeframes: string[]) => {
+    setPinnedTimeframes(selectedTimeframes);
+    localStorage.setItem(
+      "pinnedTimeframes",
+      JSON.stringify(selectedTimeframes)
+    );
+  }, []); // ✅ Empty deps = function reference KHÔNG ĐỔI
+
+  const handleCloseTimeframe = useCallback(() => {
+    setShowTimeframeSelector(false);
+  }, []);
+
+  // Refs
+  const symbolButtonRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handlers
+  const handleSymbolButtonEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsDropdownOpen(true);
+    }, 150);
+  };
+
+  const handleSymbolButtonLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  };
+
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+
+
+ useEffect(() => {
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  let errorCount = 0;
+  let modalTimer: NodeJS.Timeout | null = null;
+  let resetTimer: NodeJS.Timeout | null = null;
   
-  // ===== Disconnect =====
-  public disconnect() {
-    if (this.socket) {
-      console.log('🔌 Disconnecting WebSocket');
-      this.socket.close();
-      this.socket = null;
-      this.state = 'closed';
-      this.accountSelected = false;
-      this.accountSelectedResolvers = [];
+  const handleError = () => {
+    errorCount++;
+    console.log(`🚨 WebSocket error #${errorCount}`);
+    
+    // Reset counter sau 15 giây (tăng lên để cho đủ thời gian connect)
+    if (resetTimer) clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
+      console.log('🔄 Resetting error count (connection recovered)');
+      errorCount = 0;
+    }, 15000);
+    
+    // ✅ CHỈ hiện modal nếu có >= 3 lỗi VÀ connectionStatus !== "connected"
+    if (errorCount >= 3) {
+      console.log('🚨 Multiple errors detected, checking connection status...');
+      
+      if (modalTimer) clearTimeout(modalTimer);
+      
+      // ✅ Đợi 8 giây rồi check status
+      modalTimer = setTimeout(() => {
+        // Kiểm tra xem đã connect lại chưa
+        if (connectionStatus !== "connected") {
+          console.log('⏰ Connection still failed → Showing modal');
+          setShowMaintenanceModal(true);
+        } else {
+          console.log('✅ Connection recovered → NOT showing modal');
+          errorCount = 0; // Reset vì đã ổn
+        }
+      }, 8000); // Tăng lên 8 giây để cho đủ thời gian reconnect
+    }
+  };
+  
+  console.error = function(...args) {
+  const msg = args.join(' ');
+  
+  if (msg.includes('WebSocket') || msg.includes('ws://')) {
+    // ✅ Chỉ log nếu không đang connecting
+    if (connectionStatus !== 'connecting') {
+      handleError();
+    } else {
+      console.log('⏳ WebSocket connecting... (ignoring error)');
     }
   }
+  
+  originalError.apply(console, args);
+};
+  
+  console.warn = function(...args) {
+    const msg = args.join(' ');
+    if (msg.includes('WebSocket closed') && msg.includes('1006')) {
+      handleError();
+    }
+    originalWarn.apply(console, args);
+  };
+
+  return () => {
+    console.error = originalError;
+    console.warn = originalWarn;
+    if (modalTimer) clearTimeout(modalTimer);
+    if (resetTimer) clearTimeout(resetTimer);
+  };
+}, [connectionStatus]); // ✅ Thêm dependency
+
+// ===== ERROR POPUP LISTENER (Giống MaintenanceModal pattern) =====
+useEffect(() => {
+  const originalLog = console.log;
+  
+  console.log = function(...args) {
+    const msg = args.join(' ');
+    
+    // Bắt RAW WS MSG từ BinanceWebSocketService
+    if (msg.includes('📥 RAW WS MSG:') && msg.includes('"type":"error"')) {
+      try {
+        // Tìm JSON object trong message
+        const jsonMatch = msg.match(/(\{[^}]*"type"\s*:\s*"error"[^}]*\})/);
+        if (jsonMatch) {
+          const data = JSON.parse(jsonMatch[0]);
+          if (data.type === 'error' && data.message) {
+            
+            setErrorPopup({
+              show: true,
+              message: data.message
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing popup message:', e);
+      }
+    }
+    
+    originalLog.apply(console, args);
+  };
+  
+  return () => {
+    console.log = originalLog;
+  };
+}, []);
+  
+useEffect(() => {
+  // ✅ Show modal when connection status is "maintenance"
+  
+  if (connectionStatus === "maintenance") {
+    
+    setShowMaintenanceModal(true);
+  } else if (connectionStatus === "connected") {
+    
+    setShowMaintenanceModal(false);
+  }
+}, [connectionStatus]);
+
+const handleRefreshConnection = () => {
+  setShowMaintenanceModal(false);
+  
+  // Force reconnect by creating new WebSocket service
+  wsService.disconnect();
+  
+  // Wait a bit then reload page
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
+};
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Market data
+  const [klineData, setKlineData] = useState<KlineData | null>(null);
+  const [tickerData, setTickerData] = useState<TickerData | null>(null);
+  const [orderBook, setOrderBook] = useState<OrderBookData | null>(null);
+  const [recentTrades, setRecentTrades] = useState<TradeData[]>([]);
+  const [bookTicker, setBookTicker] = useState<BookTickerData | null>(null);
+  const [miniTicker, setMiniTicker] = useState<MiniTickerData | null>(null);
+
+
+
+  // UI
+
+
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+
+  // Trading form
+  const [price, setPrice] = useState<number>(0);
+
+
+  const { user } = useAuth() as { user: User };
+  const binanceAccountId = user?.internalAccountId;
+
+  const [floatingInfo, setFloatingInfo] = useState<FloatingInfo | null>(null);
+
+  // Toggle control setting
+  const [chartSettings, setChartSettings] = React.useState<ChartSettings>(
+    () => {
+      try {
+        const saved = localStorage.getItem("chartSettings");
+        return saved
+          ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
+          : DEFAULT_SETTINGS;
+      } catch {
+        return DEFAULT_SETTINGS;
+      }
+    }
+  );
+
+
+
+  // ============= RESPONSIVE STATE (THÊM MỚI) =============
+  const [isMobile, setIsMobile] = useState(false);
+
+
+  // Detect screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Auto close khi chuyển về desktop
+      if (!mobile) {
+        setIsTradingFormOpen(false);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // 4️⃣ AUTO CLOSE KHI ĐỔI SYMBOL (optional - thêm useEffect):
+  useEffect(() => {
+    if (isMobile) {
+      setIsTradingFormOpen(false);
+    }
+  }, [selectedSymbol]);
+  // ======================================================
+
+
+
+  // đóng panel setting khi click ngoài (có guard modal Time)
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showSettings) return;
+
+    const onClick = (e: MouseEvent) => {
+      if (showTimeframeSelector) return; // ✅ Check trực tiếp state
+      if (!panelRef.current) return;
+      if (!panelRef.current.contains(e.target as Node)) setShowSettings(false);
+    };
+
+    document.addEventListener("mousedown", onClick,);
+    return () => document.removeEventListener("mousedown", onClick, true);
+  }, [showSettings, showTimeframeSelector]); // ✅ Thêm dependency
+
+  // Reset khi đổi symbol
+  useEffect(() => {
+    setLivePrice(0); // reset khi đổi symbol
+  }, [selectedSymbol]);
+  // lưu local symbol
+  useEffect(() => {
+    if (selectedSymbol) {
+      localStorage.setItem("selectedSymbol", selectedSymbol);
+    }
+  }, [selectedSymbol]);
+
+
+
+  // đóng menu setting khi click ra ngoài (có guard modal Time)
+
+  // ✅ Dùng một handler duy nhất cho openOrders (tránh ghi đè)
+  useEffect(() => {
+    binanceWS.setOrderUpdateHandler((orders: any[]) => {
+      // service đã chuẩn hoá localStorage; ở đây chỉ sync state
+      setOpenOrders(orders || []);
+    });
+    return () => {
+      binanceWS.setOrderUpdateHandler(null);
+    };
+  }, []);
+  useEffect(() => {
+    const checkShowTab = () => {
+      const shouldShowTab = window.innerWidth < 1200; // < 1200px = show tab
+      setShowPositionTab(shouldShowTab);
+
+      // Desktop: auto open
+      if (!shouldShowTab) {
+        setIsPositionPanelOpen(true);
+      }
+    };
+
+    checkShowTab();
+    window.addEventListener("resize", checkShowTab);
+    return () => window.removeEventListener("resize", checkShowTab);
+  }, []);
+
+  // 3️⃣ COUNT POSITIONS (để hiện badge số):
+  const [positionCount, setPositionCount] = useState(0);
+
+  // useEffect để đếm positions (nếu chưa có)
+  useEffect(() => {
+    // Count active positions
+    const count = positions.filter(
+      (p) => Math.abs(parseFloat(p.positionAmt || "0")) > 0
+    ).length;
+    setPositionCount(count);
+  }, [positions]);
+
+  // Khi đổi thị trường → kéo account info tương ứng
+  useEffect(() => {
+    if (!selectedAccount?.id) return;
+    if (selectedMarket === "futures") {
+      binanceWS.getFuturesAccount(selectedAccount.id);
+    } else {
+      binanceWS.getSpotAccount(selectedAccount.id);
+    }
+  }, [selectedMarket, selectedAccount?.id]);
+
+  // Handler WS tổng (không chọn account ở đây để tránh double-select)
+  const globalWsHandler = useCallback((msg: any) => {
+    console.log("📥 WS Message:", msg);
+
+    switch (msg.type) {
+      case "authenticated": {
+        // service clean sẽ tự flush queue sau authenticated
+        break;
+      }
+      // ❌ BỎ chọn account ở đây để tránh double select
+      // case "myBinanceAccounts": { ... }
+
+      case "error": {
+  
+  
+  setErrorPopup({
+    show: true,
+    message: msg.message || "An error occurred"
+  });
+  
+  break;
 }
 
-export const binanceWS = new BinanceWebSocketService();
+      case "cancelAllOrdersSuccess":
+
+      case "cancelAllOrdersFailed":
+        toast.error("Huỷ tất cả lệnh thất bại!");
+        break;
+
+      case "futuresDataLoaded":
+      case "balances": {
+        const usdt = msg.data?.balances?.find((b: any) => b.asset === "USDT");
+        if (usdt) setAvailableBalance(parseFloat(usdt.availableBalance || "0"));
+        break;
+      }
+      default:
+        break;
+    }
+  }, []);
+
+  // 3) useEffect connect (đặt SAU handler)
+  React.useEffect(() => {
+    if (!token) return;
+    if (hasConnectedRef.current) return;
+    hasConnectedRef.current = true;
+
+    // ✅ THÊM - Set maintenance callback TRƯỚC KHI connect
+    binanceWS.setMaintenanceCallback(() => {
+      console.log('🚨 BinanceWS maintenance callback triggered!');
+      setShowMaintenanceModal(true);
+    });
+
+    binanceWS.connect(token, globalWsHandler);
+  }, [token, globalWsHandler]);
+
+
+
+  // Tải dữ liệu nến lịch sử ban đầu
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHistoricalKlines = async () => {
+      try {
+     
+        const historicalData = await fetchHistoricalKlines(
+          selectedSymbol,
+  selectedInterval,
+  500,
+  selectedMarket 
+        );
+        if (isMounted) {
+          setCandles(historicalData);
+        }
+      } catch (error) {
+        console.error("❌ Failed to fetch historical klines:", error);
+      }
+    };
+
+    loadHistoricalKlines();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedSymbol, selectedInterval]);
+
+  // Khởi tạo WS phụ (public streams cho panel bên) — đã bỏ Kline ở đây để tránh subscribe trùng
+  useEffect(() => {
+    wsService.setStatusCallback(setConnectionStatus);
+
+    const subscriptionIds: string[] = [];
+
+    // 1) 24h Ticker
+    const tickerId = wsService.subscribeTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setTickerData(data);
+        const p = Number(data.lastPrice);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
+      }
+    );
+    if (tickerId) subscriptionIds.push(tickerId);
+
+    // 2) Order Book Depth
+    const depthId = wsService.subscribeDepth(
+      selectedSymbol,
+      "20",
+      "1000ms",
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setOrderBook(data);
+      }
+    );
+    if (depthId) subscriptionIds.push(depthId);
+
+    // 3) Trade Stream
+    const tradeId = wsService.subscribeTrade(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        const trade: TradeData = {
+          symbol: data.symbol,
+          tradeId: data.tradeId,
+          price: data.price?.toString() ?? "0",
+          qty: data.quantity?.toString() ?? "0",
+          time: data.tradeTime ?? Date.now(),
+          isBuyerMaker: data.isBuyerMaker,
+        };
+
+        setRecentTrades((prev) => {
+          const newTrades = [trade, ...prev.slice(0, 49)];
+          return newTrades.sort((a, b) => b.time - a.time);
+        });
+      }
+    );
+    if (tradeId) subscriptionIds.push(tradeId);
+
+    // 4) Book Ticker
+    const bookTickerId = wsService.subscribeBookTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setBookTicker(data);
+        const bid = Number(data.bidPrice);
+        const ask = Number(data.askPrice);
+        const mid = bid > 0 && ask > 0 ? (bid + ask) / 2 : 0;
+        if (mid > 0) setLivePrice(mid); // ✅ thêm dòng này
+      }
+    );
+    if (bookTickerId) subscriptionIds.push(bookTickerId);
+
+    // 5) Mini Ticker cho symbol đang chọn (lưu id để cleanup)
+    const miniId = wsService.subscribeMiniTicker(
+      selectedSymbol,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+        setMiniTicker(data); // (tuỳ bạn có dùng)
+        const p = Number(data.close ?? data.c ?? 0);
+        if (p > 0) setLivePrice(p); // ✅ thêm dòng này
+      }
+    );
+    if (miniId) subscriptionIds.push(miniId);
+
+    // cập nhật danh sách subscriptions (thông tin hiển thị)
+    setSubscriptions(wsService.getSubscriptions());
+
+    return () => {
+      // cleanup các stream đã đăng ký trong effect này
+      subscriptionIds.forEach((id) => {
+        wsService.unsubscribe(id);
+      });
+    };
+  }, [selectedSymbol, selectedMarket, selectedInterval]);
+
+  // Stream Kline duy nhất → cập nhật candles + (tuỳ chọn) overlay klineData
+  useEffect(() => {
+    const klineId = wsService.subscribeKline(
+      selectedSymbol,
+      selectedInterval,
+      selectedMarket,
+      (data) => {
+        if (data.symbol !== selectedSymbol) return;
+
+        // set overlay cho panel thông tin (nếu cần)
+        setKlineData(data);
+
+        const newCandle: ExtendedCandle = {
+          time: Math.floor(data.openTime / 1000),
+          open: parseFloat(data.open),
+          high: parseFloat(data.high),
+          low: parseFloat(data.low),
+          close: parseFloat(data.close),
+          volume: parseFloat(data.volume),
+        };
+
+        setCandles((prev) => {
+          const exists = prev.find((c) => c.time === newCandle.time);
+          let updated = exists
+            ? prev.map((c) => (c.time === newCandle.time ? newCandle : c))
+            : [...prev, newCandle];
+
+          if (updated.length > 500) updated = updated.slice(-500);
+          return updated;
+        });
+      }
+    );
+
+    return () => {
+      wsService.unsubscribe(klineId);
+    };
+  }, [selectedSymbol, selectedInterval, selectedMarket]);
+
+  // Stream miniTicker cho toàn bộ symbolList để render danh sách — cleanup đúng
+  useEffect(() => {
+    const ids: string[] = [];
+
+    symbolList.forEach((sym) => {
+      const callback = (data: MiniTickerData) => {
+        const symbol = data.symbol?.toUpperCase?.();
+        const close = parseFloat(data.close);
+        const open = parseFloat(data.open);
+        const percentChange = open !== 0 ? ((close - open) / open) * 100 : 0;
+
+        // bỏ qua symbol đang chọn
+        if (symbol === selectedSymbol) return;
+
+        setAllSymbols((prev) => {
+          const updated = prev.filter((s) => s.symbol !== symbol);
+          return [
+            ...updated,
+            {
+              symbol,
+              price: close,
+              percentChange,
+              volume: parseFloat(data.volume),
+            },
+          ];
+        });
+      };
+
+      const id = wsService.subscribeMiniTicker(sym, selectedMarket, callback);
+      ids.push(id);
+    });
+
+    return () => {
+      ids.forEach((id) => wsService.unsubscribe(id));
+    };
+  }, [selectedMarket, selectedSymbol]);
+
+
+
+ // ✅ Subscribe realtime theo account đã chọn (thêm ref-guard chống duplicate)
+const subOnceRef = useRef<number | null>(null);
+useEffect(() => {
+  const id = selectedAccount?.id;
+  if (!id) return;
+
+  const now = Date.now();
+  if (subOnceRef.current && now - subOnceRef.current < 1500) return;
+  subOnceRef.current = now;
+
+  // 1) chọn account
+  binanceWS.selectAccount(id);
+
+  // 2) subscribe realtime (balance/positions/orders)
+  binanceWS.subscribeAccountUpdates(setOpenOrders, [
+    "balance",
+    "positions",
+    "orders",
+  ]);
+
+  // 3) kéo positions trước một nhịp
+  binanceWS.getPositions(id);
+  binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
+  console.log('📥 Initial getOpenOrders:', orders);
+  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(orders));
+  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: orders } }));
+});
+  // ✅ 4) THÊM ĐOẠN NÀY - Kéo open orders ngay khi load
+  binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
+    console.log('📥 Initial getOpenOrders:', orders);
+    localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(orders));
+    window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: orders } }));
+  });
+
+  // 5) cập nhật positions từ snapshot/stream
+  binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
+    const active = (rawPositions || []).filter(
+      (p: any) => parseFloat(p.positionAmt) !== 0
+    );
+    setPositions(active);
+    localStorage.setItem("positions", JSON.stringify(active));
+  });
+
+  return () => {
+    binanceWS.unsubscribeAccountUpdates();
+  };
+}, [selectedAccount?.id, selectedMarket]);
+
+  // Khôi phục account đã chọn từ localStorage khi vào trang (chỉ 1 lần)
+  useEffect(() => {
+    const savedId = localStorage.getItem("selectedBinanceAccountId");
+    const parsedId = savedId ? parseInt(savedId, 10) : null;
+    if (!parsedId) return;
+
+    const restore = () => {
+      binanceWS.setCurrentAccountId(parsedId);
+      binanceWS.selectAccount(parsedId);
+      binanceWS.getMultiAssetsMode();
+      setSelectedAccount({ id: parsedId } as BinanceAccount);
+    };
+
+    const timer = setTimeout(() => {
+      if (binanceWS.isConnected()) {
+        restore();
+      } else {
+        const waitInterval = setInterval(() => {
+          if (binanceWS.isConnected()) {
+            clearInterval(waitInterval);
+            restore();
+          }
+        }, 200);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+
+
+  const handleClickOrderBookPrice = (price: number) => {
+    setPrice(price);
+  };
+
+
+
+  const handleMarketChange = (newMarket: MarketType) => {
+    setSelectedMarket(newMarket);
+    localStorage.setItem("selectedMarket", newMarket);
+    console.log("✅ Market selected:", newMarket);
+  };
+  useEffect(() => {
+    const savedMarket = localStorage.getItem("selectedMarket");
+    if (savedMarket === "spot" || savedMarket === "futures") {
+      setSelectedMarket(savedMarket as MarketType);
+    }
+  }, []);
+
+  const handleIntervalChange = (newInterval: string) => {
+    setSelectedInterval(newInterval);
+    localStorage.setItem("selectedInterval", newInterval); // ✅ Thêm dòng này
+  };
+
+
+
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [
+    isPositionPanelOpen,
+    isTradingFormOpen,
+    positions?.length,
+    showPositionTab,
+    positionCount,
+    isMobile,                    // Thêm: Khi responsive breakpoint đổi
+    selectedSymbol,              // Thêm: Khi đổi symbol
+  ]);
+
+
+
+  return (
+
+    <div className="trading-terminal">
+      {/* ===== HEADER ===== */}
+      <div className="trading-header">
+        {/* Symbol Selector Row */}
+        <div className="symbol-selector-row">
+          {/* Left: Symbol + Price Info */}
+          <div className="symbol-info-group">
+            {/* Symbol Selector */}
+            <div className="symbol-selector">
+              <div className="relative z-50">
+                <div
+                  ref={symbolButtonRef}
+                  className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded transition-colors cursor-default"
+                  onMouseEnter={handleSymbolButtonEnter}
+                  onMouseLeave={handleSymbolButtonLeave}
+                >
+                  <div className="h-6 w-6 rounded-full bg-warning-300 flex items-center justify-center">
+                    <span className="text-xs font-bold text-dark-900">
+                      {selectedSymbol[0]}
+                    </span>
+                  </div>
+                  <span className="font-bold text-lg">{selectedSymbol}</span>
+                  <ChevronDown className="h-4 w-4 text-dark-400" />
+                </div>
+
+                {isDropdownOpen &&
+                  (() => {
+                    const pos = getDropdownPosition();
+                    if (!pos) return null;
+
+                    return createPortal(
+                      <div
+                        ref={symbolDropdownWrapperRef}
+                        className="fixed z-[9999]"
+                        style={{
+                          left: `${pos.left}px`,
+                          top:
+                            pos.top !== undefined ? `${pos.top}px` : undefined,
+                          bottom:
+                            pos.bottom !== undefined
+                              ? `${pos.bottom}px`
+                              : undefined,
+                        }}
+                      >
+                        <SymbolDropdown
+                          selectedSymbol={selectedSymbol}
+                          searchTerm={searchTerm}
+                          activeTab={activeSymbolTab}
+                          onSelect={(s) => {
+                            setSelectedSymbol(s);
+                            setIsDropdownOpen(false);
+                          }}
+                          onSearchChange={setSearchTerm}
+                          onTabChange={setActiveSymbolTab}
+                          market="futures"
+                          quote="USDT"
+                          isOpen={isDropdownOpen}
+                          onOpen={() => setIsDropdownOpen(true)}
+                          onClose={() => setIsDropdownOpen(false)}
+                        />
+                      </div>,
+                      document.body // ✅ Render vào body, không bị parent giới hạn!
+                    );
+                  })()}
+              </div>
+
+              <Star className="h-4 w-4 text-dark-400 hover:text-warning-300 ml-2 cursor-pointer" />
+            </div>
+
+            {/* Market Selector */}
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-dark-400">Market:</span>
+              <select
+                value={selectedMarket}
+                onChange={(e) =>
+                  handleMarketChange(e.target.value as "spot" | "futures")
+                }
+                className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
+              >
+                <option value="futures">FUTURES</option>
+                <option value="spot">SPOT</option>
+              </select>
+            </div>
+
+            {/* Price Display */}
+            {tickerData && (
+              <div className="price-display-group">
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold">
+                    {parseFloat(tickerData.lastPrice).toFixed(4)}
+                  </span>
+                  <span className="text-xs text-dark-400">
+                    ≈ ${parseFloat(tickerData.lastPrice).toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col">
+                  <span
+                    className={`text-sm font-medium ${parseFloat(tickerData.priceChange) >= 0
+                      ? "text-success-500"
+                      : "text-danger-500"
+                      }`}
+                  >
+                    {parseFloat(tickerData.priceChange) >= 0 ? "+" : ""}
+                    {parseFloat(tickerData.priceChange).toFixed(4)}
+                  </span>
+                  <span
+                    className={`text-xs ${parseFloat(tickerData.priceChangePercent) >= 0
+                      ? "text-success-500"
+                      : "text-danger-500"
+                      }`}
+                  >
+                    {parseFloat(tickerData.priceChangePercent) >= 0 ? "+" : ""}
+                    {tickerData.priceChangePercent}%
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Stats Row 24h - Show only on XL */}
+          <div className="stats-row-24h">
+            {tickerData ? (
+              <>
+                <div className="flex flex-col">
+                  <span className="text-dark-400">24h High</span>
+                  <span className="font-medium">
+                    {parseFloat(tickerData.highPrice).toFixed(4)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-dark-400">24h Low</span>
+                  <span className="font-medium">
+                    {parseFloat(tickerData.lowPrice).toFixed(4)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-dark-400">
+                    24h Volume ({selectedSymbol.replace("USDT", "")})
+                  </span>
+                  <span className="font-medium">
+                    {parseFloat(tickerData.volume).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-dark-400">24h Volume (USDT)</span>
+                  <span className="font-medium">
+                    {parseFloat(tickerData.quoteVolume).toLocaleString()}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1">
+                  <span className="text-dark-400">24h High</span>
+                  <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-dark-400">24h Low</span>
+                  <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-dark-400">24h Volume (BTC)</span>
+                  <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-dark-400">24h Volume (USDT)</span>
+                  <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
+                </div>
+              </>
+            )}
+          </div>
+          {/* Right: Controls */}
+          <div className="header-controls">
+            
+            <div className="flex items-center space-x-2">
+              {connectionStatus === "connected" ? (
+                <Wifi className="h-4 w-4 text-success-500" />
+              ) : connectionStatus === "connecting" ? (
+                <div className="h-4 w-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-danger-500" />
+              )}
+              <span className="text-xs text-dark-400 capitalize hidden sm:inline">
+                {connectionStatus}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-dark-400 hidden md:inline">
+                Tài khoản:
+              </span>
+              <BinanceAccountSelector
+                onSelect={(id) => {
+                  setSelectedAccount({ id });
+                }}
+              />
+            </div>
+
+            <div className="text-xs text-dark-400 hidden lg:block">
+              Subscriptions: {subscriptions.length}
+            </div>
+
+            <button
+              onClick={() => wsService.getSubscriptions()}
+              className="p-1 hover:bg-dark-700 rounded"
+            >
+              <RefreshCw className="h-4 w-4 text-dark-400" />
+            </button>
+
+            <button className="p-1 hover:bg-dark-700 rounded">
+              <Settings className="h-4 w-4 text-dark-400" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== WORKSPACE ===== */}
+      <div className="trading-workspace">
+        {/* Column 1+2: Chart & OrderBook & Position */}
+        <div className="workspace-left-columns">
+          {/* Row 1: Chart + OrderBook */}
+          <div className="workspace-chart-orderbook-row">
+            {/* Chart Panel */}
+            <div className="chart-panel">
+              <div className="h-full flex flex-col">
+                {/* Chart Controls */}
+                <div className="flex items-center justify-between p-3 border-b border-dark-700">
+                  <div className="flex items-center space-x-4">
+                    {/* Timeframe Selector */}
+                    <div className="flex items-center space-x-2">
+                      {pinnedTimeframes.map((interval) => (
+                        <button
+                          key={interval}
+                          onClick={() => handleIntervalChange(interval)}
+                          className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${selectedInterval === interval ? "bg-dark-700" : ""
+                            }`}
+                        >
+                          {interval}
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTimeout(() => {
+                            setShowTimeframeSelector(true);
+                          }, 0);
+                        }}
+                        className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
+                        title="Edit timeframes"
+                      >
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Chart Type Panel */}
+                    <ChartTypePanel
+                      currentType={chartType}
+                      onTypeChange={(newType) => {
+                        setChartType(newType);
+                        console.log("[ChartType] Changed to:", newType);
+                      }}
+                    />
+
+                    {/* Settings Button */}
+                    <div className="flex items-center gap-2 relative" ref={panelRef}>
+                      <button
+                        ref={settingsButtonRef}
+                        onClick={() => setShowSettings((v) => !v)}
+                        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+                        title="Cài đặt biểu đồ"
+                      >
+                        <Settings size={15} />
+                      </button>
+
+                      {showSettings && (
+                        <SettingControl
+                          settings={chartSettings}
+                          onToggle={(k, v) => {
+                            const newSettings = { ...chartSettings, [k]: v };
+                            setChartSettings(newSettings);
+                            localStorage.setItem("chartSettings", JSON.stringify(newSettings));
+                          }}
+                          onClose={() => setShowSettings(false)}
+                          triggerRef={settingsButtonRef}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Controls */}
+                  <div className="flex items-center space-x-2">
+                    <button className="p-1 hover:bg-dark-700 rounded non-essential">
+                      <TrendingUp className="h-4 w-4 text-dark-400" />
+                    </button>
+                    <button className="p-1 hover:bg-dark-700 rounded non-essential">
+                      <Maximize2 className="h-4 w-4 text-dark-400" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Chart Container */}
+                <div className="flex-1 relative min-h-0">
+                  <section className="h-full w-full bg-dark-800 rounded-xl overflow-hidden">
+                    <div className="h-full w-full chart-main-container">
+                      <TradingBinance
+                        selectedSymbol={selectedSymbol}
+                        chartType={chartType}
+                        onChartTypeChange={setChartType}
+                        selectedInterval={selectedInterval}
+                        market={selectedMarket}
+                        floating={floatingInfo}
+                        showPositionTag={chartSettings.positionTag}
+                        onRequestSymbolChange={(sym) => setSelectedSymbol(sym)}
+                      />
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+
+            {/* OrderBook Panel */}
+            <div className="orderbook-panel">
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b border-dark-700">
+                  <h3 className="text-sm font-medium">Order Book</h3>
+                  <div className="flex items-center space-x-2">
+                    <button className="text-xs text-dark-400 hover:text-dark-200">
+                      0.01
+                    </button>
+                    <Settings className="h-3 w-3 text-dark-400" />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  {orderBook ? (
+                    <div className="h-full flex flex-col">
+                      {/* Asks */}
+                      <div className="overflow-y-auto scrollbar-hide" style={{ minHeight: '200px' }}>
+                        <div className="space-y-0.5 p-2">
+                          {orderBook.asks
+                            .slice(0, 15)
+                            .reverse()
+                            .map((ask, index) => (
+                              <div
+                                key={index}
+                                className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                                onClick={() =>
+                                  handleClickOrderBookPrice(parseFloat(ask.price))
+                                }
+                              >
+                                <span className="text-danger-500 font-mono">
+                                  {parseFloat(ask.price).toFixed(4)}
+                                </span>
+                                <span className="text-dark-300 font-mono">
+                                  {parseFloat(ask.quantity).toFixed(3)}
+                                </span>
+                                <div
+                                  className="absolute right-0 top-0 h-full bg-danger-500/10"
+                                  style={{
+                                    width: `${Math.min(
+                                      (parseFloat(ask.quantity) / 10) * 100,
+                                      100
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Current Price */}
+                      <div className="px-2 py-1 border-y border-dark-700">
+                        <div className="text-center">
+                          <div
+                            className={`text-sm font-bold ${tickerData && parseFloat(tickerData.priceChange) >= 0
+                              ? "text-success-500"
+                              : "text-danger-500"
+                              }`}
+                          >
+                            {tickerData
+                              ? parseFloat(tickerData.lastPrice).toFixed(4)
+                              : "0.0000"}
+                          </div>
+                          <div className="text-xs text-dark-400">
+                            ≈ $
+                            {tickerData
+                              ? parseFloat(tickerData.lastPrice).toFixed(2)
+                              : "0.00"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bids */}
+                      <div className="overflow-y-auto scrollbar-hide" style={{ minHeight: '200px' }}>
+                        <div className="space-y-0.5 p-2">
+                          {orderBook.bids.slice(0, 15).map((bid, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                              onClick={() =>
+                                handleClickOrderBookPrice(parseFloat(bid.price))
+                              }
+                            >
+                              <span className="text-success-500 font-mono">
+                                {parseFloat(bid.price).toFixed(4)}
+                              </span>
+                              <span className="text-dark-300 font-mono">
+                                {parseFloat(bid.quantity).toFixed(3)}
+                              </span>
+                              <div
+                                className="absolute right-0 top-0 h-full bg-success-500/10"
+                                style={{
+                                  width: `${Math.min(
+                                    (parseFloat(bid.quantity) / 10) * 100,
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-dark-400">
+                      <div className="text-center">
+                        <div className="text-sm">No order book data</div>
+                        <div className="text-xs mt-1">
+                          Waiting for WebSocket connection...
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Position Panel (Full width of Chart + OrderBook) */}
+          <div
+            className={`positions-panel ${isPositionPanelOpen ? "is-open" : ""}`}
+            data-count={positions.length} // ✅ Thêm attribute này
+          >
+            {/* Tab Header */}
+            {showPositionTab && (
+              <div
+                className="position-panel-header flex items-center justify-between cursor-pointer"
+
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="font-semibold text-sm">Positions & Orders</span>
+                  {positionCount > 0 && (
+                    <span className="inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-1 rounded-full bg-primary-500/20 text-primary-300 font-medium">
+                      {positionCount}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center">
+                  {isPositionPanelOpen ? (
+                    <ChevronDown className="h-4 w-4 text-dark-300" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4 text-dark-300" />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Panel Content */}
+            <div
+              className={`position-panel-content ${showPositionTab && !isPositionPanelOpen ? "hidden" : ""
+                }`}
+            >
+              <PositionFunction
+                market={selectedMarket}
+                selectedSymbol={selectedSymbol}
+                orderBook={orderBook}
+                positions={positions}
+                onFloatingInfoChange={setFloatingInfo}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Column 3: Trading Form (Độc lập) */}
+        <div
+          className={`trading-form-panel ${isTradingFormOpen ? "is-open" : ""}`}
+        >
+          {/* Mobile Header */}
+          {isMobile && (
+            <div
+              className="trading-form-mobile-header flex items-center justify-between p-3.5 bg-dark-700/80 backdrop-blur cursor-pointer border-b border-dark-600 hover:bg-dark-700 active:bg-dark-700/95 transition-colors"
+              onClick={() => setIsTradingFormOpen(!isTradingFormOpen)}
+            >
+              <div className="flex items-center space-x-2.5">
+                <span className="font-semibold text-sm">Trade {selectedSymbol}</span>
+                <span className="text-[10px] text-dark-400 bg-dark-800 px-1.5 py-0.5 rounded uppercase">
+                  {selectedMarket}
+                </span>
+              </div>
+
+              <div className="flex items-center">
+                {isTradingFormOpen ? (
+                  <ChevronDown className="h-5 w-5 text-dark-300" />
+                ) : (
+                  <ChevronUp className="h-5 w-5 text-dark-300" />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Trading Form Content */}
+          <div
+            className={`trading-form-content flex-1 min-h-0 overflow-y-auto ${isMobile && !isTradingFormOpen ? "hidden" : ""
+              }`}
+          >
+            <TradingForm
+              selectedSymbol={selectedSymbol}
+              price={livePrice}
+              internalBalance={availableBalance}
+              selectedMarket={selectedMarket}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Timeframe Modal */}
+      <TimeframeModalWrapper
+        isOpen={showTimeframeSelector}
+        pinnedTimeframes={pinnedTimeframes}
+        onClose={handleCloseTimeframe}
+        onSave={handleSaveTimeframes}
+      />
+ <MaintenanceModal 
+      isOpen={showMaintenanceModal}
+      onRefresh={handleRefreshConnection}
+    />
+
+    {/* Error Popup */}
+    {errorPopup.show && (
+      <ErrorPopup
+        message={errorPopup.message}
+        onClose={() => setErrorPopup({ show: false, message: '' })}
+      />
+    )}
+      
+    </div>
+  );
+}

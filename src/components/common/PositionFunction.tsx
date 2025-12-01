@@ -41,14 +41,12 @@ function countPositions(symbol?: string) {
   }
 }
 
-function countPending(symbol?: string) {
+function countPending() {  // ✅ Bỏ param symbol
   try {
     const list = JSON.parse(
       localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]'
-    ) as Array<{ symbol: string; status: string }>;
-    return list.filter(
-      (o) => o.status === 'NEW' && (!symbol || o.symbol === symbol)
-    ).length;
+    ) as Array<{ status: string }>;
+    return list.filter((o) => o.status === 'NEW').length;  // ✅ Không filter symbol
   } catch {
     return 0;
   }
@@ -143,35 +141,28 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
 
   // Open orders count tracking
   useEffect(() => {
-    setOpenOrderCount(countPending(selectedSymbol));
+  setOpenOrderCount(countPending());  // ✅ Không truyền symbol
 
-    const onBus = (e: any) => {
-      const list = (e?.detail?.list ?? null) as Array<{
-        symbol: string;
-        status: string;
-      }> | null;
-      if (Array.isArray(list)) {
-        const n = list.filter(
-          (o) =>
-            o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol)
-        ).length;
-        setOpenOrderCount(n);
-      } else {
-        setOpenOrderCount(countPending(selectedSymbol));
-      }
-    };
-    const onStorage = (ev: StorageEvent) => {
-      if (ev.key === OPEN_ORDERS_LS_KEY)
-        setOpenOrderCount(countPending(selectedSymbol));
-    };
+  const onBus = (e: any) => {
+    const list = e?.detail?.list;
+    if (Array.isArray(list)) {
+      setOpenOrderCount(list.filter((o: any) => o.status === 'NEW').length);
+    } else {
+      setOpenOrderCount(countPending());
+    }
+  };
+  
+  const onStorage = (ev: StorageEvent) => {
+    if (ev.key === OPEN_ORDERS_LS_KEY) setOpenOrderCount(countPending());
+  };
 
-    window.addEventListener(OPEN_ORDERS_EVENT, onBus as any);
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.removeEventListener(OPEN_ORDERS_EVENT, onBus as any);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, [selectedSymbol]);
+  window.addEventListener(OPEN_ORDERS_EVENT, onBus as any);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(OPEN_ORDERS_EVENT, onBus as any);
+    window.removeEventListener('storage', onStorage);
+  };
+}, []);
 
   const tabs = useMemo(
     () =>

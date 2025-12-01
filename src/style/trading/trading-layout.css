@@ -27,10 +27,9 @@
 .trading-workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr minmax(180px, 320px); /* âœ… Giáº£m min tá»« 200px â†’ 180px */
-  height: 100%;
+  grid-template-columns: 1fr minmax(180px, 320px);
   min-height: 0;
-  overflow: hidden; /* âœ… Prevent scrollbars */
+  overflow: visible; /* ✅ ĐỔI từ hidden → visible */
   width: 100%;
   max-width: 100%;
   gap: 0;
@@ -65,78 +64,59 @@ body:has(.sidebar-wrapper.collapsed) .trading-workspace {
   background: rgba(100, 116, 139, 0.8);
 }
 
-/* ===== LEFT SECTION: Chart + OrderBook + Position ===== */
+/* ===== LEFT SECTION ===== */
 .workspace-left-columns {
   display: flex;
   flex-direction: column;
-  min-width: 0; /* âœ… Critical for grid flexibility */
-  overflow: hidden;
+  min-width: 0;
+  overflow: visible; /* ✅ ĐỔI từ hidden → visible */
   background: var(--bg-panel, #1e293b);
-  height: 100%;
+  min-height: min-content; /* ✅ THÊM để tự động expand */
 }
 
 /* Top Row: Chart + OrderBook */
 .workspace-chart-orderbook-row {
   display: grid;
-  grid-template-columns: 1fr 280px; /* âœ… Chart flexible, OrderBook fixed */
-  flex: 1; /* âœ… Take remaining space after position panel */
-  min-height: 400px; /* âœ… Minimum height instead of fixed */
+  grid-template-columns: 1fr 280px;
+  min-height: 400px; /* ✅ GIỮ NGUYÊN min-height */
   gap: 0;
-  overflow: hidden;
+  overflow: visible; /* ✅ ĐỔI từ hidden → visible */
 }
 
-/* Chart Panel */
-.chart-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0; /* âœ… Allow shrinking */
-  flex-shrink: 1; /* âœ… Shrink when needed */
-  overflow: hidden;
-  background: var(--bg-panel, #1e293b);
-  border-right: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-}
-
-/* OrderBook Panel */
-.orderbook-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  width: 280px; /* âœ… Fixed width */
-  flex-shrink: 2; /* âœ… Shrink more aggressively than chart */
-  overflow: hidden;
-  background: var(--bg-panel, #1e293b);
-  border-right: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-}
-
-/* Position Panel - Flexible height */
+/* Position Panel - Let it expand naturally */
 .positions-panel {
-  flex: 0 0 auto; /* âœ… Don't grow, don't shrink, auto height */
-  min-height: 44px; /* âœ… Collapsed height */
-  max-height: 400px; /* âœ… Prevent taking too much space */
-  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: 44px;
+  /* ❌ XÓA max-height: 400px; */
+  /* ❌ XÓA overflow: hidden; */
   border-top: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
 }
 
 .positions-panel.is-open {
-  flex: 0 1 auto; /* âœ… Can shrink if needed */
+  flex: 0 0 auto; /* ✅ ĐỔI từ 0 1 auto */
   min-height: 280px;
+  /* ❌ KHÔNG CẦN max-height */
 }
 
-/* ===== RIGHT COLUMN: Trading Form ===== */
+/* ===== RIGHT COLUMN: Trading Form - FIXED ===== */
 .trading-form-panel {
   width: 100%;
-  min-width: 180px; /* âœ… Giáº£m tá»« 200px â†’ 180px */
+  min-width: 180px;
   max-width: 320px;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel, #1e293b);
   border-left: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-  overflow: hidden;
+  overflow: hidden; /* ✅ ĐỔI lại thành hidden */
+  position: sticky; /* ✅ THÊM */
+  top: 0; /* ✅ THÊM */
+  height: 100vh; /* ✅ THÊM - hoặc calc(100vh - 4rem) nếu có header */
+  max-height: calc(100dvh - 4rem); /* ✅ THÊM - trừ đi header height */
 }
 
 .trading-form-content {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* ✅ ĐỔI lại thành auto */
   overflow-x: hidden;
   min-height: 0;
 }
@@ -292,9 +272,14 @@ body:has(.sidebar-wrapper.collapsed) .trading-workspace {
 
 /* ===== CRITICAL: PREVENT OVERFLOW ===== */
 .trading-terminal {
-  overflow-x: hidden !important;
-  max-width: 100vw !important;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 4rem);
+  width: 100%;
+  max-width: 100vw;
+  background: #0b1426;
+  overflow-y: auto; /* ✅ ĐỔI từ hidden → auto */
+  overflow-x: hidden;
 }
 
 .trading-workspace {

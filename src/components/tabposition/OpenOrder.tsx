@@ -68,20 +68,20 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
   useEffect(() => {
     // khởi tạo từ LS (bao gồm optimistic)
     const initAll = readOrdersLS();
-    const initFiltered = initAll.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+    const initFiltered = initAll.filter(o => o.status === 'NEW');
     setOpenOrders(initFiltered);
     onPendingCountChange?.(initFiltered.length);
 
     const onBus = (e: any) => {
       const list: Order[] = e?.detail?.list ?? readOrdersLS();
-      const filtered = list.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+      const filtered = list.filter(o => o.status === 'NEW');
       setOpenOrders(filtered);
       onPendingCountChange?.(filtered.length);
     };
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === OPEN_ORDERS_LS_KEY) {
         const list = readOrdersLS();
-        const filtered = list.filter(o => o.status === 'NEW' && (!selectedSymbol || o.symbol === selectedSymbol));
+        const filtered = list.filter(o => o.status === 'NEW');
         setOpenOrders(filtered);
         onPendingCountChange?.(filtered.length);
       }
@@ -107,20 +107,19 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
     return () => { binanceWS.setOrderUpdateHandler?.(null); };
   }, []);
 
-  // ========== Pull open orders khi market/symbol đổi ==========
-  const debounceTimer = useRef<number | null>(null);
-  useEffect(() => {
+  // ========== Pull open orders khi market đổi ==========
+const debounceTimer = useRef<number | null>(null);
+useEffect(() => {
   if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
   debounceTimer.current = window.setTimeout(() => {
     const handleResponse = (orders: Order[]) => {
       console.log('📥 getOpenOrders response:', orders);
-      // Ghi đè LS - clear optimistic orders
       writeOrdersLS(orders);
     };
     
-    selectedSymbol 
-      ? binanceWS.getOpenOrders(market, selectedSymbol, handleResponse)
-      : binanceWS.getOpenOrders(market, undefined, handleResponse);
+    // ✅ Gọi ALL - không truyền symbol
+    binanceWS.getOpenOrders(market, undefined, handleResponse);
+    
   }, 250);
   
   return () => {
@@ -129,7 +128,7 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
       debounceTimer.current = null; 
     }
   };
-}, [market, selectedSymbol]);
+}, [market]);  // ✅ Chỉ depend vào market
   // ========== Cancel ==========
   const cancelOrder = (order: Order) => binanceWS.cancelOrder(order.symbol, Number(order.orderId), market);
   const cancelFilteredOrders = (filterFn: (o: Order) => boolean) => {

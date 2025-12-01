@@ -8,6 +8,34 @@ import { Edit3 } from "lucide-react";
 import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
 import { createPortal } from 'react-dom';
 import CloseAllPositionsModal from "../popupposition/CloseAllPositionsModal";
+
+// ===== Helper đọc TP/SL settings từ localStorage =====
+interface TpSlSettings {
+  trigger: "MARK" | "LAST";
+  mode: "price" | "pnl_abs" | "roi_pct";
+  tpInput: string;
+  slInput: string;
+  entryPrice: number;
+}
+
+function loadPositionTpSlSettings(symbol: string): Partial<TpSlSettings> | null {
+  try {
+    const saved = localStorage.getItem(`position_tpsl_settings_${symbol}`);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
+
+// Format label cho mode
+function getModeLabel(mode?: string): string {
+  switch (mode) {
+    case "roi_pct": return "ROI%";
+    case "pnl_abs": return "PnL";
+    case "price": return "Price";
+    default: return "";
+  }
+}
+
 // ===== Helpers =====
 function loadLeverageLS(
   accountId?: number | null,
@@ -83,6 +111,31 @@ const Position: React.FC<PositionProps> = ({
   const deltaQueueRef = React.useRef<PositionCalc[]>([]);
 const [showCloseAllModal, setShowCloseAllModal] = useState(false);
   const [positionsView, setPositionsView] = useState<PositionCalc[]>([]);
+
+  // ✅ State để force re-render khi TP/SL settings thay đổi
+  const [tpslVersion, setTpslVersion] = useState(0);
+
+  // ✅ Lắng nghe storage event để cập nhật khi TP/SL thay đổi
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key?.startsWith('position_tpsl_settings_')) {
+        setTpslVersion(v => v + 1);
+      }
+    };
+
+    // Lắng nghe custom event từ PositionTpSlModal
+    const handleTpSlChanged = () => {
+      setTpslVersion(v => v + 1);
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('position-tpsl-updated', handleTpSlChanged);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('position-tpsl-updated', handleTpSlChanged);
+    };
+  }, []);
 
   const flushView = React.useCallback(() => {
   const arr = [...posStoreRef.current.values()]
@@ -831,6 +884,60 @@ useEffect(() => {
     scheduleRefresh(400);
   };
 
+  // ===== Helper: Render TP/SL cell cho một position =====
+  const renderTpSlCell = (pos: PositionCalc) => {
+    const settings = loadPositionTpSlSettings(pos.symbol);
+    const entryPrice = parseFloat(pos.entryPrice || "0");
+    
+    // Check nếu settings là của position khác (entry price khác)
+    const isSamePosition = settings?.entryPrice && 
+      Math.abs(settings.entryPrice - entryPrice) < 0.0000001;
+    
+    if (!settings || !isSamePosition) {
+      // Chưa có settings hoặc position khác
+      return (
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-gray-500">--</span>
+          <span className="text-gray-600">|</span>
+          <span className="text-gray-500">--</span>
+        </div>
+      );
+    }
+
+    const { tpInput, slInput, mode } = settings;
+    const hasTp = tpInput && tpInput.trim() !== "";
+    const hasSl = slInput && slInput.trim() !== "";
+    const modeLabel = getModeLabel(mode);
+
+    // Format value với suffix theo mode
+    const formatValue = (val: string) => {
+      if (!val || val.trim() === "") return "--";
+      const num = parseFloat(val);
+      if (!Number.isFinite(num)) return "--";
+      
+      if (mode === "roi_pct") return `${num}%`;
+      if (mode === "pnl_abs") return `${num}`;
+      return `${num}`; // price
+    };
+
+    return (
+      <div className="flex flex-col">
+        <div className="flex items-center gap-1 text-xs">
+          <span className={hasTp ? "text-[#0ecb81]" : "text-gray-500"}>
+            {formatValue(tpInput || "")}
+          </span>
+          <span className="text-gray-600">|</span>
+          <span className={hasSl ? "text-[#f6465d]" : "text-gray-500"}>
+            {formatValue(slInput || "")}
+          </span>
+        </div>
+        {modeLabel && (hasTp || hasSl) && (
+          <div className="text-[10px] text-gray-500">({modeLabel})</div>
+        )}
+      </div>
+    );
+  };
+
   // ====== UI ======
   const posAccountId =
     (activePos as any)?.internalAccountId ??
@@ -841,7 +948,7 @@ useEffect(() => {
   <div className="w-full max-w-full overflow-hidden">
     {/* ✅ THÊM WRAPPER CHO TABLE */}
     <div className="position-table-container w-full max-w-full overflow-x-auto">
-      <table className="position-table w-full min-w-[900px] text-sm">
+      <table className="position-table w-full min-w-[1000px] text-sm">
         <thead>
           <tr className="border-b border-dark-700 text-left text-xs uppercase tracking-wider text-dark-300">
             <th className="px-4 py-2">Symbol</th>
@@ -850,7 +957,8 @@ useEffect(() => {
             <th className="px-4 py-2">Mark Price</th>
             <th className="px-4 py-2">Margin</th>
             <th className="px-4 py-2">PNL(ROI%)</th>
-            
+            {/* ✅ THÊM CỘT TP | SL */}
+            <th className="px-4 py-2">TP | SL</th>
             
             
             {/* ✅ FIX: closePosition header - loại bỏ fixed width */}
@@ -884,8 +992,8 @@ useEffect(() => {
         <tbody>
   {positionsView.length === 0 ? (
     <tr>
-      {/* ✅ UPDATE COLSPAN từ 6 lên 7 */}
-      <td colSpan={7} className="text-center py-8 text-dark-400 text-sm">
+      {/* ✅ UPDATE COLSPAN từ 7 lên 8 */}
+      <td colSpan={8} className="text-center py-8 text-dark-400 text-sm">
         Bạn không có vị thế nào.
       </td>
     </tr>
@@ -949,6 +1057,16 @@ useEffect(() => {
 
           <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
 
+          {/* ✅ CỘT MARGIN */}
+          <td className="px-4 py-3 text-white">
+            <div>
+              <div>{margin > 0 ? `${fmtShort(margin)} USDT` : "--"}</div>
+              <div className="text-xs text-gray-400">
+                ({marginType === "isolated" ? "Isolated" : "Cross"})
+              </div>
+            </div>
+          </td>
+
           <td className={`px-4 py-3 font-medium ${pnlClass}`}>
             {pnl == null
               ? "--"
@@ -975,14 +1093,9 @@ useEffect(() => {
             </span>
           </td>
 
-          {/* ✅ THÊM CỘT MARGIN */}
-          <td className="px-4 py-3 text-white">
-            <div>
-              <div>{margin > 0 ? `${fmtShort(margin)} USDT` : "--"}</div>
-              <div className="text-xs text-gray-400">
-                ({marginType === "isolated" ? "Isolated" : "Cross"})
-              </div>
-            </div>
+          {/* ✅ THÊM CỘT TP | SL */}
+          <td className="px-4 py-3">
+            {renderTpSlCell(pos)}
           </td>
 
           <td>
@@ -1103,7 +1216,11 @@ useEffect(() => {
         {activePos && showTpSl && createPortal(
   <PositionTpSlModal
     isOpen={showTpSl}
-    onClose={() => setShowTpSl(false)}
+    onClose={() => {
+      setShowTpSl(false);
+      // ✅ Trigger re-render để cập nhật cột TP/SL
+      setTpslVersion(v => v + 1);
+    }}
     symbol={activePos.symbol}
     entryPrice={parseFloat(activePos.entryPrice || "0")}
     markPrice={getMark(activePos as any) ?? 0}
@@ -1122,8 +1239,10 @@ useEffect(() => {
       1
     }
     onSubmit={() => {
-  // Modal đã tự gửi lệnh, không cần gửi lại
-}}
+      // Modal đã tự gửi lệnh, không cần gửi lại
+      // ✅ Trigger re-render để cập nhật cột TP/SL
+      setTpslVersion(v => v + 1);
+    }}
   />,
   document.body
 )}

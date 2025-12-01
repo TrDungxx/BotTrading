@@ -172,6 +172,43 @@ const TradingForm: React.FC<Props> = ({
   const [isMultiAssetsOpen, setIsMultiAssetsOpen] = useState(false);
   const [multiAssetsMode, setMultiAssetsMode] = useState<boolean | null>(null);
   const [dualSide, setDualSide] = useState<boolean>(true);
+  // ✅ Load PositionMode từ Binance API khi mount/đổi account
+useEffect(() => {
+  const loadPositionMode = () => {
+    console.log('🔄 Calling getPositionMode...');
+    
+    binanceWS.getPositionMode((isDual) => {
+      console.log('📋 PositionMode loaded:', isDual ? 'HEDGE' : 'ONE-WAY', 'isDual=', isDual);
+      setDualSide(isDual);
+    });
+  };
+
+  // ✅ DELAY để đảm bảo WS đã authenticated
+  const timer = setTimeout(() => {
+    console.log('⏰ Timer fired, loading PositionMode...');
+    loadPositionMode();
+  }, 500);
+
+  // Listen cho event đổi account để reload
+  const handler = (msg: any) => {
+    console.log('📨 WS Message received:', msg?.type); // Debug all messages
+    
+    if (msg?.type === 'getPositionMode') {
+      console.log('✅ getPositionMode response:', msg);
+    }
+    
+    if (msg?.type === 'selectBinanceAccountResult' || msg?.type === 'authenticated') {
+      setTimeout(loadPositionMode, 300);
+    }
+  };
+
+  binanceWS.onMessage(handler);
+  
+  return () => {
+    clearTimeout(timer);
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccountId]);
   const [stopPrice, setStopPrice] = useState("");
   const [stopPriceType, setStopPriceType] = useState<"MARK" | "LAST">("MARK");
   const [tpTriggerType, setTpTriggerType] = useState<"MARK" | "LAST">("MARK");
@@ -278,9 +315,11 @@ const TradingForm: React.FC<Props> = ({
   const [confirmOrder, setConfirmOrder] = useState<ConfirmOrder | null>(null);
 
   const canPlaceOrder = useMemo(() => {
-    // ✅ Check cả amount VÀ sliderQty
-    const qty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
-    if (!Number.isFinite(qty) || qty <= 0) return false;
+    // ✅ FIX: Check amount HOẶC percent > 0 (slider đang được dùng)
+    const manualQty = parseFloat(amount || "0");
+    const hasValidQty = (Number.isFinite(manualQty) && manualQty > 0) || percent > 0;
+    
+    if (!hasValidQty) return false;
 
     if (orderType === "limit") {
       const p = parseFloat(priceValue || "0");
@@ -293,10 +332,21 @@ const TradingForm: React.FC<Props> = ({
     }
 
     return true;
-  }, [amount, sliderQty, orderType, priceValue, stopPrice]); // ✅ Đã có stopPrice ở đây
+  }, [amount, percent, orderType, priceValue, stopPrice]);
 
   const openConfirm = (side: ConfirmSide) => {
-    let finalQty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
+    // ✅ FIX: Chọn qty dựa trên side (Long dùng buyQty, Short dùng sellQty)
+    let finalQty: number;
+    
+    if (amount && parseFloat(amount) > 0) {
+      // User nhập thủ công -> dùng amount
+      finalQty = parseFloat(amount);
+    } else if (percent > 0) {
+      // User kéo slider -> dùng buyQty hoặc sellQty tùy side
+      finalQty = side === "LONG" ? buyQty : sellQty;
+    } else {
+      finalQty = 0;
+    }
 
     if (!Number.isFinite(finalQty) || finalQty <= 0) {
       alert("⚠️ Vui lòng nhập số lượng hoặc kéo thanh trượt");
@@ -582,11 +632,49 @@ const TradingForm: React.FC<Props> = ({
 
   const priceDecimals = decimalsFromTick(tickSize);
 
-  const qtyNum = Number((amount || "").replace(",", ".")) || sliderQty || 0;
   const effectivePrice =
     (Number.isFinite(price) && price > 0 ? Number(price) : undefined) ??
     (Number(priceValue) > 0 ? Number(priceValue) : undefined);
   const priceNum = effectivePrice ?? 0;
+
+  // ✅ FIX: Tính buyQty và sellQty riêng biệt như Binance
+  const buyQty = useMemo(() => {
+    if (percent === 0 || !priceNum || priceNum <= 0) return 0;
+
+    const buyingPower =
+      selectedMarket === "futures"
+        ? internalBalance * leverage
+        : internalBalance;
+    
+    const notional = (buyingPower * percent) / 100;
+    
+    // ✅ Long: Tính qty cơ bản
+    const rawQty = notional / priceNum;
+    return Math.floor(rawQty / stepSize) * stepSize;
+  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize]);
+
+  const sellQty = useMemo(() => {
+    if (percent === 0 || !priceNum || priceNum <= 0) return 0;
+
+    const buyingPower =
+      selectedMarket === "futures"
+        ? internalBalance * leverage
+        : internalBalance;
+    
+    const notional = (buyingPower * percent) / 100;
+    
+    // ✅ Short: Binance cho phép short nhiều hơn ~1.5%
+    // Phân tích: 1339/1319 = 1.0152, 2231/2198 = 1.015, 178/176 = 1.0114
+    // Công thức ước tính: factor ≈ 1 + (percent * 0.0005) hoặc cố định ~1.015
+    const shortFactor = 1.015; // +1.5% cố định
+    const adjustedNotional = notional * shortFactor;
+    
+    const rawQty = adjustedNotional / priceNum;
+    return Math.floor(rawQty / stepSize) * stepSize;
+  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize]);
+
+  // ✅ FIX: Dùng buyQty cho estimate (Long side là default)
+  const qtyNum = Number((amount || "").replace(",", ".")) || buyQty || 0;
 
   const est = useMemo(
     () =>
@@ -677,13 +765,13 @@ useEffect(() => {
   // ✅ DELAY để các useEffect clear chạy xong TRƯỚC
   // Sau đó mới set values và mark loaded
   setTimeout(() => {
-    setTpSl(true);
-    setTpSlValues({
-      takeProfitPrice: "500",
-      stopLossPrice: "-300",
-      takeProfitEnabled: true,
-      stopLossEnabled: true,
-    });
+   // setTpSl(true);
+   // setTpSlValues({
+     // takeProfitPrice: "500",
+     // stopLossPrice: "-300",
+      //takeProfitEnabled: true,
+     // stopLossEnabled: true,
+  //  });
     
     // Mark loaded SAU KHI đã set values
     tpSlLoadedRef.current = true;
@@ -946,52 +1034,9 @@ useEffect(() => {
       });
   };
 
-  const buyAmount = useMemo(() => {
-    if (percent === 0) return 0;
-
-    if (selectedUnit === "quote") {
-      const buyingPower =
-        selectedMarket === "futures"
-          ? internalBalance * leverage
-          : internalBalance;
-      return (buyingPower * percent) / 100;
-    }
-
-    return (maxBuyQty * percent) / 100;
-  }, [
-    maxBuyQty,
-    percent,
-    selectedUnit,
-    internalBalance,
-    leverage,
-    selectedMarket,
-  ]);
-
-  const sellAmount = useMemo(() => {
-    if (percent === 0) return 0;
-
-    if (selectedUnit === "quote") {
-      const buyingPower =
-        selectedMarket === "futures"
-          ? internalBalance * leverage
-          : internalBalance;
-      const notionalBuy = (buyingPower * percent) / 100;
-      const leveragedNotional = notionalBuy * (1 + 1 / leverage);
-      return leveragedNotional;
-    }
-
-    const notionalBuy = (maxBuyQty * percent) / 100;
-    const leveragedNotional = notionalBuy * (1 + 1 / leverage);
-
-    return leveragedNotional;
-  }, [
-    maxBuyQty,
-    percent,
-    leverage,
-    selectedUnit,
-    internalBalance,
-    selectedMarket,
-  ]);
+  // ✅ buyAmount/sellAmount cho backward compatibility
+  const buyAmount = buyQty;
+  const sellAmount = sellQty;
 
   const convertAmount = (
     value: string,
@@ -1050,7 +1095,8 @@ useEffect(() => {
 
   // Tính % rủi ro của lệnh
   const orderRiskPercent = useMemo(() => {
-    const qty = sliderQty > 0 ? sliderQty : parseFloat(amount || "0");
+    // ✅ FIX: Dùng buyQty thay vì sliderQty
+    const qty = parseFloat(amount || "0") > 0 ? parseFloat(amount) : buyQty;
     if (!Number.isFinite(qty) || qty <= 0 || !priceNum || priceNum <= 0) return 0;
 
     const notional = qty * priceNum;
@@ -1059,7 +1105,7 @@ useEffect(() => {
     if (internalBalance <= 0) return 0;
 
     return (margin / internalBalance) * 100;
-  }, [sliderQty, amount, priceNum, internalBalance, leverage, selectedMarket]);
+  }, [buyQty, amount, priceNum, internalBalance, leverage, selectedMarket]);
 
   const MAX_RISK_PERCENT = 5; // 5% max
   // ===== Render =====
@@ -1374,13 +1420,16 @@ useEffect(() => {
             {leverage}x
           </button>
           <button
-            onClick={() => setIsMultiAssetsOpen(true)}
-            className={`text-xs px-2 py-1 rounded ${multiAssetsMode ? "bg-warning-700" : "bg-dark-700"
-              } hover:ring-1 ring-primary-500`}
-            title={multiAssetsMode ? "Hedge (M)" : "One-way (S)"}
-          >
-            {multiAssetsMode ? "M" : "S"}
-          </button>
+  onClick={() => setIsMultiAssetsOpen(true)}
+  className={`text-xs px-2 py-1 rounded hover:ring-1 ring-primary-500 ${
+    dualSide 
+      ? "bg-yellow-600 text-black font-semibold"  // HEDGE - nổi bật
+      : "bg-dark-700 text-white"                   // ONE-WAY
+  }`}
+  title={dualSide ? "Hedge Mode" : "One-way Mode"}
+>
+  {dualSide ? "M" : "S"}
+</button>
         </div>
 
         {/* Tab Mở/Đóng */}
@@ -1596,16 +1645,18 @@ useEffect(() => {
       <span className="text-dark-400">
         Mua{" "}
         <span className="text-white font-medium">
-          {Math.floor(buyAmount).toLocaleString()}{" "}
-          {selectedUnit === "base" ? baseAsset : "USDT"}
+          {/* ✅ FIX: Dùng buyQty - đã tính phí cho Long */}
+          {buyQty.toLocaleString(undefined, { maximumFractionDigits: qtyDecimals(stepSize) })}{" "}
+          {baseAsset}
         </span>
       </span>
 
       <span className="text-dark-400">
         Bán{" "}
         <span className="text-white font-medium">
-          {Math.floor(sellAmount).toLocaleString()}{" "}
-          {selectedUnit === "base" ? baseAsset : "USDT"}
+          {/* ✅ FIX: Dùng sellQty - đã tính phí cho Short */}
+          {sellQty.toLocaleString(undefined, { maximumFractionDigits: qtyDecimals(stepSize) })}{" "}
+          {baseAsset}
         </span>
       </span>
     </div>
@@ -1620,6 +1671,7 @@ useEffect(() => {
       onValueChange={([v]) => {
         const snapped = findNearestAllowedPercent(v);
         setPercent(snapped);
+        if (snapped > 0) setAmount(""); // ✅ Clear amount khi kéo slider
       }}
       min={0}
       max={4}
@@ -1678,6 +1730,7 @@ useEffect(() => {
             const targetIndex = Math.round(percentage * 5);
             const snapped = ALLOWED_PERCENTAGES[targetIndex] || 0;
             setPercent(snapped);
+            if (snapped > 0) setAmount(""); // ✅ Clear amount khi kéo slider
           };
 
           const handleUp = () => {
@@ -1698,7 +1751,10 @@ useEffect(() => {
   {ALLOWED_PERCENTAGES.map((mark, index) => (
     <button
       key={mark}
-      onClick={() => setPercent(mark)}
+      onClick={() => {
+        setPercent(mark);
+        if (mark > 0) setAmount(""); // ✅ Clear amount khi click vào %
+      }}
       className={`absolute -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 font-medium select-none ${
   percent === mark 
     ? 'text-blue-400 bg-blue-500/10 shadow-lg shadow-blue-500/20 scale-105'
@@ -1739,13 +1795,13 @@ useEffect(() => {
       }
 
       // ✅ THÊM: Set default TP = 500%, SL = -300% nếu chưa có giá trị
-      setTpSlValues((prev) => ({
-        ...prev,
-        takeProfitPrice: prev.takeProfitPrice || "500",
-        stopLossPrice: prev.stopLossPrice || "-300",
-        takeProfitEnabled: true,
-        stopLossEnabled: true,
-      }));
+     // setTpSlValues((prev) => ({
+     //   ...prev,
+     //   takeProfitPrice: prev.takeProfitPrice || "500",
+     //   stopLossPrice: prev.stopLossPrice || "-300",
+     //   takeProfitEnabled: true,
+     //   stopLossEnabled: true,
+     // }));
     }
   }}
   className="form-checkbox"

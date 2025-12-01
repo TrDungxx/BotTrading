@@ -31,16 +31,17 @@ export type PlaceOrderType =
 export interface PlaceOrderPayload {
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: PlaceOrderType;                 // ⬅️ đổi từ union cũ sang type mới
+  type: PlaceOrderType;
   market: 'futures' | 'spot';
 
   // qty/price
   quantity?: number;
-  price?: number;     // LIMIT, *_LIMIT (Spot)
-  stopPrice?: number; // *_MARKET (Futures), *_LIMIT (Spot)
+  price?: number;
+  stopPrice?: number;
 
   // futures-only (optional)
   reduceOnly?: boolean;
+  closePosition?: boolean | 'true';  // ✅ Cho phép cả boolean và string 'true'
   positionSide?: 'LONG' | 'SHORT' | 'BOTH';
   timeInForce?: 'GTC' | 'IOC' | 'FOK';
 
@@ -298,32 +299,42 @@ public setMaintenanceCallback(callback: (() => void) | null) {
 
   // ========= Position mode =========
   public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
-    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
-
-    if (!onDone) return;
-    const once = (m: any) => {
-      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onDone(true, m);
-        this.removeMessageHandler(once);
-      } else if (m?.success === false && m?.error) {
-        onDone(false, m);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
+  this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
+  if (!onDone) return;
+  
+  const once = (m: any) => {
+    // ✅ FIX: Check theo response thực tế từ server
+    // Server trả về: {code: 200, msg: "success", dualSidePosition: false, mode: "ONE_WAY", ...}
+    if (
+      (m?.code === 200 || m?.msg === 'success' || m?.msg?.includes('Position mode')) &&
+      typeof m?.dualSidePosition === 'boolean' &&
+      (m?.mode === 'HEDGE' || m?.mode === 'ONE_WAY')
+    ) {
+      console.log('✅ changePositionMode success:', m.mode, m.dualSidePosition);
+      onDone(true, m);
+      this.removeMessageHandler(once);
+    }
+  };
+  this.onMessage(once);
+}
 
   public getPositionMode(onResult?: (dual: boolean) => void) {
-    this.sendAuthed({ action: 'getPositionMode' });
-    if (!onResult) return;
-    const once = (m: any) => {
-      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
-        onResult(m.dualSidePosition);
-        this.removeMessageHandler(once);
-      }
-    };
-    this.onMessage(once);
-  }
+  console.log('📤 Sending getPositionMode request...');
+  this.sendAuthed({ action: 'getPositionMode' });
+  
+  if (!onResult) return;
+  
+  const once = (m: any) => {
+    // ✅ FIX: Check theo response thực tế từ server
+    // Server trả về: {dualSidePosition: true, mode: "HEDGE", source: "library-api", ...}
+    if (typeof m?.dualSidePosition === 'boolean' && m?.source === 'library-api') {
+      console.log('✅ getPositionMode result:', m.dualSidePosition, m.mode);
+      onResult(m.dualSidePosition);
+      this.removeMessageHandler(once);
+    }
+  };
+  this.onMessage(once);
+}
 
   // Public: đóng WS + dọn state
   public disconnect(reason?: string) {

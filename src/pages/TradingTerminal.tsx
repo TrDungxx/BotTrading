@@ -33,7 +33,7 @@ import SymbolDropdown from "../components/symboldropdown/SymbolDropdown";
 import symbolList from "../utils/symbolList";
 import TradingForm from "../components/common/TradingForm";
 import { useMiniTickerStore } from "../utils/miniTickerStore";
-import { binanceWS } from "../components/binancewebsocket/BinanceWebSocketService";
+import { binanceWS,OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../components/binancewebsocket/BinanceWebSocketService";
 import { toast } from "react-toastify";
 
 
@@ -1506,42 +1506,53 @@ const handleRefreshConnection = () => {
 
 
 
-  // ✅ Subscribe realtime theo account đã chọn (thêm ref-guard chống duplicate)
-  const subOnceRef = useRef<number | null>(null);
-  useEffect(() => {
-    const id = selectedAccount?.id;
-    if (!id) return;
+ // ✅ Subscribe realtime theo account đã chọn (thêm ref-guard chống duplicate)
+const subOnceRef = useRef<number | null>(null);
+useEffect(() => {
+  const id = selectedAccount?.id;
+  if (!id) return;
 
-    const now = Date.now();
-    if (subOnceRef.current && now - subOnceRef.current < 1500) return;
-    subOnceRef.current = now;
+  const now = Date.now();
+  if (subOnceRef.current && now - subOnceRef.current < 1500) return;
+  subOnceRef.current = now;
 
-    // 1) chọn account
-    binanceWS.selectAccount(id);
+  // 1) chọn account
+  binanceWS.selectAccount(id);
 
-    // 2) subscribe realtime (balance/positions/orders)
-    binanceWS.subscribeAccountUpdates(setOpenOrders, [
-      "balance",
-      "positions",
-      "orders",
-    ]);
+  // 2) subscribe realtime (balance/positions/orders)
+  binanceWS.subscribeAccountUpdates(setOpenOrders, [
+    "balance",
+    "positions",
+    "orders",
+  ]);
 
-    // 3) kéo positions trước một nhịp
-    binanceWS.getPositions(id);
+  // 3) kéo positions trước một nhịp
+  binanceWS.getPositions(id);
+  binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
+  console.log('📥 Initial getOpenOrders:', orders);
+  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(orders));
+  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: orders } }));
+});
+  // ✅ 4) THÊM ĐOẠN NÀY - Kéo open orders ngay khi load
+  binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
+    console.log('📥 Initial getOpenOrders:', orders);
+    localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(orders));
+    window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: orders } }));
+  });
 
-    // 4) cập nhật positions từ snapshot/stream
-    binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
-      const active = (rawPositions || []).filter(
-        (p: any) => parseFloat(p.positionAmt) !== 0
-      );
-      setPositions(active);
-      localStorage.setItem("positions", JSON.stringify(active));
-    });
+  // 5) cập nhật positions từ snapshot/stream
+  binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
+    const active = (rawPositions || []).filter(
+      (p: any) => parseFloat(p.positionAmt) !== 0
+    );
+    setPositions(active);
+    localStorage.setItem("positions", JSON.stringify(active));
+  });
 
-    return () => {
-      binanceWS.unsubscribeAccountUpdates();
-    };
-  }, [selectedAccount?.id]);
+  return () => {
+    binanceWS.unsubscribeAccountUpdates();
+  };
+}, [selectedAccount?.id, selectedMarket]);
 
   // Khôi phục account đã chọn từ localStorage khi vào trang (chỉ 1 lần)
   useEffect(() => {

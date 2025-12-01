@@ -56,6 +56,7 @@ interface TpSlSettings {
   mode: InputMode;
   tpInput: string;
   slInput: string;
+  entryPrice: number;  // Để phân biệt position cũ vs mới
 }
 
 function loadSettings(symbol: string): Partial<TpSlSettings> {
@@ -72,6 +73,13 @@ function saveSettings(symbol: string, settings: TpSlSettings) {
   } catch {}
 }
 
+// Export function để clear settings khi position đóng
+export function clearPositionTpSlSettings(symbol: string) {
+  try {
+    localStorage.removeItem(getSettingsKey(symbol));
+  } catch {}
+}
+
 const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   isOpen,
   onClose,
@@ -83,29 +91,39 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   leverage,
   onSubmit,
 }) => {
-  // Load saved settings
+  // Load saved settings - chỉ cho mode/trigger preferences
   const savedSettings = React.useMemo(() => loadSettings(symbol), [symbol]);
 
   const [trigger, setTrigger] = React.useState<TriggerType>(savedSettings.trigger || "MARK");
   const [mode, setMode] = React.useState<InputMode>(savedSettings.mode || "pnl_abs");
-  const [tpInput, setTpInput] = React.useState<string>(savedSettings.tpInput || "");
-  const [slInput, setSlInput] = React.useState<string>(savedSettings.slInput || "");
+  // ✅ Luôn khởi tạo trống - KHÔNG load từ localStorage
+  const [tpInput, setTpInput] = React.useState<string>("");
+  const [slInput, setSlInput] = React.useState<string>("");
 
-  // Reset khi đổi symbol
+  // Load settings khi đổi symbol hoặc entryPrice
   useEffect(() => {
     const settings = loadSettings(symbol);
+    
+    // Load preferences (mode, trigger) luôn
     setTrigger(settings.trigger || "MARK");
     setMode(settings.mode || "pnl_abs");
-    setTpInput(settings.tpInput || "");
-    setSlInput(settings.slInput || "");
-  }, [symbol]);
-
-  // Auto-save settings khi thay đổi
-  useEffect(() => {
-    if (isOpen) {
-      saveSettings(symbol, { trigger, mode, tpInput, slInput });
+    
+    // Chỉ load values nếu CÙNG POSITION (entry price match)
+    const isSamePosition = settings.entryPrice && 
+      Math.abs(settings.entryPrice - entryPrice) < 0.0000001;
+    
+    if (isSamePosition) {
+      // Cùng position → load values đã lưu
+      setTpInput(settings.tpInput || "");
+      setSlInput(settings.slInput || "");
+    } else {
+      // Position mới → clear values
+      setTpInput("");
+      setSlInput("");
     }
-  }, [isOpen, symbol, trigger, mode, tpInput, slInput]);
+  }, [symbol, entryPrice]);
+
+  // ❌ Không auto-save nữa - chỉ save khi user submit
 
   if (!isOpen) return null;
 
@@ -154,14 +172,24 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
 
   // ---------- đặt lệnh + optimistic ----------
   const handleConfirm = () => {
+    // ✅ Lưu settings SAU KHI SUBMIT (bao gồm values và entryPrice)
+    saveSettings(symbol, {
+      trigger,
+      mode,
+      tpInput,
+      slInput,
+      entryPrice,  // Lưu entry price để phân biệt position
+    });
+
     onSubmit?.({ tpPrice, slPrice, trigger });
 
     const base = {
       market: "futures" as const,
       symbol,
-      quantity: safeQty,
       workingType: trigger,
       positionSide,
+      closePosition: 'true' as const, // ✅ String 'true' for Binance API
+      // ❌ KHÔNG gửi quantity khi có closePosition
     };
 
     const sideForClose = isLong ? "SELL" : "BUY";
@@ -177,10 +205,11 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
         price: 0,
         stopPrice: tpPrice,
         workingType: trigger,
-        origQty: String(safeQty),
+        origQty: String(safeQty), // Display only
         executedQty: "0",
         time: Date.now(),
         _optimistic: true,
+        closePosition: 'true', // ✅ Match với base - string 'true'
       };
       optimisticAddOpenOrder(optimisticRow);
 
@@ -203,10 +232,11 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
         price: 0,
         stopPrice: slPrice,
         workingType: trigger,
-        origQty: String(safeQty),
+        origQty: String(safeQty), // Display only
         executedQty: "0",
         time: Date.now(),
         _optimistic: true,
+        closePosition: 'true', // ✅ Match với base - string 'true'
       };
       optimisticAddOpenOrder(optimisticRow);
 

@@ -1,0 +1,21 @@
+/* Trading Positions - No internal scroll */
+.trading-positions {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--bg-panel, #1e293b);
+}
+
+.trading-positions-header {
+  flex-shrink: 0;
+}
+
+.trading-positions-table-container {
+  width: 100%;
+  overflow: visible; /* Không scroll riêng */
+}
+
+.trading-positions table {
+  width: 100%;
+  border-collapse: collapse;
+}
