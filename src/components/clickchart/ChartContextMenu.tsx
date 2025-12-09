@@ -64,6 +64,26 @@ const ChevronRight = () => (
   </svg>
 );
 
+interface PlaceOrderParams {
+  market: "spot" | "futures";
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: "LIMIT" | "STOP_MARKET";
+  quantity: number;
+  price?: number;
+  stopPrice?: number;
+  timeInForce?: "GTC" | "IOC" | "FOK";
+  positionSide: "LONG" | "SHORT";
+  workingType?: "MARK_PRICE" | "LAST";
+}
+
+interface SymbolInfo {
+  tickSize: number;
+  stepSize: number;
+  minQty: number;
+  minNotional: number;
+}
+
 interface ChartContextMenuProps {
   open: boolean;
   position: { x: number; y: number };
@@ -85,6 +105,10 @@ interface ChartContextMenuProps {
   // Thêm props cho order form
   availableBalance?: number;
   leverage?: number;
+  // Callback đặt lệnh
+  onPlaceOrder?: (params: PlaceOrderParams) => void;
+  // Symbol info
+  symbolInfo?: SymbolInfo;
 }
 
 const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
@@ -107,17 +131,33 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   snapToTick,
   availableBalance = 0,
   leverage = 10,
+  onPlaceOrder,
+  symbolInfo,
 }) => {
   // State cho submenu đặt lệnh
   const [orderSubMenuOpen, setOrderSubMenuOpen] = React.useState(false);
   // State cho modal - chỉ có limit và stop-limit (không có market)
   const [orderModalOpen, setOrderModalOpen] = React.useState(false);
   const [orderModalType, setOrderModalType] = React.useState<'limit' | 'stop-limit'>('limit');
-
-  if (!open && !orderModalOpen) return null;
+  // State lưu giá khi mở modal (không bị reset khi menu đóng)
+  const [savedPrice, setSavedPrice] = React.useState<number | null>(null);
 
   // Sử dụng giá tại thời điểm click, không thay đổi khi di chuột
   const displayPrice = ctxClickPrice ?? hoverPrice ?? lastCandleClose;
+
+  // Debug log
+  React.useEffect(() => {
+    if (open) {
+      console.log('[ChartContextMenu] Open with prices:', {
+        ctxClickPrice,
+        hoverPrice,
+        lastCandleClose,
+        displayPrice,
+      });
+    }
+  }, [open, ctxClickPrice, hoverPrice, lastCandleClose, displayPrice]);
+
+  if (!open && !orderModalOpen) return null;
 
   const formatPrice = (price: number | null) => {
     if (price == null) return '--';
@@ -135,12 +175,34 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   };
 
   const handleLimitOrder = () => {
+    // Lưu giá TRƯỚC KHI đóng menu
+    const priceToSave = displayPrice;
+    console.log('[ChartContextMenu] handleLimitOrder:', {
+      displayPrice,
+      ctxClickPrice,
+      priceToSave,
+    });
+    
+    if (priceToSave != null) {
+      setSavedPrice(priceToSave);
+    }
     setOrderModalType('limit');
     setOrderModalOpen(true);
     onClose();
   };
 
   const handleStopOrder = () => {
+    // Lưu giá TRƯỚC KHI đóng menu
+    const priceToSave = displayPrice;
+    console.log('[ChartContextMenu] handleStopOrder:', {
+      displayPrice,
+      ctxClickPrice,
+      priceToSave,
+    });
+    
+    if (priceToSave != null) {
+      setSavedPrice(priceToSave);
+    }
     setOrderModalType('stop-limit');
     setOrderModalOpen(true);
     onClose();
@@ -357,13 +419,18 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
     {/* Order Modal - Sử dụng TradingForm */}
     <ChartOrderModal
       open={orderModalOpen}
-      onClose={() => setOrderModalOpen(false)}
+      onClose={() => {
+        setOrderModalOpen(false);
+        setSavedPrice(null); // Reset savedPrice khi đóng modal
+      }}
       symbol={selectedSymbol}
-      price={displayPrice ?? lastCandleClose ?? 0}
+      price={savedPrice ?? lastCandleClose ?? 0}
       market={market}
       defaultOrderType={orderModalType}
       availableBalance={availableBalance}
       leverage={leverage}
+      onPlaceOrder={onPlaceOrder}
+      symbolInfo={symbolInfo}
     />
     </>
   );

@@ -2,8 +2,17 @@ import React, { useEffect } from "react";
 import { X } from "lucide-react";
 import { binanceWS, OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../../binancewebsocket/BinanceWebSocketService";
 
-type TriggerType = "MARK" | "LAST";
+type TriggerType = "MARK_PRICE" | "LAST";
 type InputMode = "price" | "pnl_abs" | "roi_pct";
+
+export function clearPositionTpSlMetadata(symbol: string, positionSide: 'LONG' | 'SHORT') {
+  try {
+    const metadata = JSON.parse(localStorage.getItem('tpsl_metadata') || '{}');
+    const metaKey = `${symbol}:${positionSide}`;
+    delete metadata[metaKey];
+    localStorage.setItem('tpsl_metadata', JSON.stringify(metadata));
+  } catch {}
+}
 
 export interface PositionTpSlModalProps {
   isOpen: boolean;
@@ -94,34 +103,101 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   // Load saved settings - chỉ cho mode/trigger preferences
   const savedSettings = React.useMemo(() => loadSettings(symbol), [symbol]);
 
-  const [trigger, setTrigger] = React.useState<TriggerType>(savedSettings.trigger || "MARK");
+  const [trigger, setTrigger] = React.useState<TriggerType>(savedSettings.trigger || "MARK_PRICE");
   const [mode, setMode] = React.useState<InputMode>(savedSettings.mode || "pnl_abs");
   // ✅ Luôn khởi tạo trống - KHÔNG load từ localStorage
   const [tpInput, setTpInput] = React.useState<string>("");
   const [slInput, setSlInput] = React.useState<string>("");
 
   // Load settings khi đổi symbol hoặc entryPrice
-  useEffect(() => {
-    const settings = loadSettings(symbol);
+useEffect(() => {
+  const settings = loadSettings(symbol);
+  
+  // Load preferences (mode, trigger) luôn
+  setTrigger(settings.trigger || "MARK_PRICE");
+  setMode(settings.mode || "roi_pct");
+  
+  // ✅ FIX: Load từ openOrders thật thay vì localStorage settings
+  const openOrders = readOpenOrdersLS();
+  const positionSide = positionAmt > 0 ? "LONG" : "SHORT";
+  const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
+  const lev = leverage && leverage > 0 ? leverage : 1;
+  
+  const tpOrder = openOrders.find((o: any) => 
+    o.symbol === symbol && 
+    (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+    o.side === expectedSide &&
+    o.status === 'NEW' &&
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
+  );
+  
+  const slOrder = openOrders.find((o: any) => 
+    o.symbol === symbol && 
+    (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+    o.side === expectedSide &&
+    o.status === 'NEW' &&
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
+  );
+  
+  // ✅ FIX: Check xem stopPrice có hợp lý với entryPrice không
+  const isValidOrder = (order: any, isTp: boolean) => {
+    if (!order || !entryPrice) return false;
+    const stopPrice = parseFloat(order.stopPrice || '0');
+    if (!stopPrice) return false;
     
-    // Load preferences (mode, trigger) luôn
-    setTrigger(settings.trigger || "MARK");
-    setMode(settings.mode || "pnl_abs");
+    const isLong = positionAmt > 0;
     
-    // Chỉ load values nếu CÙNG POSITION (entry price match)
-    const isSamePosition = settings.entryPrice && 
-      Math.abs(settings.entryPrice - entryPrice) < 0.0000001;
-    
-    if (isSamePosition) {
-      // Cùng position → load values đã lưu
-      setTpInput(settings.tpInput || "");
-      setSlInput(settings.slInput || "");
-    } else {
-      // Position mới → clear values
-      setTpInput("");
-      setSlInput("");
+    // Validate TP phải > entry (long) hoặc < entry (short)
+    if (isTp) {
+      if (isLong && stopPrice <= entryPrice) return false;
+      if (!isLong && stopPrice >= entryPrice) return false;
     }
-  }, [symbol, entryPrice]);
+    // Validate SL phải < entry (long) hoặc > entry (short)  
+    else {
+      if (isLong && stopPrice >= entryPrice) return false;
+      if (!isLong && stopPrice <= entryPrice) return false;
+    }
+    
+    // ✅ Thêm check: ROI không quá lớn (tránh orders của position cũ)
+    const priceDiff = isLong 
+      ? (isTp ? stopPrice - entryPrice : entryPrice - stopPrice)
+      : (isTp ? entryPrice - stopPrice : stopPrice - entryPrice);
+    const roi = Math.abs((priceDiff / entryPrice) * lev * 100);
+    
+    // Nếu ROI > 500% thì có thể là order của position cũ
+    if (roi > 500) return false;
+    
+    return true;
+  };
+  
+  // Tính ROI% từ existing orders với entry mới
+  const calcRoiFromOrder = (order: any, isTp: boolean) => {
+    if (!isValidOrder(order, isTp)) return '';
+    
+    const stopPrice = parseFloat(order.stopPrice || '0');
+    const isLong = positionAmt > 0;
+    const priceDiff = isLong 
+      ? (isTp ? stopPrice - entryPrice : entryPrice - stopPrice)
+      : (isTp ? entryPrice - stopPrice : stopPrice - entryPrice);
+    const roi = (priceDiff / entryPrice) * lev * 100;
+    
+    return Math.abs(roi).toFixed(1);
+  };
+  
+  // Prefill từ existing orders - CHỈ NẾU HỢP LỆ
+  if ((tpOrder && isValidOrder(tpOrder, true)) || (slOrder && isValidOrder(slOrder, false))) {
+    setMode("roi_pct");
+    setTpInput(calcRoiFromOrder(tpOrder, true));
+    setSlInput(calcRoiFromOrder(slOrder, false));
+  } else {
+    // Không có orders hợp lệ → clear
+    setTpInput("");
+    setSlInput("");
+  }
+}, [symbol, entryPrice, positionAmt, leverage]);
+
 
   // ❌ Không auto-save nữa - chỉ save khi user submit
 
@@ -171,85 +247,115 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
   const slEst = calcPnLAndROI(slPrice);
 
   // ---------- đặt lệnh + optimistic ----------
-  const handleConfirm = () => {
-    // ✅ Lưu settings SAU KHI SUBMIT (bao gồm values và entryPrice)
-    saveSettings(symbol, {
-      trigger,
-      mode,
-      tpInput,
-      slInput,
-      entryPrice,  // Lưu entry price để phân biệt position
-    });
+ const handleConfirm = () => {
+  // Lưu settings
+  saveSettings(symbol, {
+    trigger,
+    mode,
+    tpInput,
+    slInput,
+    entryPrice,
+  });
 
-    onSubmit?.({ tpPrice, slPrice, trigger });
+  onSubmit?.({ tpPrice, slPrice, trigger });
 
-    const base = {
-      market: "futures" as const,
-      symbol,
-      workingType: trigger,
-      positionSide,
-      closePosition: 'true' as const, // ✅ String 'true' for Binance API
-      // ❌ KHÔNG gửi quantity khi có closePosition
-    };
-
-    const sideForClose = isLong ? "SELL" : "BUY";
-
-    // OPTIMISTIC + WS: TP
-    if (Number.isFinite(tpPrice as number)) {
-      const optimisticRow = {
-        orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        symbol,
-        side: sideForClose,
-        type: "TAKE_PROFIT_MARKET",
-        status: "NEW",
-        price: 0,
-        stopPrice: tpPrice,
-        workingType: trigger,
-        origQty: String(safeQty), // Display only
-        executedQty: "0",
-        time: Date.now(),
-        _optimistic: true,
-        closePosition: 'true', // ✅ Match với base - string 'true'
-      };
-      optimisticAddOpenOrder(optimisticRow);
-
-      binanceWS.placeOrder({
-        ...base,
-        side: sideForClose as "BUY" | "SELL",
-        type: "TAKE_PROFIT_MARKET",
-        stopPrice: tpPrice!,
-      });
-    }
-
-    // OPTIMISTIC + WS: SL
-    if (Number.isFinite(slPrice as number)) {
-      const optimisticRow = {
-        orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        symbol,
-        side: sideForClose,
-        type: "STOP_MARKET",
-        status: "NEW",
-        price: 0,
-        stopPrice: slPrice,
-        workingType: trigger,
-        origQty: String(safeQty), // Display only
-        executedQty: "0",
-        time: Date.now(),
-        _optimistic: true,
-        closePosition: 'true', // ✅ Match với base - string 'true'
-      };
-      optimisticAddOpenOrder(optimisticRow);
-
-      binanceWS.placeOrder({
-        ...base,
-        side: sideForClose as "BUY" | "SELL",
-        type: "STOP_MARKET",
-        stopPrice: slPrice!,
-      });
-    }
-
-    onClose();
+  const base = {
+    market: "futures" as const,
+    symbol,
+    workingType: trigger,
+    positionSide,
+    closePosition: 'true' as const,
   };
+
+  const sideForClose = isLong ? "SELL" : "BUY";
+  
+  // ✅ THÊM: Check existing orders trước khi gửi
+  const openOrders = readOpenOrdersLS();
+  
+  const existingTP = openOrders.find((o: any) => 
+    o.symbol === symbol && 
+    (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+    o.side === sideForClose &&
+    o.status === 'NEW' &&
+    parseFloat(o.stopPrice) === tpPrice
+  );
+  
+  const existingSL = openOrders.find((o: any) => 
+    o.symbol === symbol && 
+    (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+    o.side === sideForClose &&
+    o.status === 'NEW' &&
+    parseFloat(o.stopPrice) === slPrice
+  );
+  
+  // ✅ THÊM: Lưu metadata ROI input của user
+  const tpslMetadata: Record<string, { tpInputRoi?: string; slInputRoi?: string }> = 
+    JSON.parse(localStorage.getItem('tpsl_metadata') || '{}');
+  
+  const metaKey = `${symbol}:${positionSide}`;
+  tpslMetadata[metaKey] = {
+    ...(mode === 'roi_pct' && tpInput ? { tpInputRoi: tpInput } : {}),
+    ...(mode === 'roi_pct' && slInput ? { slInputRoi: slInput } : {}),
+  };
+  
+  localStorage.setItem('tpsl_metadata', JSON.stringify(tpslMetadata));
+
+  // OPTIMISTIC + WS: TP - chỉ gửi nếu chưa có hoặc stopPrice khác
+  if (Number.isFinite(tpPrice as number) && !existingTP) {
+    const optimisticRow = {
+      orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      symbol,
+      side: sideForClose,
+      type: "TAKE_PROFIT_MARKET",
+      status: "NEW",
+      price: 0,
+      stopPrice: tpPrice,
+      workingType: trigger,
+      origQty: String(safeQty),
+      executedQty: "0",
+      time: Date.now(),
+      _optimistic: true,
+      closePosition: 'true',
+    };
+    optimisticAddOpenOrder(optimisticRow);
+
+    binanceWS.placeOrder({
+      ...base,
+      side: sideForClose as "BUY" | "SELL",
+      type: "TAKE_PROFIT_MARKET",
+      stopPrice: tpPrice!,
+    });
+  }
+
+  // OPTIMISTIC + WS: SL - chỉ gửi nếu chưa có hoặc stopPrice khác
+  if (Number.isFinite(slPrice as number) && !existingSL) {
+    const optimisticRow = {
+      orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      symbol,
+      side: sideForClose,
+      type: "STOP_MARKET",
+      status: "NEW",
+      price: 0,
+      stopPrice: slPrice,
+      workingType: trigger,
+      origQty: String(safeQty),
+      executedQty: "0",
+      time: Date.now(),
+      _optimistic: true,
+      closePosition: 'true',
+    };
+    optimisticAddOpenOrder(optimisticRow);
+
+    binanceWS.placeOrder({
+      ...base,
+      side: sideForClose as "BUY" | "SELL",
+      type: "STOP_MARKET",
+      stopPrice: slPrice!,
+    });
+  }
+
+  onClose();
+};
 
   const getModeLabel = () => {
     switch (mode) {
@@ -305,11 +411,11 @@ const PositionTpSlModal: React.FC<PositionTpSlModalProps> = ({
               <div className="flex rounded-lg overflow-hidden border border-[#2b3139]">
                 <button
                   className={`flex-1 px-3 py-2 text-[13px] font-medium transition-colors ${
-                    trigger === "MARK" 
+                    trigger === "MARK_PRICE" 
                       ? "bg-[#fcd535] text-black" 
                       : "bg-transparent text-gray-300 hover:bg-[#2b3139]"
                   }`}
-                  onClick={() => setTrigger("MARK")}
+                  onClick={() => setTrigger("MARK_PRICE")}
                 >
                   Mark
                 </button>

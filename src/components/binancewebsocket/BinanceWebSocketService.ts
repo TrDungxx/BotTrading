@@ -7,7 +7,7 @@ type PositionsCb = (rows: any[]) => void;
 export const OPEN_ORDERS_LS_KEY = 'openOrders';
 export const OPEN_ORDERS_EVENT  = 'tw:open-orders-changed';
 // ==== Types for placing orders ====
-export type WorkingType = 'MARK' | 'LAST';
+export type WorkingType = 'MARK_PRICE' | 'LAST';
 export const POSITIONS_LS_KEY = 'positions';
 export const POSITIONS_EVENT  = 'tw:positions-changed';
 
@@ -31,17 +31,16 @@ export type PlaceOrderType =
 export interface PlaceOrderPayload {
   symbol: string;
   side: 'BUY' | 'SELL';
-  type: PlaceOrderType;
+  type: PlaceOrderType;                 // ⬅️ đổi từ union cũ sang type mới
   market: 'futures' | 'spot';
 
   // qty/price
   quantity?: number;
-  price?: number;
-  stopPrice?: number;
+  price?: number;     // LIMIT, *_LIMIT (Spot)
+  stopPrice?: number; // *_MARKET (Futures), *_LIMIT (Spot)
 
   // futures-only (optional)
   reduceOnly?: boolean;
-  closePosition?: boolean | 'true';  // ✅ Cho phép cả boolean và string 'true'
   positionSide?: 'LONG' | 'SHORT' | 'BOTH';
   timeInForce?: 'GTC' | 'IOC' | 'FOK';
 
@@ -99,6 +98,7 @@ private apiDebounceMs = 200; // 200ms debounce
   // ===== Account Selection Tracking =====
   private accountSelectedResolvers: Array<() => void> = [];
   private accountSelected: boolean = false;
+  private accountSelectedOnServer: boolean = false;  // ✅ NEW: Server đã nhận selectAccount chưa
 
   // ===== Handlers & caches =====
   private messageHandlers: ((data: any) => void)[] = [];
@@ -299,42 +299,32 @@ public setMaintenanceCallback(callback: (() => void) | null) {
 
   // ========= Position mode =========
   public changePositionMode(dualSidePosition: boolean, onDone?: (ok: boolean, raw: any) => void) {
-  this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
-  if (!onDone) return;
-  
-  const once = (m: any) => {
-    // ✅ FIX: Check theo response thực tế từ server
-    // Server trả về: {code: 200, msg: "success", dualSidePosition: false, mode: "ONE_WAY", ...}
-    if (
-      (m?.code === 200 || m?.msg === 'success' || m?.msg?.includes('Position mode')) &&
-      typeof m?.dualSidePosition === 'boolean' &&
-      (m?.mode === 'HEDGE' || m?.mode === 'ONE_WAY')
-    ) {
-      console.log('✅ changePositionMode success:', m.mode, m.dualSidePosition);
-      onDone(true, m);
-      this.removeMessageHandler(once);
-    }
-  };
-  this.onMessage(once);
-}
+    this.sendAuthed({ action: 'changePositionMode', dualSidePosition });
+
+    if (!onDone) return;
+    const once = (m: any) => {
+      if (m?.type === 'changePositionMode' && typeof m.dualSidePosition === 'boolean') {
+        onDone(true, m);
+        this.removeMessageHandler(once);
+      } else if (m?.success === false && m?.error) {
+        onDone(false, m);
+        this.removeMessageHandler(once);
+      }
+    };
+    this.onMessage(once);
+  }
 
   public getPositionMode(onResult?: (dual: boolean) => void) {
-  console.log('📤 Sending getPositionMode request...');
-  this.sendAuthed({ action: 'getPositionMode' });
-  
-  if (!onResult) return;
-  
-  const once = (m: any) => {
-    // ✅ FIX: Check theo response thực tế từ server
-    // Server trả về: {dualSidePosition: true, mode: "HEDGE", source: "library-api", ...}
-    if (typeof m?.dualSidePosition === 'boolean' && m?.source === 'library-api') {
-      console.log('✅ getPositionMode result:', m.dualSidePosition, m.mode);
-      onResult(m.dualSidePosition);
-      this.removeMessageHandler(once);
-    }
-  };
-  this.onMessage(once);
-}
+    this.sendAuthed({ action: 'getPositionMode' });
+    if (!onResult) return;
+    const once = (m: any) => {
+      if (m?.type === 'getPositionMode' && typeof m.dualSidePosition === 'boolean') {
+        onResult(m.dualSidePosition);
+        this.removeMessageHandler(once);
+      }
+    };
+    this.onMessage(once);
+  }
 
   // Public: đóng WS + dọn state
   public disconnect(reason?: string) {
@@ -351,8 +341,9 @@ public setMaintenanceCallback(callback: (() => void) | null) {
     this.callbacks.clear();
     this.subscriptions.clear();
     this.pendingRiskSymbols.clear();
-      this.accountSelected = false;
-   this.accountSelectedResolvers = [];
+    this.accountSelected = false;
+    this.accountSelectedOnServer = false;  // ✅ Reset
+    this.accountSelectedResolvers = [];
     if (this.riskDebounceTimer != null) {
       clearTimeout(this.riskDebounceTimer);
       this.riskDebounceTimer = null;
@@ -424,20 +415,20 @@ public setMaintenanceCallback(callback: (() => void) | null) {
           });
         }
 
-        // Detect "account selected" shape (from your logs)
-        if (data && typeof data.id === 'number' && data.BinanceId && data.internalAccountId) {
+        // Detect "account selected" response from server
+        // Format: {"id":30,"name":"trdungrun","binanceId":"1120488512","binanceWebSocketConnected":true,...}
+        if (data && typeof data.id === 'number' && data.binanceId && data.binanceWebSocketConnected !== undefined) {
           if (!this.currentAccountId) this.currentAccountId = Number(data.id);
           
-          // ✅ MARK ACCOUNT AS SELECTED
-          console.log('✅ Account selected:', data.id, data.Name);
+          // ✅ MARK ACCOUNT AS SELECTED ON SERVER
+          console.log('✅ Account selected on server:', data.id, data.name);
           this.accountSelected = true;
+          this.accountSelectedOnServer = true;  // ✅ Server đã xác nhận
           this.accountSelectedResolvers.splice(0).forEach(r => r());
           
           // Forward to message handlers để TradingForm biết
           this.messageHandlers.forEach(h => h({ type: 'accountSelected', account: data }));
           
-          // ❌ FIX: Don't auto-trigger snapshot - wait for explicit API calls
-          // this.ensureInitialSnapshot(120);
           return;
         }
 
@@ -878,9 +869,27 @@ writePositionsLS(merged);
   }
 
   public async getPositions(binanceAccountId?: number) {
-  if (!this.accountSelected) {
-    console.warn('⚠️ getPositions called before account selected, waiting...');
-    await this.waitForAccountSelected();
+  // ✅ GUARD CỨNG: Check account ID trước
+  const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
+  const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
+  const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
+  
+  // Không có account ID → skip ngay
+  if (!id) {
+    console.warn('⏭️ getPositions skipped - no account ID available');
+    return;
+  }
+  
+  // WebSocket chưa ready → skip ngay  
+  if (!this.isConnected() || this.state !== 'authenticated') {
+    console.warn('⏭️ getPositions skipped - WebSocket not ready');
+    return;
+  }
+  
+  // ✅ NEW: Server chưa nhận selectAccount → skip
+  if (!this.accountSelectedOnServer) {
+    console.warn('⏭️ getPositions skipped - account not yet selected on server');
+    return;
   }
   
   // ✅ DEBOUNCE: Skip if called recently  
@@ -901,17 +910,29 @@ writePositionsLS(merged);
   }
   this.lastPositionsPullAt = now;
 
-  const savedIdStr = localStorage.getItem('selectedBinanceAccountId');
-  const savedId = savedIdStr !== null ? Number(savedIdStr) : undefined;
-  const id: number | undefined = binanceAccountId ?? this.currentAccountId ?? savedId;
-  if (!id) { console.warn('[WS] getPositions: missing binanceAccountId'); return; }
   this.sendAuthed({ action: 'getPositions', binanceAccountId: id });
 }
 
   public async getFuturesAccount(id?: number) {
-  if (!this.accountSelected) {
-    console.warn('⚠️ getFuturesAccount called before account selected, waiting...');
-    await this.waitForAccountSelected();
+  // ✅ GUARD CỨNG: Check account ID trước
+  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  
+  // Không có account ID → skip ngay
+  if (!target) {
+    console.warn('⏭️ getFuturesAccount skipped - no account ID available');
+    return;
+  }
+  
+  // WebSocket chưa ready → skip ngay
+  if (!this.isConnected() || this.state !== 'authenticated') {
+    console.warn('⏭️ getFuturesAccount skipped - WebSocket not ready');
+    return;
+  }
+  
+  // ✅ NEW: Server chưa nhận selectAccount → skip
+  if (!this.accountSelectedOnServer) {
+    console.warn('⏭️ getFuturesAccount skipped - account not yet selected on server');
+    return;
   }
   
   // ✅ DEBOUNCE: Skip if called recently
@@ -926,27 +947,51 @@ writePositionsLS(merged);
   
   this.pendingApiCalls.set(callKey, now);
   
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getFuturesAccount: missing binanceAccountId');
   this.sendAuthed({ action: 'getFuturesAccount', binanceAccountId: target });
 }
   public async getSpotAccount(id?: number) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getSpotAccount called before account selected, waiting...');
-    await this.waitForAccountSelected();
+  // ✅ GUARD CỨNG: Check account ID trước
+  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  
+  // Không có account ID → skip ngay
+  if (!target) {
+    console.warn('⏭️ getSpotAccount skipped - no account ID available');
+    return;
   }
   
-  const target = id ?? this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
-  if (!target) return console.warn('[WS] getSpotAccount: missing binanceAccountId');
+  // WebSocket chưa ready → skip ngay
+  if (!this.isConnected() || this.state !== 'authenticated') {
+    console.warn('⏭️ getSpotAccount skipped - WebSocket not ready');
+    return;
+  }
+  
+  // ✅ NEW: Server chưa nhận selectAccount → skip
+  if (!this.accountSelectedOnServer) {
+    console.warn('⏭️ getSpotAccount skipped - account not yet selected on server');
+    return;
+  }
+  
   this.sendAuthed({ action: 'getSpotAccount', binanceAccountId: target });
 }
 
   public async getMultiAssetsMode(onResult?: (isMulti: boolean, raw: any) => void) {
-  // ✅ GUARD: Wait for account selected
-  if (!this.accountSelected) {
-    console.warn('⚠️ getMultiAssetsMode called before account selected, waiting...');
-    await this.waitForAccountSelected();
+  // ✅ GUARD CỨNG: WebSocket phải ready
+  if (!this.isConnected() || this.state !== 'authenticated') {
+    console.warn('⏭️ getMultiAssetsMode skipped - WebSocket not ready');
+    return;
+  }
+  
+  // Phải có account ID
+  const accountId = this.currentAccountId ?? Number(localStorage.getItem('selectedBinanceAccountId') || 0);
+  if (!accountId) {
+    console.warn('⏭️ getMultiAssetsMode skipped - no account ID available');
+    return;
+  }
+  
+  // ✅ NEW: Server chưa nhận selectAccount → skip
+  if (!this.accountSelectedOnServer) {
+    console.warn('⏭️ getMultiAssetsMode skipped - account not yet selected on server');
+    return;
   }
   
   this.sendAuthed({ action: 'getMultiAssetsMode' });

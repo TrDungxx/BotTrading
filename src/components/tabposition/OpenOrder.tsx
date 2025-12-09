@@ -24,6 +24,8 @@ interface Order {
   workingType?: 'MARK_PRICE' | 'LAST_PRICE' | 'INDEX_PRICE' | 'CONTRACT_PRICE' | string;
   time?: number;
   updateTime?: number;
+  closePosition?: boolean;
+  reduceOnly?: boolean; 
   _optimistic?: boolean;
 }
 
@@ -41,8 +43,26 @@ function readOrdersLS(): Order[] {
   catch { return []; }
 }
 function writeOrdersLS(list: Order[]) {
-  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(list));
-  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list } }));
+  // ✅ Tách real vs optimistic
+  const realOrders = list.filter(o => !o._optimistic);
+  const optimisticOrders = list.filter(o => o._optimistic);
+  
+  // ✅ Chỉ giữ optimistic nếu CHƯA có order thật match
+  const pendingOptimistic = optimisticOrders.filter(opt => {
+    const hasReal = realOrders.some(real => 
+      real.symbol === opt.symbol &&
+      real.side === opt.side &&
+      real.type === opt.type &&
+      // Match stopPrice (với tolerance nhỏ)
+      Math.abs(Number(real.stopPrice) - Number(opt.stopPrice)) < 0.001
+    );
+    return !hasReal;
+  });
+  
+  const finalList = [...realOrders, ...pendingOptimistic];
+  
+  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(finalList));
+  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: finalList } }));
 }
 
 function toNumber(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -66,22 +86,37 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
 
   // ========== SUBSCRIBE REALTIME (event-bus + storage) ==========
   useEffect(() => {
-    // khởi tạo từ LS (bao gồm optimistic)
     const initAll = readOrdersLS();
-    const initFiltered = initAll.filter(o => o.status === 'NEW');
+    // ✅ Filter bỏ optimistic orders
+    const initFiltered = initAll.filter(o => 
+      o.status === 'NEW' && 
+      !o._optimistic && 
+      !String(o.orderId || '').startsWith('tmp_')
+    );
     setOpenOrders(initFiltered);
     onPendingCountChange?.(initFiltered.length);
 
     const onBus = (e: any) => {
       const list: Order[] = e?.detail?.list ?? readOrdersLS();
-      const filtered = list.filter(o => o.status === 'NEW');
+      // ✅ Filter bỏ optimistic orders
+      const filtered = list.filter(o => 
+        o.status === 'NEW' && 
+        !o._optimistic && 
+        !String(o.orderId || '').startsWith('tmp_')
+      );
       setOpenOrders(filtered);
       onPendingCountChange?.(filtered.length);
     };
+    
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === OPEN_ORDERS_LS_KEY) {
         const list = readOrdersLS();
-        const filtered = list.filter(o => o.status === 'NEW');
+        // ✅ Filter bỏ optimistic orders
+        const filtered = list.filter(o => 
+          o.status === 'NEW' && 
+          !o._optimistic && 
+          !String(o.orderId || '').startsWith('tmp_')
+        );
         setOpenOrders(filtered);
         onPendingCountChange?.(filtered.length);
       }
@@ -108,29 +143,60 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
   }, []);
 
   // ========== Pull open orders khi market đổi ==========
-const debounceTimer = useRef<number | null>(null);
-useEffect(() => {
-  if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
-  debounceTimer.current = window.setTimeout(() => {
-    const handleResponse = (orders: Order[]) => {
-      console.log('📥 getOpenOrders response:', orders);
-      writeOrdersLS(orders);
+  const debounceTimer = useRef<number | null>(null);
+  useEffect(() => {
+    if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
+    debounceTimer.current = window.setTimeout(() => {
+      const handleResponse = (orders: Order[]) => {
+        console.log('📥 getOpenOrders response:', orders);
+        writeOrdersLS(orders);
+      };
+      
+      // ✅ Gọi ALL - không truyền symbol
+      binanceWS.getOpenOrders(market, undefined, handleResponse);
+      
+    }, 250);
+    
+    return () => {
+      if (debounceTimer.current) { 
+        window.clearTimeout(debounceTimer.current); 
+        debounceTimer.current = null; 
+      }
     };
-    
-    // ✅ Gọi ALL - không truyền symbol
-    binanceWS.getOpenOrders(market, undefined, handleResponse);
-    
-  }, 250);
-  
-  return () => {
-    if (debounceTimer.current) { 
-      window.clearTimeout(debounceTimer.current); 
-      debounceTimer.current = null; 
-    }
-  };
-}, [market]);  // ✅ Chỉ depend vào market
+  }, [market]);  // ✅ Chỉ depend vào market
+
   // ========== Cancel ==========
-  const cancelOrder = (order: Order) => binanceWS.cancelOrder(order.symbol, Number(order.orderId), market);
+  // ✅ FIX: Kiểm tra orderId trước khi gọi cancelOrder
+  const cancelOrder = (order: Order) => {
+    const orderId = order.orderId;
+    
+    // Validate orderId
+    if (orderId == null || orderId === '' || orderId === 0) {
+      console.error('[OpenOrder] Cannot cancel: orderId is missing', order);
+      return;
+    }
+    
+    // Skip optimistic orders (tmp_*)
+    if (String(orderId).startsWith('tmp_')) {
+      console.warn('[OpenOrder] Cannot cancel optimistic order:', orderId);
+      return;
+    }
+    
+    const numericOrderId = Number(orderId);
+    if (!Number.isFinite(numericOrderId) || numericOrderId <= 0) {
+      console.error('[OpenOrder] Cannot cancel: invalid orderId', orderId);
+      return;
+    }
+    
+    console.log('[OpenOrder] Canceling order:', {
+      symbol: order.symbol,
+      orderId: numericOrderId,
+      market,
+    });
+    
+    binanceWS.cancelOrder(order.symbol, numericOrderId, market);
+  };
+
   const cancelFilteredOrders = (filterFn: (o: Order) => boolean) => {
     openOrders.filter(filterFn).forEach(cancelOrder);
   };
@@ -212,16 +278,27 @@ useEffect(() => {
                   ? String(toNumber(order.stopPrice))
                   : dash;
 
-              const qty = fmt(order.origQty);
+              // Cột Số lượng - sửa logic render
+              const qty = order.closePosition || toNumber(order.origQty) === 0 
+                ? 'Đóng vị thế' 
+                : fmt(order.origQty);
               const filled = fmt(order.executedQty);
               const when = order.updateTime || order.time;
               const timeStr = when ? new Date(when).toLocaleTimeString() : '--';
+
+              // ✅ Check if order can be cancelled
+              const canCancel = order.orderId != null && 
+                order.orderId !== '' && 
+                order.orderId !== 0 &&
+                !String(order.orderId).startsWith('tmp_');
 
               return (
                 <tr className="border-b border-dark-700" key={String(order.orderId)}>
                   <td className="px-4 py-3 text-white">{timeStr}</td>
                   <td className="px-4 py-3 text-white">{order.symbol}</td>
-                  <td className="px-4 py-3 text-green-500 font-medium">{order.side === 'BUY' ? 'Mua' : 'Bán'}</td>
+                  <td className={`px-4 py-3 font-medium ${order.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
+                    {order.side === 'BUY' ? 'Mua' : 'Bán'}
+                  </td>
                   <td className="px-4 py-3 text-white">{order.type}</td>
                   <td className="px-4 py-3 text-white">{limitPrice}</td>
                   <td className="px-4 py-3 text-white">{triggerPrice}</td>
@@ -229,13 +306,16 @@ useEffect(() => {
                   <td className="px-4 py-3 text-white">{qty}</td>
                   <td className="px-4 py-3 text-white">{filled}</td>
                   <td className="px-4 py-3 text-white">–</td>
-                  <td className="px-4 py-3 text-white">Không</td>
+                  <td className="px-4 py-3 text-white">
+                    {order.closePosition || order.reduceOnly ? 'Có' : 'Không'}
+                  </td>
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      className="text-gray-400 hover:text-red-500"
-                      onClick={() => cancelOrder(order)}
-                      title="Huỷ lệnh"
+                      className={`${canCancel ? 'text-gray-400 hover:text-red-500' : 'text-gray-600 cursor-not-allowed'}`}
+                      onClick={() => canCancel && cancelOrder(order)}
+                      disabled={!canCancel}
+                      title={canCancel ? 'Huỷ lệnh' : 'Không thể huỷ'}
                     >
                       <Trash2 size={14} />
                     </button>

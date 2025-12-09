@@ -9,7 +9,7 @@ export type ConfirmOrderPayload = {
   price?: number;
   stopPrice?: number;
   timeInForce?: "GTC" | "IOC" | "FOK";
-  workingType?: "MARK" | "LAST";
+  workingType?: "MARK_PRICE" | "LAST";
   // futures only
   positionSide?: "LONG" | "SHORT" | "BOTH";
   reduceOnly?: boolean;
@@ -93,7 +93,7 @@ const ConfirmPlaceOrderModal: React.FC<Props> = ({
                 ? "Thị trường"
                 : order.type === "LIMIT"
                 ? `${fmt(order.price)} USDT`
-                : `Stop ${fmt(order.stopPrice)} (${order.workingType ?? "MARK"})`}
+                : `Stop ${fmt(order.stopPrice)} (${order.workingType ?? "MARK_PRICE"})`}
             </span>
           </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 
-type TriggerType = "MARK" | "LAST";
+type TriggerType = "MARK_PRICE" | "LAST";
 
 interface Props {
   value: TriggerType;
@@ -32,7 +32,7 @@ const TriggerTypeSelect: React.FC<Props> = ({ value, onChange }) => {
   }, [isOpen]);
 
   const options: { value: TriggerType; label: string }[] = [
-    { value: "MARK", label: "Mark" },
+    { value: "MARK_PRICE", label: "Mark" },
     { value: "LAST", label: "Last" },
   ];
 

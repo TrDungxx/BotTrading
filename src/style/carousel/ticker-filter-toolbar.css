@@ -1,0 +1,128 @@
+/* Ticker Filter Toolbar */
+.ticker-filter-toolbar {
+  position: fixed;
+  bottom: 0;
+  /* ✅ Sử dụng CSS variable thay vì hardcode */
+  left: var(--sidebar-width, 64px);
+  height: 35px;
+  background: var(--dark-800, #1e293b);
+  border-top: 1px solid var(--dark-700, #2b3139);
+  border-right: 1px solid var(--dark-700, #2b3139);
+  display: flex;
+  align-items: center;
+  z-index: 1001;
+  transition: width 0.3s ease, left 0.3s ease;
+  width: 40px;
+  overflow: hidden;
+}
+
+/* ✅ Tự động điều chỉnh theo sidebar state */
+body:has(.sidebar-wrapper:not(.collapsed)) .ticker-filter-toolbar {
+  left: 256px;
+}
+
+body:has(.sidebar-wrapper.collapsed) .ticker-filter-toolbar {
+  left: 64px;
+}
+
+.ticker-filter-toolbar.expanded {
+  width: 250px;
+}
+
+.toolbar-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* Filter Button */
+.filter-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  color: #848e9c;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.filter-button:hover {
+  background: #2b3139;
+  color: #eaecef;
+}
+
+.filter-button.active {
+  background: #2b3139;
+  color: #0ecb81;
+}
+
+.filter-button.active .filter-icon {
+  color: #0ecb81;
+}
+
+/* Icons */
+.filter-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Label */
+.filter-label {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.ticker-filter-toolbar:not(.expanded) .filter-label {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .ticker-filter-toolbar {
+    left: 0 !important;
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    justify-content: center;
+    padding: 4px;
+  }
+
+  .ticker-filter-toolbar.expanded {
+    width: 100%;
+  }
+
+  .toolbar-content {
+    gap: 8px;
+  }
+
+  .filter-button {
+    flex: 1;
+  }
+
+  .filter-label {
+    display: block;
+    opacity: 1 !important;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .ticker-filter-toolbar {
+    width: 45px;
+  }
+
+  .ticker-filter-toolbar.expanded {
+    width: 200px;
+  }
+}

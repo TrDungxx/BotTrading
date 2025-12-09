@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState,useMemo } from "react";
 import { binancePublicWS } from "../binancewebsocket/binancePublicWS";
-import { binanceWS } from "../binancewebsocket/BinanceWebSocketService";
+import { binanceWS,OPEN_ORDERS_LS_KEY,POSITIONS_LS_KEY } from "../binancewebsocket/BinanceWebSocketService";
 import PopupPosition from "../popupposition/PopupPosition";
 import { PositionData } from "../../utils/types";
 import PositionTpSlModal from "./function/PositionTpSlModal";
@@ -8,10 +8,11 @@ import { Edit3 } from "lucide-react";
 import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
 import { createPortal } from 'react-dom';
 import CloseAllPositionsModal from "../popupposition/CloseAllPositionsModal";
-
+import SymbolFilterDropdown, {PositionFilter} from "./dropdownfilter/SymbolFilterDropdown";
+import { StandardSortHeader, RoiSortHeader,SortConfig } from "./dropdownfilter/ColumnSortHeader";
 // ===== Helper đọc TP/SL settings từ localStorage =====
 interface TpSlSettings {
-  trigger: "MARK" | "LAST";
+  trigger: "MARK_PRICE" | "LAST";
   mode: "price" | "pnl_abs" | "roi_pct";
   tpInput: string;
   slInput: string;
@@ -111,7 +112,10 @@ const Position: React.FC<PositionProps> = ({
   const deltaQueueRef = React.useRef<PositionCalc[]>([]);
 const [showCloseAllModal, setShowCloseAllModal] = useState(false);
   const [positionsView, setPositionsView] = useState<PositionCalc[]>([]);
-
+// ✅ STATE cho filter Long/Short/All
+const [positionFilter, setPositionFilter] = useState<PositionFilter>('all');
+// ✅ STATE cho sort columns
+const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   // ✅ State để force re-render khi TP/SL settings thay đổi
   const [tpslVersion, setTpslVersion] = useState(0);
 
@@ -220,7 +224,12 @@ const settleInflight = () => {
   }
   posStoreRef.current = m;
   scheduleFlush();
-
+// ✅ THÊM: Sync localStorage ngay
+  if (m.size === 0) {
+    localStorage.removeItem("positions");
+  } else {
+    localStorage.setItem("positions", JSON.stringify([...m.values()]));
+  }
   if (m.size > 0) {
     gotAnyPositionsRef.current = true;
     if (positionsWatchdog.current) {
@@ -482,7 +491,7 @@ useEffect(() => {
     pos: PositionData,
     tpPrice?: number,
     slPrice?: number,
-    trigger: "MARK" | "LAST" = "MARK"
+    trigger: "MARK_PRICE" | "LAST" = "MARK_PRICE"
   ) => {
     const size = parseFloat(pos.positionAmt || "0");
     if (!size) return;
@@ -565,7 +574,7 @@ useEffect(() => {
           type: p.type,
           stopPrice: sp,
           price: sp,
-          workingType: "MARK",
+          workingType: "MARK_PRICE",
           timeInForce: "GTC",
         };
 
@@ -598,15 +607,16 @@ useEffect(() => {
   };
 })();
 
-  // ====== Lấy futures account để enrich leverage/wallet khi cần ======
-  useEffect(() => {
-    binanceWS.getFuturesAccount();
-  }, []);
+ 
 
   // ====== Khi view thay đổi: lưu cache + emit count/floating ======
   useEffect(() => {
     try {
-      localStorage.setItem("positions", JSON.stringify(positionsView));
+      if (positionsView.length > 0) {
+  localStorage.setItem("positions", JSON.stringify(positionsView));
+} else {
+  localStorage.removeItem("positions");
+};
     } catch {}
     onPositionCountChange?.(positionsView.length);
 
@@ -643,18 +653,36 @@ useEffect(() => {
   }, [positionsView]);
 
   // ====== Hydrate từ cache, rồi kéo snapshot thật ======
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem("positions");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length) {
-          applySnapshot(parsed, Date.now() - 1); // version thấp để snapshot thật overwrite
-        }
+ useEffect(() => {
+  try {
+    const cached = localStorage.getItem("positions");
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length) {
+        applySnapshot(parsed, Date.now() - 1);
       }
-    } catch {}
-    binanceWS.getPositions();
-  }, []);
+    }
+  } catch {}
+  // ✅ FIX: Chờ WebSocket ready và account selected
+  const init = async () => {
+    if (binanceWS.isConnected()) {
+      binanceWS.getPositions();
+    } else {
+      // Chờ tối đa 3 giây
+      let waited = 0;
+      const interval = setInterval(() => {
+        waited += 200;
+        if (binanceWS.isConnected()) {
+          clearInterval(interval);
+          binanceWS.getPositions();
+        } else if (waited >= 3000) {
+          clearInterval(interval);
+        }
+      }, 200);
+    }
+  };
+  init();
+}, []);
 
   
 
@@ -773,39 +801,43 @@ useEffect(() => {
 
   // ====== Close all Market ======
   const handleCloseAllMarket = async () => {
-    const actives = positionsView.filter(
-      (p) => Number(p.positionAmt || 0) !== 0
-    );
-    for (const pos of actives) {
-      const rawSize = Number(pos.positionAmt || 0);
-      if (!Number.isFinite(rawSize) || rawSize === 0) continue;
+  const actives = positionsView.filter(
+    (p) => Number(p.positionAmt || 0) !== 0
+  );
+   // ✅ Clear cache NGAY LẬP TỨC trước khi close
+  localStorage.removeItem("positions");
+  posStoreRef.current.clear();
+  setPositionsView([]);
+  for (const pos of actives) {
+    const rawSize = Number(pos.positionAmt || 0);
+    if (!Number.isFinite(rawSize) || rawSize === 0) continue;
 
-      const symbol = pos.symbol;
-      const side = rawSize > 0 ? "SELL" : "BUY";
-      const isHedge = true;
-      const positionSide = (
-        isHedge ? (rawSize > 0 ? "LONG" : "SHORT") : "BOTH"
-      ) as "LONG" | "SHORT" | "BOTH";
+    const symbol = pos.symbol;
+    const side = rawSize > 0 ? "SELL" : "BUY";
+    const isHedge = true;
+    const positionSide = (
+      isHedge ? (rawSize > 0 ? "LONG" : "SHORT") : "BOTH"
+    ) as "LONG" | "SHORT" | "BOTH";
 
-      const step = getStepSize(symbol);
-      const qty = roundToStep(Math.abs(rawSize), step);
-      if (qty <= 0) continue;
+    const step = getStepSize(symbol);
+    const qty = roundToStep(Math.abs(rawSize), step);
+    if (qty <= 0) continue;
 
-      try {
-        await binanceWS.cancelAllOrders(symbol, "futures");
-      } catch {}
-      await waitForCancelAck(symbol, 800);
+    try {
+      await binanceWS.cancelAllOrders(symbol, "futures");
+    } catch {}
+    await waitForCancelAck(symbol, 800);
 
-      try {
-        await binanceWS.placeOrder({
-          symbol,
-          market: "futures",
-          type: "MARKET",
-          side: side as "BUY" | "SELL",
-          positionSide,
-          quantity: qty,
-        });
-      } catch (e: any) {
+    try {
+      await binanceWS.placeOrder({
+        symbol,
+        market: "futures",
+        type: "MARKET",
+        side: side as "BUY" | "SELL",
+        positionSide,
+        quantity: qty,  // ✅ Dùng quantity
+      });
+    } catch (e: any) {
         const msg = String(e?.message || "").toLowerCase();
         if (
           msg.includes("exposure") &&
@@ -885,120 +917,317 @@ useEffect(() => {
   };
 
   // ===== Helper: Render TP/SL cell cho một position =====
-  const renderTpSlCell = (pos: PositionCalc) => {
-    const settings = loadPositionTpSlSettings(pos.symbol);
-    const entryPrice = parseFloat(pos.entryPrice || "0");
+const renderTpSlCell = (pos: PositionCalc) => {
+  const openOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
+  const positionSide = parseFloat(pos.positionAmt || "0") > 0 ? "LONG" : "SHORT";
+  const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
+  const entryPrice = parseFloat(pos.entryPrice || "0");
+  const accountId = Number(localStorage.getItem('selectedBinanceAccountId')) || null;
+  const leverage = pos.leverage || loadLeverageLS(accountId, 'futures', pos.symbol) || 10;
+  
+  // ✅ ĐỊNH NGHĨA isValidOrder TRONG renderTpSlCell
+  const isValidOrder = (order: any, isTp: boolean) => {
+    if (!order || !entryPrice) return false;
+    const stopPrice = parseFloat(order.stopPrice || '0');
+    if (!stopPrice) return false;
     
-    // Check nếu settings là của position khác (entry price khác)
-    const isSamePosition = settings?.entryPrice && 
-      Math.abs(settings.entryPrice - entryPrice) < 0.0000001;
+    const isLong = positionSide === "LONG";
     
-    if (!settings || !isSamePosition) {
-      // Chưa có settings hoặc position khác
-      return (
-        <div className="flex items-center gap-1 text-xs">
-          <span className="text-gray-500">--</span>
-          <span className="text-gray-600">|</span>
-          <span className="text-gray-500">--</span>
-        </div>
-      );
+    // Validate TP phải > entry (long) hoặc < entry (short)
+    if (isTp) {
+      if (isLong && stopPrice <= entryPrice) return false;
+      if (!isLong && stopPrice >= entryPrice) return false;
     }
-
-    const { tpInput, slInput, mode } = settings;
-    const hasTp = tpInput && tpInput.trim() !== "";
-    const hasSl = slInput && slInput.trim() !== "";
-    const modeLabel = getModeLabel(mode);
-
-    // Format value với suffix theo mode
-    const formatValue = (val: string) => {
-      if (!val || val.trim() === "") return "--";
-      const num = parseFloat(val);
-      if (!Number.isFinite(num)) return "--";
-      
-      if (mode === "roi_pct") return `${num}%`;
-      if (mode === "pnl_abs") return `${num}`;
-      return `${num}`; // price
-    };
-
+    // Validate SL phải < entry (long) hoặc > entry (short)  
+    else {
+      if (isLong && stopPrice >= entryPrice) return false;
+      if (!isLong && stopPrice <= entryPrice) return false;
+    }
+    
+    // Check ROI không quá lớn (tránh orders của position cũ)
+    const priceDiff = isLong 
+      ? (isTp ? stopPrice - entryPrice : entryPrice - stopPrice)
+      : (isTp ? entryPrice - stopPrice : stopPrice - entryPrice);
+    const roi = Math.abs((priceDiff / entryPrice) * leverage * 100);
+    
+    // Nếu ROI > 500% thì chắc chắn là order của position cũ
+    if (roi > 500) return false;
+    
+    return true;
+  };
+  
+  const tpOrder = openOrders.find((o: any) => 
+    o.symbol === pos.symbol && 
+    (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+    o.side === expectedSide &&
+    o.status === 'NEW' &&
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
+  );
+  
+  const slOrder = openOrders.find((o: any) => 
+    o.symbol === pos.symbol && 
+    (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+    o.side === expectedSide &&
+    o.status === 'NEW' &&
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
+  );
+  
+  // CHỈ HIỂN THỊ NẾU ORDERS HỢP LỆ
+  const validTp = tpOrder && isValidOrder(tpOrder, true) ? tpOrder : null;
+  const validSl = slOrder && isValidOrder(slOrder, false) ? slOrder : null;
+  
+  if (!validTp && !validSl) {
     return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1 text-xs">
-          <span className={hasTp ? "text-[#0ecb81]" : "text-gray-500"}>
-            {formatValue(tpInput || "")}
-          </span>
-          <span className="text-gray-600">|</span>
-          <span className={hasSl ? "text-[#f6465d]" : "text-gray-500"}>
-            {formatValue(slInput || "")}
-          </span>
-        </div>
-        {modeLabel && (hasTp || hasSl) && (
-          <div className="text-[10px] text-gray-500">({modeLabel})</div>
-        )}
+      <div className="flex items-center gap-1 text-fluid-xs">
+        <span className="text-gray-500">--</span>
+        <span className="text-gray-600">|</span>
+        <span className="text-gray-500">--</span>
       </div>
     );
+  }
+
+  // ĐỌC METADATA ĐỂ LẤY ROI INPUT CỦA USER
+  const tpslMetadata = JSON.parse(localStorage.getItem('tpsl_metadata') || '{}');
+  const metaKey = `${pos.symbol}:${positionSide}`;
+  const metadata = tpslMetadata[metaKey] || {};
+
+  // Hàm tính ROI từ stopPrice (fallback)
+  const calcRoi = (stopPrice: number, isTp: boolean) => {
+    if (!entryPrice || !stopPrice) return null;
+    const isLong = positionSide === "LONG";
+    const priceDiff = isLong 
+      ? (isTp ? stopPrice - entryPrice : entryPrice - stopPrice)
+      : (isTp ? entryPrice - stopPrice : stopPrice - entryPrice);
+    const roi = (priceDiff / entryPrice) * leverage * 100;
+    return roi.toFixed(1);
   };
+
+  const tpStopPrice = validTp ? parseFloat(validTp.stopPrice || "0") : 0;
+  const slStopPrice = validSl ? parseFloat(validSl.stopPrice || "0") : 0;
+  
+  // ƯU TIÊN HIỂN THỊ ROI INPUT CỦA USER, NẾU KHÔNG CÓ THÌ TÍNH LẠI
+  const tpRoi = validTp 
+    ? (metadata.tpInputRoi || calcRoi(tpStopPrice, true))
+    : null;
+  const slRoi = validSl 
+    ? (metadata.slInputRoi || calcRoi(slStopPrice, false))
+    : null;
+
+
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1 text-[15px]">
+        <span className={validTp ? "text-[#0ecb81]" : "text-gray-500"}>
+          {tpRoi ? `${tpRoi}%` : "--"}
+        </span>
+        <span className="text-gray-600">|</span>
+        <span className={validSl ? "text-[#f6465d]" : "text-gray-500"}>
+          {slRoi ? `${slRoi}%` : "--"}
+        </span>
+      </div>
+      <div className="text-[10px] text-gray-500">(ROI%)</div>
+    </div>
+  );
+};
 
   // ====== UI ======
   const posAccountId =
     (activePos as any)?.internalAccountId ??
     (activePos as any)?.accountId ??
     null;
+// ✅ HELPER: Tính ROI cho 1 position (ĐẶT TRƯỚC sortedPositions)
+const calculateRoi = (pos: PositionCalc): number => {
+  const pnl = calculatePnl(pos);
+  if (pnl == null) return 0;
+  
+  const margin = getInitialMargin(pos);
+  if (!margin || margin === 0) return 0;
+  
+  return (pnl / margin) * 100;
+};
+
+// ✅ FILTER + SORT POSITIONS
+const sortedPositions = React.useMemo(() => {
+  let result = positionsView;
+  
+  // Bước 1: Filter theo Long/Short/All/Current
+  if (positionFilter === 'long') {
+    result = result.filter((pos) => parseFloat(pos.positionAmt || "0") > 0);
+  } else if (positionFilter === 'short') {
+    result = result.filter((pos) => parseFloat(pos.positionAmt || "0") < 0);
+  } else if (positionFilter === 'current') {
+    // ✅ MỚI: Chỉ hiện symbol đang chọn trên chart
+    const currentSymbol = localStorage.getItem('selectedSymbol') || '';
+    if (currentSymbol) {
+      result = result.filter((pos) => pos.symbol === currentSymbol);
+    }
+  }
+
+  // Bước 2: Sort nếu có sortConfig
+  if (sortConfig && sortConfig.direction) {
+    const { column, direction, roiType } = sortConfig;
+    const multiplier = direction === 'asc' ? 1 : -1;
+
+    result = [...result].sort((a, b) => {
+      let valA = 0, valB = 0;
+
+      switch (column) {
+        case 'symbol':
+          return multiplier * a.symbol.localeCompare(b.symbol);
+        case 'size':
+          valA = parseFloat(a.positionAmt || "0");
+          valB = parseFloat(b.positionAmt || "0");
+          break;
+        case 'entry':
+          valA = parseFloat(a.entryPrice || "0");
+          valB = parseFloat(b.entryPrice || "0");
+          break;
+        case 'markPrice':
+          valA = parseFloat(a.markPrice || "0");
+          valB = parseFloat(b.markPrice || "0");
+          break;
+        case 'margin':
+          valA = getInitialMargin(a) || 0;
+          valB = getInitialMargin(b) || 0;
+          break;
+        case 'pnl':
+          valA = calculatePnl(a) || 0;
+          valB = calculatePnl(b) || 0;
+          break;
+        case 'roi':
+          const roiA = calculateRoi(a);
+          const roiB = calculateRoi(b);
+          
+          if (roiType === 'positive') {
+            if (roiA > 0 && roiB <= 0) return -1;
+            if (roiA <= 0 && roiB > 0) return 1;
+            if (roiA <= 0 && roiB <= 0) return 0;
+          } else if (roiType === 'negative') {
+            if (roiA < 0 && roiB >= 0) return -1;
+            if (roiA >= 0 && roiB < 0) return 1;
+            if (roiA >= 0 && roiB >= 0) return 0;
+          }
+          
+          valA = roiA;
+          valB = roiB;
+          break;
+        default:
+          return 0;
+      }
+      return multiplier * (valA - valB);
+    });
+  }
+
+  return result;  // ✅ QUAN TRỌNG: return result
+}, [positionsView, positionFilter, sortConfig]);  // ✅ QUAN TRỌNG: đóng useMemo
+
 
   return (
   <div className="w-full max-w-full overflow-hidden">
     {/* ✅ THÊM WRAPPER CHO TABLE */}
-    <div className="position-table-container w-full max-w-full overflow-x-auto">
-      <table className="position-table w-full min-w-[1000px] text-sm">
+    <div className="trading-positions-table-container w-full max-w-full">
+      <table className="position-table w-full min-w-[1000px] text-fluid-xs">
         <thead>
-          <tr className="border-b border-dark-700 text-left text-xs uppercase tracking-wider text-dark-300">
-            <th className="px-4 py-2">Symbol</th>
-            <th className="px-4 py-2">Size</th>
-            <th className="px-4 py-2">Entry</th>
-            <th className="px-4 py-2">Mark Price</th>
-            <th className="px-4 py-2">Margin</th>
-            <th className="px-4 py-2">PNL(ROI%)</th>
-            {/* ✅ THÊM CỘT TP | SL */}
-            <th className="px-4 py-2">TP | SL</th>
-            
-            
-            {/* ✅ FIX: closePosition header - loại bỏ fixed width */}
-            <th className="closePosition px-2">
-              <div className="flex items-center justify-start space-x-2 min-w-[200px]">
-                {/* ✅ Button 1: Close All Market - rút gọn text */}
-                <button
-  onClick={() => setShowCloseAllModal(true)}  // ✅ Mở modal thay vì gọi trực tiếp
-  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
-  title="Đóng tất cả Market Order"
->
-  Close All
-</button>
-                
-                {/* Divider */}
-                <div className="w-[1px] h-[16px] bg-gray-600"></div>
-                
-                {/* ✅ Button 2: Close by PnL - rút gọn text */}
-                <button
-                  onClick={() => setShowPopup(true)}
-                  className="text-[#fcd535] text-[10px] sm:text-[12px] hover:underline whitespace-nowrap"
-                  title="Đóng tất cả theo PnL"
-                >
-                  Close by PnL
-                </button>
-              </div>
-            </th>
-          </tr>
-        </thead>
+  <tr className="border-b border-dark-700 text-left text-fluid-xs uppercase tracking-wider text-dark-300">
+    {/* Symbol với Filter dropdown */}
+    <th className="px-fluid-sm py-1.5">
+      <SymbolFilterDropdown
+        value={positionFilter}
+        onChange={setPositionFilter}
+      />
+    </th>
+    
+    {/* Size với Sort */}
+    <th className="px-2 py-1.5">
+      <StandardSortHeader
+        label="Size"
+        column="size"
+        currentSort={sortConfig}
+        onSort={setSortConfig}
+      />
+    </th>
+    
+    {/* Entry với Sort */}
+    <th className="px-3 py-1.5">
+      <StandardSortHeader
+        label="Entry"
+        column="entry"
+        currentSort={sortConfig}
+        onSort={setSortConfig}
+      />
+    </th>
+    
+    {/* Mark Price với Sort */}
+    <th className="px-3 py-1.5">
+      <StandardSortHeader
+        label="Mark Price"
+        column="markPrice"
+        currentSort={sortConfig}
+        onSort={setSortConfig}
+      />
+    </th>
+    
+    {/* Margin với Sort */}
+    <th className="px-3 py-1.5">
+      <StandardSortHeader
+        label="Margin"
+        column="margin"
+        currentSort={sortConfig}
+        onSort={setSortConfig}
+      />
+    </th>
+    
+    {/* PNL(ROI%) với Sort đặc biệt - dropdown 3 loại */}
+    <th className="px-3 py-1.5">
+      <RoiSortHeader
+        currentSort={sortConfig}
+        onSort={setSortConfig}
+      />
+    </th>
+    
+    {/* TP | SL */}
+    <th className="px-3 py-1.5">TP | SL</th>
+    
+    {/* Close Position header - giữ nguyên */}
+    <th className="closePosition px-2">
+      <div className="flex items-center justify-start space-x-2 min-w-[200px]">
+        <button
+          onClick={() => setShowCloseAllModal(true)}
+          className="text-[#fcd535] text-[10px] sm:text-fluid-xs hover:underline whitespace-nowrap"
+          title="Đóng tất cả Market Order"
+        >
+          Close All
+        </button>
+        <div className="w-[1px] h-[16px] bg-gray-600"></div>
+        <button
+          onClick={() => setShowPopup(true)}
+          className="text-[#fcd535] text-[10px] sm:text-fluid-xs hover:underline whitespace-nowrap"
+          title="Đóng tất cả theo PnL"
+        >
+          Close by PnL
+        </button>
+      </div>
+    </th>
+  </tr>
+</thead>
 
         <tbody>
-  {positionsView.length === 0 ? (
+  {sortedPositions.length === 0 ? (
     <tr>
       {/* ✅ UPDATE COLSPAN từ 7 lên 8 */}
-      <td colSpan={8} className="text-center py-8 text-dark-400 text-sm">
-        Bạn không có vị thế nào.
-      </td>
+      <td colSpan={8} className="text-center py-6 text-dark-400 text-sm">
+  {positionFilter === 'all' 
+    ? 'Bạn không có vị thế nào.'
+    : positionFilter === 'long'
+    ? 'Không có lệnh Long nào.'
+    : 'Không có lệnh Short nào.'}
+</td>
     </tr>
   ) : (
-    positionsView.map((pos) => {
+    sortedPositions.map((pos) => {
       const size = parseFloat(pos.positionAmt || "0");
       const pnl = calculatePnl(pos);
       const key = rowKey(pos);
@@ -1028,169 +1257,168 @@ useEffect(() => {
           : "text-white";
 
       return (
-        <tr
-          key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
-          className="border-b border-dark-700"
-        >
-          <td 
-            className="px-4 py-3 font-medium text-white cursor-pointer hover:text-[#fcd535] transition-colors"
+  <tr
+    key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
+    className="border-b border-dark-700 hover:bg-dark-800/50 transition-colors"
+  >
+    {/* SYMBOL */}
+    <td 
+      className="px-fluid-sm py-fluid-xs font-medium text-white cursor-pointer hover:text-[#fcd535] transition-colors text-fluid-sm"
+      onClick={() => {
+        window.dispatchEvent(
+          new CustomEvent("chart-symbol-change-request", {
+            detail: { symbol: pos.symbol },
+          })
+        );
+        try {
+          localStorage.setItem("selectedSymbol", pos.symbol);
+        } catch {}
+      }}
+      title={`Click để chuyển chart sang ${pos.symbol}`}
+    >
+      {pos.symbol}
+    </td>
+
+    {/* SIZE */}
+    <td className={`px-fluid-sm py-fluid-xs font-medium text-fluid-sm tabular-nums ${sizeClass}`}>
+      {size > 0 ? "" : "-"} {Math.abs(size)}
+    </td>
+
+    {/* ENTRY PRICE */}
+    <td className="px-fluid-sm py-fluid-xs text-white text-fluid-sm tabular-nums">
+      {pos.entryPrice}
+    </td>
+
+    {/* MARK PRICE */}
+    <td className="px-fluid-sm py-fluid-xs text-white text-fluid-sm tabular-nums">
+      {fmt(getMark(pos))}
+    </td>
+
+    {/* MARGIN */}
+    <td className="px-fluid-sm py-fluid-xs text-white">
+      <div>
+        <div className="text-fluid-sm tabular-nums">
+          {margin > 0 ? `${fmtShort(margin)} USDT` : "--"}
+        </div>
+        <div className="text-fluid-2xs text-gray-400">
+          ({marginType === "isolated" ? "Isolated" : "Cross"})
+        </div>
+      </div>
+    </td>
+
+    {/* PNL */}
+    <td className={`px-fluid-sm py-fluid-xs font-medium text-fluid-sm tabular-nums ${pnlClass}`}>
+      {pnl == null
+        ? "--"
+        : nearZero(pnl)
+        ? "0.00"
+        : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
+      <br />
+      <span className="text-fluid-3xs opacity-80">
+        {(() => {
+          const pnlPct = (() => {
+            const im = getInitialMargin(pos);
+            if (!im) return undefined;
+            return (pnl! / im) * 100;
+          })();
+          return pnlPct == null
+            ? "--"
+            : nearZero(pnlPct)
+            ? "0.00%"
+            : `(${pnlPct > 0 ? "+" : "-"}${fmt(Math.abs(pnlPct), 2)}%)`;
+        })()}
+      </span>
+    </td>
+
+    {/* TP | SL */}
+    <td className="px-fluid-sm py-fluid-xs text-fluid-sm">
+      {renderTpSlCell(pos)}
+    </td>
+
+    {/* ORDER TYPE SELECTOR */}
+    <td className="px-fluid-sm py-fluid-xs">
+      <div className="flex items-center gap-fluid-xs mt-fluid-xs">
+        <div className="text-fluid-xs font-normal text-white flex items-center gap-fluid-2xs">
+          <span
+            className={`cursor-pointer transition-colors ${
+              orderType === "market" ? "text-[#fcd535]" : "text-white hover:text-gray-300"
+            }`}
             onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent("chart-symbol-change-request", {
-                  detail: { symbol: pos.symbol },
-                })
-              );
-              try {
-                localStorage.setItem("selectedSymbol", pos.symbol);
-              } catch {}
+              setOrderType("market");
+              setCloseModal({ open: true, mode: "market", pos });
+              setRowQty(key, absSize ? String(absSize) : "");
             }}
-            title={`Click để chuyển chart sang ${pos.symbol}`}
           >
-            {pos.symbol}
-          </td>
+            Thị trường
+          </span>
+          <span className="text-gray-600">|</span>
+          <span
+            className={`cursor-pointer transition-colors ${
+              orderType === "limit" ? "text-[#fcd535]" : "text-white hover:text-gray-300"
+            }`}
+            onClick={() => {
+              setOrderType("limit");
+              setCloseModal({ open: true, mode: "limit", pos });
+              if (Number.isFinite(mark)) setRowPrice(key, String(mark));
+              setRowQty(key, absSize ? String(absSize) : "");
+            }}
+          >
+            Giới hạn
+          </span>
+        </div>
+      </div>
+    </td>
 
-          <td className={`px-4 py-3 font-medium ${sizeClass}`}>
-            {size > 0 ? "" : "-"} {Math.abs(size)}
-          </td>
+    {/* ACTION BUTTONS */}
+    <td className="pr-fluid-md">
+      <div className="flex items-center justify-end gap-fluid-xs">
+        {/* TP/SL Button */}
+        <button
+          onClick={() => {
+            setActivePos(pos);
+            setShowTpSl(true);
+          }}
+          className="inline-flex items-center gap-fluid-2xs text-fluid-2xs px-fluid-xs py-fluid-2xs rounded border border-dark-500 text-gray-200 hover:bg-dark-700 transition-colors"
+          title="TP/SL cho vị thế (modal)"
+        >
+          <Edit3 size={14} className="flex-shrink-0" /> 
+          <span>TP/SL</span>
+        </button>
 
-          <td className="px-4 py-3 text-white">{pos.entryPrice}</td>
-
-          <td className="px-4 py-3 text-white">{fmt(getMark(pos))}</td>
-
-          {/* ✅ CỘT MARGIN */}
-          <td className="px-4 py-3 text-white">
-            <div>
-              <div>{margin > 0 ? `${fmtShort(margin)} USDT` : "--"}</div>
-              <div className="text-xs text-gray-400">
-                ({marginType === "isolated" ? "Isolated" : "Cross"})
-              </div>
-            </div>
-          </td>
-
-          <td className={`px-4 py-3 font-medium ${pnlClass}`}>
-            {pnl == null
-              ? "--"
-              : nearZero(pnl)
-              ? "0.00"
-              : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
-            <br />
-            <span className="text-xs opacity-80">
-              {(() => {
-                const pnlPct = (() => {
-                  const im = getInitialMargin(pos);
-                  if (!im) return undefined;
-                  return (pnl! / im) * 100;
-                })();
-                return pnlPct == null
-                  ? "--"
-                  : nearZero(pnlPct)
-                  ? "0.00%"
-                  : `(${pnlPct > 0 ? "+" : "-"}${fmt(
-                      Math.abs(pnlPct),
-                      2
-                    )}%)`;
-              })()}
-            </span>
-          </td>
-
-          {/* ✅ THÊM CỘT TP | SL */}
-          <td className="px-4 py-3">
-            {renderTpSlCell(pos)}
-          </td>
-
-          <td>
-            <div className="flex items-center space-x-2 mt-2">
-              <div className="text-[13px] font-normal text-white flex items-center space-x-1">
-                <span
-                  className={`cursor-pointer ${
-                    orderType === "market"
-                      ? "text-[#fcd535]"
-                      : "text-white"
-                  }`}
-                  onClick={() => {
-                    setOrderType("market");
-                    setCloseModal({ open: true, mode: "market", pos });
-                    setRowQty(key, absSize ? String(absSize) : "");
-                  }}
-                >
-                  Thị trường
-                </span>
-                <span className="text-gray-600">|</span>
-                <span
-                  className={`cursor-pointer ${
-                    orderType === "limit"
-                      ? "text-[#fcd535]"
-                      : "text-white"
-                  }`}
-                  onClick={() => {
-                    setOrderType("limit");
-                    setCloseModal({ open: true, mode: "limit", pos });
-                    if (Number.isFinite(mark))
-                      setRowPrice(key, String(mark));
-                    setRowQty(key, absSize ? String(absSize) : "");
-                  }}
-                >
-                  Giới hạn
-                </span>
-              </div>
-            </div>
-          </td>
-
-          <td className="pr-4">
-            <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => {
-                  setActivePos(pos);
-                  setShowTpSl(true);
-                }}
-                className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
-                title="TP/SL cho vị thế (modal)"
-              >
-                <Edit3 size={14} /> TP/SL
-              </button>
-
-              <button
-                onClick={() => {
-                  const size = parseFloat(pos.positionAmt || "0");
-                  if (!size) return;
-                  const side = (size > 0 ? "LONG" : "SHORT") as
-                    | "LONG"
-                    | "SHORT";
-                  const payload = {
-                    positionId: `${pos.symbol}:${
-                      pos.positionSide ?? side
-                    }`,
-                    symbol: pos.symbol,
-                    side,
-                    entry: parseFloat(pos.entryPrice || "0"),
-                  };
-                  try {
-                    localStorage.setItem(
-                      "activeTool",
-                      JSON.stringify(payload)
-                    );
-                  } catch {}
-                  window.dispatchEvent(
-                    new CustomEvent("chart-symbol-change-request", {
-                      detail: { symbol: pos.symbol },
-                    })
-                  );
-                  setTimeout(() => {
-                    window.dispatchEvent(
-                      new CustomEvent("active-tool-changed", {
-                        detail: payload,
-                      })
-                    );
-                  }, 300);
-                }}
-                className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded border border-primary/60 text-primary hover:bg-dark-700"
-                title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
-              >
-                Nâng cao
-              </button>
-            </div>
-          </td>
-        </tr>
+        {/* Advanced Button */}
+        <button
+          onClick={() => {
+            const size = parseFloat(pos.positionAmt || "0");
+            if (!size) return;
+            const side = (size > 0 ? "LONG" : "SHORT") as "LONG" | "SHORT";
+            const payload = {
+              positionId: `${pos.symbol}:${pos.positionSide ?? side}`,
+              symbol: pos.symbol,
+              side,
+              entry: parseFloat(pos.entryPrice || "0"),
+            };
+            try {
+              localStorage.setItem("activeTool", JSON.stringify(payload));
+            } catch {}
+            window.dispatchEvent(
+              new CustomEvent("chart-symbol-change-request", {
+                detail: { symbol: pos.symbol },
+              })
+            );
+            setTimeout(() => {
+              window.dispatchEvent(
+                new CustomEvent("active-tool-changed", { detail: payload })
+              );
+            }, 300);
+          }}
+          className="inline-flex items-center gap-fluid-2xs text-fluid-xs px-fluid-xs py-fluid-2xs rounded border border-primary/60 text-primary hover:bg-dark-700 transition-colors"
+          title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
+        >
+          Nâng cao
+        </button>
+      </div>
+    </td>
+  </tr>
       );
     })
   )}
@@ -1218,7 +1446,6 @@ useEffect(() => {
     isOpen={showTpSl}
     onClose={() => {
       setShowTpSl(false);
-      // ✅ Trigger re-render để cập nhật cột TP/SL
       setTpslVersion(v => v + 1);
     }}
     symbol={activePos.symbol}
@@ -1236,11 +1463,30 @@ useEffect(() => {
         market,
         activePos.symbol
       ) ||
-      1
+      10
     }
+    // ✅ THÊM PROPS ĐỂ TRUYỀN TP/SL HIỆN TẠI
+    existingTpSlOrders={(() => {
+      const openOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
+      const positionSide = parseFloat(activePos.positionAmt || "0") > 0 ? "LONG" : "SHORT";
+      const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
+      
+      const tpOrder = openOrders.find((o: any) => 
+        o.symbol === activePos.symbol && 
+        (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+        o.side === expectedSide &&
+        o.status === 'NEW'
+      );
+      const slOrder = openOrders.find((o: any) => 
+        o.symbol === activePos.symbol && 
+        (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+        o.side === expectedSide &&
+        o.status === 'NEW'
+      );
+      
+      return { tpOrder, slOrder };
+    })()}
     onSubmit={() => {
-      // Modal đã tự gửi lệnh, không cần gửi lại
-      // ✅ Trigger re-render để cập nhật cột TP/SL
       setTpslVersion(v => v + 1);
     }}
   />,

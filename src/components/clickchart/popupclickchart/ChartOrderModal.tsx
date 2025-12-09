@@ -2,6 +2,26 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import ChartOrderForm from './ChartOrderForm';
 
+interface PlaceOrderParams {
+  market: "spot" | "futures";
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: "LIMIT" | "STOP_MARKET";
+  quantity: number;
+  price?: number;
+  stopPrice?: number;
+  timeInForce?: "GTC" | "IOC" | "FOK";
+  positionSide: "LONG" | "SHORT";
+  workingType?: "MARK_PRICE" | "LAST";
+}
+
+interface SymbolInfo {
+  tickSize: number;
+  stepSize: number;
+  minQty: number;
+  minNotional: number;
+}
+
 interface ChartOrderModalProps {
   open: boolean;
   onClose: () => void;
@@ -12,6 +32,10 @@ interface ChartOrderModalProps {
   // Truyền từ parent để tính toán chính xác
   availableBalance?: number;
   leverage?: number;
+  // Callback đặt lệnh
+  onPlaceOrder?: (params: PlaceOrderParams) => void;
+  // Symbol info
+  symbolInfo?: SymbolInfo;
 }
 
 const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
@@ -23,6 +47,8 @@ const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
   defaultOrderType = 'limit',
   availableBalance = 0,
   leverage = 10,
+  onPlaceOrder,
+  symbolInfo,
 }) => {
   // Đóng modal khi nhấn Escape
   useEffect(() => {
@@ -82,6 +108,8 @@ const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
             onClose={onClose}
             availableBalance={availableBalance}
             leverage={leverage}
+            onPlaceOrder={onPlaceOrder}
+            symbolInfo={symbolInfo}
           />
         </div>
       </div>

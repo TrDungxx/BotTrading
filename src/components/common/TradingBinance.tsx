@@ -1618,8 +1618,15 @@ const TradingBinance: React.FC<Props> = ({
   }}
   hlineKey={hlineKey(selectedSymbol, market)}
   snapToTick={snapToTick}
-  availableBalance={availableBalance}
-  leverage={leverage}
+  // ⚠️ QUAN TRỌNG: Truyền balance và leverage từ TradingForm/WebSocket
+  availableBalance={availableBalance}  // Số dư khả dụng từ WebSocket
+  leverage={leverage}                  // Đòn bẩy hiện tại
+  // ⚠️ QUAN TRỌNG: Truyền callback đặt lệnh
+  onPlaceOrder={(params) => {
+    console.log('[Chart Order]', params);
+    binanceWS.placeOrder(params);
+  }}
+  
 />
 
 

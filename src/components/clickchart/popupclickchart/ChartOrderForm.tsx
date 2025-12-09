@@ -1,9 +1,27 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
-import { binancePublicWS } from "../../binancewebsocket/binancePublicWS";
-import { binanceSymbolInfo } from "../../../utils/BinanceSymbolInfo";
 
 // ===== Types =====
+interface PlaceOrderParams {
+  market: "spot" | "futures";
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: "LIMIT" | "STOP_MARKET";
+  quantity: number;
+  price?: number;
+  stopPrice?: number;
+  timeInForce?: "GTC" | "IOC" | "FOK";
+  positionSide: "LONG" | "SHORT";
+  workingType?: "MARK_PRICE" | "LAST";
+}
+
+interface SymbolInfo {
+  tickSize: number;
+  stepSize: number;
+  minQty: number;
+  minNotional: number;
+}
+
 interface Props {
   selectedSymbol: string;
   price: number;
@@ -13,6 +31,10 @@ interface Props {
   // Nhận từ parent để tính toán chính xác
   availableBalance?: number;
   leverage?: number;
+  // Callbacks
+  onPlaceOrder?: (params: PlaceOrderParams) => void;
+  // Symbol info (optional - có thể truyền từ parent hoặc tự fetch)
+  symbolInfo?: SymbolInfo;
 }
 
 type OrderTypeBin = "limit" | "stop-limit";
@@ -45,6 +67,8 @@ const ChartOrderForm: React.FC<Props> = ({
   onClose,
   availableBalance: propBalance = 0,
   leverage: propLeverage = DEFAULT_LEVERAGE,
+  onPlaceOrder,
+  symbolInfo: propSymbolInfo,
 }) => {
   const [orderAction, setOrderAction] = useState<OrderAction>("open");
   const [orderType, setOrderType] = useState<OrderTypeBin>(defaultOrderType);
@@ -53,37 +77,113 @@ const ChartOrderForm: React.FC<Props> = ({
   const [amount, setAmount] = useState("");
   const [percent, setPercent] = useState(0);
 
-  // Symbol info
-  const [tickSize, setTickSize] = useState(DEFAULT_TICK);
-  const [stepSize, setStepSize] = useState(DEFAULT_STEP);
-  const [minQty, setMinQty] = useState(0);
-  const [minNotional, setMinNotional] = useState(0);
+  // Symbol info từ props hoặc defaults
+  const tickSize = propSymbolInfo?.tickSize || DEFAULT_TICK;
+  
+  // Auto detect stepSize dựa vào symbol nếu không được truyền
+  const getDefaultStepSize = (symbol: string): number => {
+    const s = symbol.toUpperCase();
+    // Coins có stepSize = 1 (số nguyên)
+    if (s.includes('DOGE') || s.includes('SHIB') || s.includes('PEPE') || 
+        s.includes('FLOKI') || s.includes('LUNC') || s.includes('XRP') ||
+        s.includes('TRX') || s.includes('ADA') || s.includes('MATIC')) {
+      return 1;
+    }
+    // Coins có stepSize nhỏ
+    if (s.includes('BTC') || s.includes('ETH')) {
+      return 0.001;
+    }
+    // Default
+    return 0.01;
+  };
+  
+  const stepSize = propSymbolInfo?.stepSize || getDefaultStepSize(selectedSymbol);
+  const minQty = propSymbolInfo?.minQty || 0;
+  const minNotional = propSymbolInfo?.minNotional || 0;
+
+  // Debug log
+  React.useEffect(() => {
+    console.log('[ChartOrderForm] Symbol info:', {
+      selectedSymbol,
+      tickSize,
+      stepSize,
+      propSymbolInfo,
+    });
+  }, [selectedSymbol, tickSize, stepSize, propSymbolInfo]);
 
   // Balance và leverage từ props
   const availableBalance = propBalance;
   const leverage = propLeverage;
 
   const coinName = selectedSymbol.replace("USDT", "").replace("BUSD", "");
-  const priceDecimals = decimalsFromTick(tickSize);
+  
+  // Tính decimals từ tickSize hoặc từ giá
+  const priceDecimals = useMemo(() => {
+    if (tickSize && tickSize < 1) {
+      return decimalsFromTick(tickSize);
+    }
+    // Fallback dựa vào giá
+    if (propPrice >= 1000) return 2;
+    if (propPrice >= 100) return 2;
+    if (propPrice >= 10) return 3;
+    if (propPrice >= 1) return 4;
+    if (propPrice >= 0.1) return 5;
+    return 6;
+  }, [tickSize, propPrice]);
+  
   const qtyDecimals = decimalsFromTick(stepSize);
 
-  // Fetch symbol info từ cache
-  useEffect(() => {
-    const info = binanceSymbolInfo.getSymbolInfo(selectedSymbol);
-    if (info) {
-      setTickSize(info.tickSize || DEFAULT_TICK);
-      setStepSize(info.stepSize || DEFAULT_STEP);
-      setMinQty(info.minQty || 0);
-      setMinNotional(info.minNotional || 0);
+  // Helper làm tròn giá theo tickSize
+  const roundPrice = (price: number): string => {
+    if (tickSize > 0) {
+      const rounded = Math.round(price / tickSize) * tickSize;
+      return rounded.toFixed(priceDecimals);
     }
-  }, [selectedSymbol]);
+    return price.toFixed(priceDecimals);
+  };
 
-  // Set initial price
-  useEffect(() => {
-    if (propPrice > 0 && !priceValue) {
-      setPriceValue(propPrice.toFixed(priceDecimals));
+  // Helper làm tròn số lượng theo stepSize
+  const roundQty = (qty: number): number => {
+    if (stepSize > 0) {
+      return Math.floor(qty / stepSize) * stepSize;
     }
-  }, [propPrice, priceDecimals, priceValue]);
+    return qty;
+  };
+
+  // Helper format số lượng để hiển thị (không có số thập phân nếu stepSize >= 1)
+  const formatQty = (qty: number): string => {
+    const rounded = roundQty(qty);
+    if (stepSize >= 1) {
+      return String(Math.round(rounded));
+    }
+    return rounded.toFixed(qtyDecimals);
+  };
+
+  // Set initial price - CHỈ set 1 lần khi mount, đã làm tròn
+  const priceInitRef = React.useRef(false);
+  
+  useEffect(() => {
+    if (propPrice > 0 && !priceInitRef.current) {
+      const roundedPrice = roundPrice(propPrice);
+      console.log('[ChartOrderForm] Setting initial price:', propPrice, '→', roundedPrice);
+      setPriceValue(roundedPrice);
+      priceInitRef.current = true;
+    }
+  }, [propPrice]);
+
+  // Reset ref khi component unmount
+  useEffect(() => {
+    return () => {
+      priceInitRef.current = false;
+    };
+  }, []);
+
+  // Reset form khi symbol thay đổi
+  useEffect(() => {
+    setAmount("");
+    setPercent(0);
+    setStopPrice("");
+  }, [selectedSymbol]);
 
   // Giá hiệu dụng
   const priceNum = parseFloat(priceValue) || propPrice || 0;
@@ -126,13 +226,8 @@ const ChartOrderForm: React.FC<Props> = ({
     return Math.floor(rawQty / stepSize) * stepSize;
   }, [percent, priceNum, availableBalance, leverage, selectedMarket, stepSize]);
 
-  // Số lượng hiệu dụng: ưu tiên input thủ công, nếu không có thì dùng từ slider
-  const qtyNum = useMemo(() => {
-    const manualQty = parseFloat(amount);
-    if (manualQty > 0) return manualQty;
-    // Nếu không có input thủ công và slider > 0, dùng buyQty
-    return buyQty > 0 ? buyQty : 0;
-  }, [amount, buyQty]);
+  // Số lượng từ input hoặc slider
+  const qtyNum = parseFloat(amount) || buyQty || 0;
 
   // Tính maxQty
   const maxBuyQty = useMemo(() => {
@@ -150,66 +245,43 @@ const ChartOrderForm: React.FC<Props> = ({
     return Math.floor((maxBuyQty * 1.015) / stepSize) * stepSize;
   }, [maxBuyQty, stepSize]);
 
-  // Tính estimate - dùng qtyNum (có thể từ manual input hoặc slider)
+  // Tính estimate giống TradingForm
   const est = useMemo(() => {
+    const notional = priceNum * qtyNum;
     const feeRate = getFeeRate(orderType);
-    
-    // Dùng qtyNum làm base quantity
-    // Nếu có manual input thì dùng manual, không thì dùng buyQty/sellQty
-    const effectiveLongQty = qtyNum > 0 ? qtyNum : buyQty;
-    const effectiveShortQty = qtyNum > 0 ? qtyNum : sellQty;
-    
-    // Tính cho Long
-    const notionalLong = priceNum * effectiveLongQty;
-    const feeLong = notionalLong * feeRate;
-    // Initial Margin (Chi phí thực tế khi dùng leverage)
-    const initMarginLong = selectedMarket === "futures" 
-      ? notionalLong / Math.max(leverage, 1)
-      : notionalLong;
-    
-    // Tính cho Short
-    const notionalShort = priceNum * effectiveShortQty;
-    const feeShort = notionalShort * feeRate;
-    const initMarginShort = selectedMarket === "futures"
-      ? notionalShort / Math.max(leverage, 1)
-      : notionalShort;
+    const fee = notional * feeRate;
 
     // Giá thanh lý (công thức đơn giản)
     let liqPriceLong: number | undefined;
     let liqPriceShort: number | undefined;
     
-    if (selectedMarket === "futures" && leverage > 1) {
+    if (selectedMarket === "futures" && leverage > 1 && qtyNum > 0) {
       const mmr = 0.004; // Maintenance Margin Rate
-      if (effectiveLongQty > 0) {
-        liqPriceLong = priceNum * (1 - 1 / leverage + mmr);
-      }
-      if (effectiveShortQty > 0) {
-        liqPriceShort = priceNum * (1 + 1 / leverage - mmr);
-      }
+      liqPriceLong = priceNum * (1 - 1 / leverage + mmr);
+      liqPriceShort = priceNum * (1 + 1 / leverage - mmr);
     }
 
     return {
-      notionalLong,
-      feeLong,
-      initMarginLong,
-      notionalShort,
-      feeShort,
-      initMarginShort,
+      notional,
+      fee,
       maxBuyQty,
       maxSellQty,
       liqPriceLong,
       liqPriceShort,
     };
-  }, [priceNum, qtyNum, buyQty, sellQty, orderType, selectedMarket, leverage, maxBuyQty, maxSellQty]);
+  }, [priceNum, qtyNum, orderType, selectedMarket, leverage, maxBuyQty, maxSellQty]);
 
   // Update amount khi slider thay đổi
   useEffect(() => {
-    if (percent > 0) {
-      // Khi kéo slider, tự động tính số lượng dựa trên buyQty
-      setAmount(buyQty > 0 ? buyQty.toFixed(qtyDecimals) : "");
+    if (percent > 0 && maxBuyQty > 0) {
+      const qty = roundQty(maxBuyQty * percent / 100);
+      // Format theo stepSize: nếu stepSize >= 1 thì không có số thập phân
+      const formatted = stepSize >= 1 ? String(Math.round(qty)) : qty.toFixed(qtyDecimals);
+      setAmount(qty > 0 ? formatted : "");
+    } else if (percent === 0) {
+      // Không clear amount khi percent = 0, giữ nguyên input thủ công
     }
-    // Không clear amount khi percent = 0 để giữ input thủ công
-  }, [percent, buyQty, qtyDecimals]);
+  }, [percent, maxBuyQty, stepSize, qtyDecimals]);
 
   // Allowed percentages
   const ALLOWED_PERCENTAGES = [0, 0.5, 1, 2, 3, 4];
@@ -239,36 +311,48 @@ const ChartOrderForm: React.FC<Props> = ({
       return;
     }
 
-    const orderSide = side === "LONG" ? "BUY" : "SELL";
+    const orderSide: "BUY" | "SELL" = side === "LONG" ? "BUY" : "SELL";
     const positionSide = side;
 
+    console.log('[ChartOrderForm] Submitting order:', {
+      priceValue,
+      parsedPrice: p,
+      quantity: q,
+      side,
+      orderType,
+    });
+
     if (orderType === "limit") {
-      binanceWS.placeOrder({
+      const orderParams = {
         market: selectedMarket,
         symbol: selectedSymbol,
         side: orderSide,
-        type: "LIMIT",
+        type: "LIMIT" as const,
         quantity: q,
         price: p,
-        timeInForce: "GTC",
+        timeInForce: "GTC" as const,
         positionSide,
-      });
+      };
+      console.log('[ChartOrderForm] LIMIT order params:', orderParams);
+      onPlaceOrder?.(orderParams);
     } else if (orderType === "stop-limit") {
       const sp = parseFloat(stopPrice);
       if (!sp) {
         console.warn("[ChartOrderForm] Stop price required");
         return;
       }
-      binanceWS.placeOrder({
+      const orderParams = {
         market: selectedMarket,
         symbol: selectedSymbol,
         side: orderSide,
-        type: "STOP_MARKET",
+        type: "STOP_MARKET" as const,
         quantity: q,
         stopPrice: sp,
         positionSide,
-        workingType: "MARK",
-      });
+        workingType: "MARK_PRICE" as const,
+      };
+      console.log('[ChartOrderForm] STOP order params:', orderParams);
+      onPlaceOrder?.(orderParams);
     }
 
     onClose?.();
@@ -276,11 +360,12 @@ const ChartOrderForm: React.FC<Props> = ({
 
   const canPlaceOrder = useMemo(() => {
     const p = parseFloat(priceValue);
-    if (!p || p <= 0 || !qtyNum || qtyNum <= 0) return false;
-    if (qtyNum < minQuantity) return false;
+    const q = parseFloat(amount) || (percent > 0 ? buyQty : 0);
+    if (!p || p <= 0 || !q || q <= 0) return false;
+    if (q < minQuantity) return false;
     if (orderType === "stop-limit" && !parseFloat(stopPrice)) return false;
     return true;
-  }, [priceValue, qtyNum, minQuantity, orderType, stopPrice]);
+  }, [priceValue, amount, percent, buyQty, minQuantity, orderType, stopPrice]);
 
   return (
     <div className="p-4 space-y-4">
@@ -409,11 +494,11 @@ const ChartOrderForm: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Hiển thị Mua/Bán số lượng - hiện khi có slider hoặc input */}
-      {(percent > 0 || qtyNum > 0) && (
+      {/* Hiển thị Mua/Bán số lượng */}
+      {percent > 0 && (
         <div className="flex justify-between text-xs text-[#848e9c]">
-          <span>Mua <span className="text-white">{buyQty.toFixed(qtyDecimals)} {coinName}</span></span>
-          <span>Bán <span className="text-white">{sellQty.toFixed(qtyDecimals)} {coinName}</span></span>
+          <span>Mua <span className="text-white">{formatQty(buyQty)} {coinName}</span></span>
+          <span>Bán <span className="text-white">{formatQty(sellQty)} {coinName}</span></span>
         </div>
       )}
 
@@ -462,7 +547,7 @@ const ChartOrderForm: React.FC<Props> = ({
         </button>
       </div>
 
-      {/* Estimate Panel - Giống TradingForm layout */}
+      {/* Estimate Panel - Giống TradingForm */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pt-2 border-t border-[#2b3139]">
         <div className="text-[#848e9c]">
           Giá thanh lý{" "}
@@ -471,25 +556,22 @@ const ChartOrderForm: React.FC<Props> = ({
           </span>
         </div>
         <div className="text-[#848e9c] text-right">
-          Phí{" "}
+          Giá thanh lý{" "}
           <span className="text-white">
-            {est.feeLong < 0.01 && est.feeLong > 0
-              ? est.feeLong.toFixed(6)
-              : est.feeLong.toFixed(4)}{" "}
-            USDT
+            {est.liqPriceShort ? est.liqPriceShort.toFixed(priceDecimals) : "--"} USDT
           </span>
         </div>
         <div className="text-[#848e9c]">
-          Chi phí{" "}
-          <span className="text-white">
-            {est.initMarginLong.toFixed(2)} USDT
-          </span>
+          Chi phí <span className="text-white">{est.fee.toFixed(2)} USDT</span>
         </div>
         <div className="text-[#848e9c] text-right">
-          Tối đa{" "}
-          <span className="text-white">
-            {est.maxBuyQty.toFixed(qtyDecimals)} {coinName}
-          </span>
+          Chi phí <span className="text-white">{est.fee.toFixed(2)} USDT</span>
+        </div>
+        <div className="text-[#848e9c]">
+          Tối đa <span className="text-white">{formatQty(est.maxBuyQty)} {coinName}</span>
+        </div>
+        <div className="text-[#848e9c] text-right">
+          Tối đa <span className="text-white">{formatQty(est.maxSellQty)} {coinName}</span>
         </div>
         <div className="col-span-2 text-[#848e9c] mt-1">
           % Mức phí: {(getFeeRate(orderType) * 100).toFixed(3)}% ({orderType === "limit" ? "Maker" : "Taker"})

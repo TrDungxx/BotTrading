@@ -1,4 +1,4 @@
-/* Trading Positions - No internal scroll */
+/* Trading Positions - With internal scroll */
 .trading-positions {
   display: flex;
   flex-direction: column;
@@ -12,10 +12,24 @@
 
 .trading-positions-table-container {
   width: 100%;
-  overflow: visible; /* Không scroll riêng */
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 300px; /* ← Điều chỉnh theo ý bạn: 300px, 400px, 50vh */
 }
 
 .trading-positions table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* ✅ Sticky header khi scroll */
+.trading-positions table thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel, #1e293b);
+  z-index: 10;
+}
+
+.trading-positions table thead th {
+  background: var(--bg-panel, #1e293b);
 }

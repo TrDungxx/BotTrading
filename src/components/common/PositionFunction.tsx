@@ -41,12 +41,18 @@ function countPositions(symbol?: string) {
   }
 }
 
-function countPending() {  // ✅ Bỏ param symbol
+function countPending() {
   try {
     const list = JSON.parse(
       localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]'
-    ) as Array<{ status: string }>;
-    return list.filter((o) => o.status === 'NEW').length;  // ✅ Không filter symbol
+    ) as Array<{ status: string; _optimistic?: boolean; orderId?: string | number }>;
+    
+    // ✅ Chỉ đếm order THẬT (không phải optimistic)
+    return list.filter((o) => 
+      o.status === 'NEW' && 
+      !o._optimistic && 
+      !String(o.orderId || '').startsWith('tmp_')
+    ).length;
   } catch {
     return 0;
   }
@@ -146,7 +152,13 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
   const onBus = (e: any) => {
     const list = e?.detail?.list;
     if (Array.isArray(list)) {
-      setOpenOrderCount(list.filter((o: any) => o.status === 'NEW').length);
+      // ✅ Chỉ đếm order THẬT
+      const realOrders = list.filter((o: any) => 
+        o.status === 'NEW' && 
+        !o._optimistic && 
+        !String(o.orderId || '').startsWith('tmp_')
+      );
+      setOpenOrderCount(realOrders.length);
     } else {
       setOpenOrderCount(countPending());
     }
@@ -275,7 +287,7 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex-shrink-0 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  className={`flex-shrink-0 px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
                     activeTab === tab.key
                       ? 'border-primary-500 text-primary-400'
                       : 'border-transparent text-dark-400 hover:text-dark-200'
@@ -306,12 +318,12 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
 
   // ✅ Desktop: Original layout
   return (
-    <div className="w-full max-w-full overflow-hidden p-2 sm:p-4">
-      <div className="flex space-x-2 sm:space-x-4 border-b border-dark-700 mb-2 sm:mb-4 overflow-x-auto scrollbar-hide">
+    <div className="w-full max-w-full overflow-hidden p-1.5 sm:p-3">
+      <div className="flex space-x-1.5 sm:space-x-3  border-b border-dark-700 mb-2 sm:mb-4 overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            className={`py-2 px-2 sm:px-3 md:px-4 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap flex-shrink-0 ${
+            className={`py-1.5 px-1.5 sm:px-2 md:px-3 text-[10px] sm:text-xs font-medium border-b-2 whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.key
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-gray-400 hover:text-white'
@@ -321,12 +333,12 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
             <span className="inline-flex items-center">
               {tab.label}
               {tab.key === 'position' && positionCount > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-[2px] rounded-full bg-primary-500/20 text-primary-300">
+                <span className="ml-0.5 inline-flex items-center justify-center text-[8px] leading-none px-1 py-[1px] rounded-full bg-primary-500/20 text-primary-300">
                   {positionCount}
                 </span>
               )}
               {tab.key === 'openOrder' && openOrderCount > 0 && (
-                <span className="ml-1 inline-flex items-center justify-center text-[10px] leading-none px-1.5 py-[2px] rounded-full bg-primary-500/20 text-primary-300">
+                <span className="ml-0.5 inline-flex items-center justify-center text-[8px] leading-none px-1 py-[1px] rounded-full bg-primary-500/20 text-primary-300">
                   {openOrderCount}
                 </span>
               )}

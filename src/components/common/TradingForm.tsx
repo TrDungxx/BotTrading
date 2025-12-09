@@ -16,6 +16,7 @@ import UnitSelectModal from "../modeltrading/UnitSelectModal";
 import TpSlTooltip from "../modeltrading/TpSlTooltip";
 import { binanceSymbolInfo } from "../../utils/BinanceSymbolInfo";
 import EstimatePanel from "../modeltrading/EstimatePanel";
+import PnLAnalysisPanel from "../formtrading/PnLAnalysisPanel";
 // ===== Types =====
 interface Props {
   selectedSymbol: string;
@@ -160,7 +161,7 @@ const TradingForm: React.FC<Props> = ({
     null
   );
   // Thêm constant cho các mốc % cho phép
-  const ALLOWED_PERCENTAGES = [0, 0.5, 1, 2, 3, 4];
+  const ALLOWED_PERCENTAGES = [0, 0.1, 0.2, 0.5, 1];
 
   // Hàm tìm mốc % gần nhất
   const findNearestAllowedPercent = (value: number): number => {
@@ -210,9 +211,9 @@ useEffect(() => {
   };
 }, [selectedAccountId]);
   const [stopPrice, setStopPrice] = useState("");
-  const [stopPriceType, setStopPriceType] = useState<"MARK" | "LAST">("MARK");
-  const [tpTriggerType, setTpTriggerType] = useState<"MARK" | "LAST">("MARK");
-  const [slTriggerType, setSlTriggerType] = useState<"MARK" | "LAST">("MARK");
+  const [stopPriceType, setStopPriceType] = useState<"MARK_PRICE" | "LAST">("MARK_PRICE");
+  const [tpTriggerType, setTpTriggerType] = useState<"MARK_PRICE" | "LAST">("MARK_PRICE");
+  const [slTriggerType, setSlTriggerType] = useState<"MARK_PRICE" | "LAST">("MARK_PRICE");
   const [tpTooltipShow, setTpTooltipShow] = useState(false);
   const [slTooltipShow, setSlTooltipShow] = useState(false);
   const tpInputRef = useRef<HTMLInputElement>(null);
@@ -267,7 +268,7 @@ useEffect(() => {
     price?: number;
     stopPrice?: number;
     timeInForce?: "GTC" | "IOC" | "FOK";
-    workingType?: "MARK" | "LAST";
+    workingType?: "MARK_PRICE" | "LAST";
     positionSide?: "LONG" | "SHORT" | "BOTH";
     reduceOnly?: boolean;
   };
@@ -335,6 +336,7 @@ useEffect(() => {
   }, [amount, percent, orderType, priceValue, stopPrice]);
 
   const openConfirm = (side: ConfirmSide) => {
+    console.log('🔥 DEBUG slTriggerType:', slTriggerType);
     // ✅ FIX: Chọn qty dựa trên side (Long dùng buyQty, Short dùng sellQty)
     let finalQty: number;
     
@@ -490,6 +492,7 @@ useEffect(() => {
 
   // Balance tracking
   const [internalBalance, setInternalBalance] = useState<number>(propInternal);
+  const [totalWalletBalance, setTotalWalletBalance] = useState<number>(0);
   const [balanceSource, setBalanceSource] = useState<BalanceSource>("none");
   const RANK: Record<BalanceSource, number> = {
     "ws-live": 3,
@@ -573,8 +576,8 @@ useEffect(() => {
     symbol: string,
     settings: {
       tpSl: boolean;
-      tpTriggerType: "MARK" | "LAST";
-      slTriggerType: "MARK" | "LAST";
+      tpTriggerType: "MARK_PRICE" | "LAST";
+      slTriggerType: "MARK_PRICE" | "LAST";
       tpMode: TpSlMode;
       slMode: TpSlMode;
     }
@@ -639,6 +642,7 @@ useEffect(() => {
 
   // ✅ FIX: Tính buyQty và sellQty riêng biệt như Binance
   const buyQty = useMemo(() => {
+    
     if (percent === 0 || !priceNum || priceNum <= 0) return 0;
 
     const buyingPower =
@@ -651,7 +655,7 @@ useEffect(() => {
     // ✅ Long: Tính qty cơ bản
     const rawQty = notional / priceNum;
     return Math.floor(rawQty / stepSize) * stepSize;
-  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize]);
+  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize,selectedSymbol]);
 
   const sellQty = useMemo(() => {
     if (percent === 0 || !priceNum || priceNum <= 0) return 0;
@@ -671,7 +675,7 @@ useEffect(() => {
     
     const rawQty = adjustedNotional / priceNum;
     return Math.floor(rawQty / stepSize) * stepSize;
-  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize]);
+  }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize,selectedSymbol]);
 
   // ✅ FIX: Dùng buyQty cho estimate (Long side là default)
   const qtyNum = Number((amount || "").replace(",", ".")) || buyQty || 0;
@@ -699,6 +703,7 @@ useEffect(() => {
       tickSize,
       stepSize,
       tradeSide,
+      selectedSymbol,
     ]
   );
 
@@ -903,7 +908,7 @@ useEffect(() => {
     // ===== CLEANUP - DISCONNECT ON UNMOUNT =====
     return () => {
       console.log('🔌 Component unmounting, disconnecting WebSocket');
-      binanceWS.disconnect();
+      
     };
   }, []);
 
@@ -995,21 +1000,37 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    const handler = (msg: any) => {
-      if (typeof msg?.multiAssetsMargin === "boolean") {
-        setMultiAssetsMode(msg.multiAssetsMargin);
-        if (selectedAccountId)
-          localStorage.setItem(
-            `multiAssetsMode_${selectedAccountId}`,
-            String(msg.multiAssetsMargin)
-          );
-      }
-    };
-    binanceWS.onMessage(handler);
-    return () => {
-      binanceWS.removeMessageHandler(handler);
-    };
-  }, [selectedAccountId]);
+  const handler = (msg: any) => {
+    // ✅ THÊM: Listen accountInformation để update balances
+    if (msg?.type === 'accountInformation' && msg?.data) {
+      console.log('💰 Account Info Update:', msg.data);
+      
+      const availBal = parseFloat(String(msg.data.availableBalance || "0"));
+      const totalBal = parseFloat(String(msg.data.totalWalletBalance || "0"));
+      
+      // Update available balance với priority system
+      setBalanceIfHigherPriority(availBal, msg.data.source);
+      
+      // ✅ Update total wallet balance
+      setTotalWalletBalance(totalBal);
+    }
+
+    // Giữ nguyên logic cũ cho multiAssetsMargin
+    if (typeof msg?.multiAssetsMargin === "boolean") {
+      setMultiAssetsMode(msg.multiAssetsMargin);
+      if (selectedAccountId)
+        localStorage.setItem(
+          `multiAssetsMode_${selectedAccountId}`,
+          String(msg.multiAssetsMargin)
+        );
+    }
+  };
+  
+  binanceWS.onMessage(handler);
+  return () => {
+    binanceWS.removeMessageHandler(handler);
+  };
+}, [selectedAccountId]);
 
   const changeMarginTypeWS = (symbol: string, mode: "cross" | "isolated") => {
     const marginType = mode === "isolated" ? "ISOLATED" : "CROSSED";
@@ -1108,6 +1129,23 @@ useEffect(() => {
   }, [buyQty, amount, priceNum, internalBalance, leverage, selectedMarket]);
 
   const MAX_RISK_PERCENT = 5; // 5% max
+
+// Thêm useEffect này vào TradingForm (sau các useEffect khác)
+useEffect(() => {
+  console.log('🔄 Symbol changed, resetting amount/percent');
+  
+  // ✅ Reset amount và percent về 0
+  setAmount("");
+  setPercent(0);
+  
+  // ✅ Reset price nếu đang override
+  if (isPriceOverridden) {
+    setPriceValue("");
+    setIsPriceOverridden(false);
+  }
+  
+}, [selectedSymbol]); // Chỉ trigger khi selectedSymbol thay đổi
+
   // ===== Render =====
   return (
     <>
@@ -1248,30 +1286,30 @@ useEffect(() => {
 
   // ✅ Tạo danh sách TP/SL orders để gửi sau
   const pendingTpSlOrders = tpSlOrders.map((child) => {
-    let finalStopPrice = child.stopPrice;
+  let finalStopPrice = child.stopPrice;
 
-    if (child.type === "TAKE_PROFIT_MARKET" && tpPriceToSend) {
-      finalStopPrice = parseFloat(tpPriceToSend);
-    } else if (child.type === "STOP_MARKET" && slPriceToSend) {
-      finalStopPrice = parseFloat(slPriceToSend);
-    }
+  if (child.type === "TAKE_PROFIT_MARKET" && tpPriceToSend) {
+    finalStopPrice = parseFloat(tpPriceToSend);
+  } else if (child.type === "STOP_MARKET" && slPriceToSend) {
+    finalStopPrice = parseFloat(slPriceToSend);
+  }
 
-    finalStopPrice = roundTick(finalStopPrice, tickSize);
-    const priceDecimalsCount = decimalsFromTick(tickSize);
-    finalStopPrice = parseFloat(finalStopPrice.toFixed(priceDecimalsCount));
+  finalStopPrice = roundTick(finalStopPrice, tickSize);
+  const priceDecimalsCount = decimalsFromTick(tickSize);
+  finalStopPrice = parseFloat(finalStopPrice.toFixed(priceDecimalsCount));
 
-    return {
-      symbol: selectedSymbol,
-      market: selectedMarket,
-      side: o.side === "BUY" ? "SELL" : "BUY",
-      type: child.type,
-      stopPrice: finalStopPrice,
-      workingType: child.type === "TAKE_PROFIT_MARKET" ? tpTriggerType : slTriggerType,
-      quantity: o.quantity,
-      positionSide: selectedMarket === "futures" ? o.positionSide : undefined,
-    };
-  });
-
+  return {
+    symbol: selectedSymbol,
+    market: selectedMarket,
+    side: o.side === "BUY" ? "SELL" : "BUY",
+    type: child.type,
+    stopPrice: finalStopPrice,
+    workingType: child.type === "TAKE_PROFIT_MARKET" ? tpTriggerType : slTriggerType,
+    closePosition: "true",  // ✅ ĐÚNG - gửi closePosition
+    // quantity bỏ đi, không gửi nữa
+    positionSide: selectedMarket === "futures" ? o.positionSide : undefined,
+  };
+});
   // ✅ Function để gửi TP/SL sau khi order chính thành công
   const placeTpSlOrders = () => {
     pendingTpSlOrders.forEach((tpslOrder) => {
@@ -1481,12 +1519,21 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="pl-12 text-xs text-dark-400">
-          Số dư khả dụng:{" "}
-          <span className="text-white font-medium">
-            {Number(internalBalance).toFixed(2)} USDT
-          </span>
-        </div>
+        <div className="pl-12 text-xs space-y-0.5">
+       {/*   <div className="text-dark-400">
+    Tổng số dư ví:{" "}
+    <span className="text-dark-300 font-medium">
+      {Number(totalWalletBalance).toFixed(2)} USDT
+    </span>
+  </div>*/}
+  <div className="text-dark-400">
+    Số dư khả dụng:{" "}
+    <span className="text-white font-medium">
+      {Number(internalBalance).toFixed(2)} USDT
+    </span>
+  </div>
+  
+</div>
 
         {(orderType === "limit" || orderType === "stop-limit") && (
           <div>
@@ -1518,11 +1565,11 @@ useEffect(() => {
               <select
                 value={stopPriceType}
                 onChange={(e) =>
-                  setStopPriceType(e.target.value as "MARK" | "LAST")
+                  setStopPriceType(e.target.value as "MARK_PRICE" | "LAST")
                 }
                 className="form-select text-xs w-[80px]"
               >
-                <option value="MARK">Mark</option>
+                <option value="MARK_PRICE">Mark</option>
                 <option value="LAST">Last</option>
               </select>
             </div>
@@ -1684,7 +1731,7 @@ useEffect(() => {
       <div 
         className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full shadow-lg shadow-blue-500/20 transition-all duration-200"
         style={{
-          width: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 5) * 100}%`
+          width: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 4) * 100}%`
         }}
       />
 
@@ -1698,7 +1745,7 @@ useEffect(() => {
               : 'bg-dark-600 shadow-inner'
           }`}
           style={{
-            left: `${(index / 5) * 100}%`
+            left: `${(index / 4) * 100}%`
           }}
         >
           {percent >= mark && (
@@ -1711,7 +1758,7 @@ useEffect(() => {
       <div
         className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full shadow-xl shadow-blue-500/50 hover:shadow-blue-400/70 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all cursor-grab active:cursor-grabbing active:scale-125 border-2 border-white/20 hover:border-white/40 z-20 select-none" 
         style={{
-          left: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 5) * 100}%`
+          left: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 4) * 100}%`
         }}
         onMouseDown={(e) => {
           e.preventDefault(); // ✅ THÊM preventDefault
@@ -1727,7 +1774,7 @@ useEffect(() => {
             const percentage = Math.max(0, Math.min(1, x / rect.width));
             
             // Map to nearest allowed index
-            const targetIndex = Math.round(percentage * 5);
+            const targetIndex = Math.round(percentage * 4);
             const snapped = ALLOWED_PERCENTAGES[targetIndex] || 0;
             setPercent(snapped);
             if (snapped > 0) setAmount(""); // ✅ Clear amount khi kéo slider
@@ -1761,7 +1808,7 @@ useEffect(() => {
     : 'text-dark-400 hover:text-blue-300 hover:bg-dark-700/50'
 }`}
       style={{
-        left: `${(index / 5) * 100}%`
+        left: `${(index / 4) * 100}%`
       }}
     >
       {mark}%
@@ -2026,6 +2073,8 @@ useEffect(() => {
   orderType={orderType}
   getFeeRate={getFeeRate}
 />
+{/* Profit and Loss Analysis Panel */}
+<PnLAnalysisPanel />
       </div>
     </>
   );
