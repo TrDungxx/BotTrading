@@ -1,6 +1,7 @@
 /* ============================================
    TRADING TERMINAL - MAIN STYLESHEET
    Import all trading-related CSS modules
+   Fluid Responsive System
    ============================================ */
 
 /* Core Variables & Base Layout */
@@ -13,7 +14,6 @@
 @import './trading-orderbook.css';
 @import './trading-form.css';
 @import './trading-positions.css';
-
 
 /* ===== GLOBAL OVERRIDES ===== */
 
@@ -28,25 +28,135 @@
   scroll-behavior: smooth;
 }
 
-/* ===== UTILITY CLASSES ===== */
+/* ===== FLUID UTILITY CLASSES FOR TRADING ===== */
+
+/* Fluid text sizes */
+.trading-text-2xs { font-size: var(--stats-font-xs) !important; }
+.trading-text-xs { font-size: var(--stats-font-sm) !important; }
+.trading-text-sm { font-size: var(--stats-font-md) !important; }
+.trading-text-base { font-size: var(--stats-font-lg) !important; }
+.trading-text-lg { font-size: var(--price-font-sm) !important; }
+.trading-text-xl { font-size: var(--price-font-md) !important; }
+.trading-text-2xl { font-size: var(--price-font-lg) !important; }
+.trading-text-3xl { font-size: var(--price-font-xl) !important; }
+
+/* Fluid price text (mono) */
+.trading-price-xs { 
+  font-size: var(--stats-font-sm) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.trading-price-sm { 
+  font-size: var(--stats-font-md) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.trading-price-base { 
+  font-size: var(--stats-font-lg) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.trading-price-lg { 
+  font-size: var(--price-font-sm) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.trading-price-xl { 
+  font-size: var(--price-font-md) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+.trading-price-2xl { 
+  font-size: var(--price-font-lg) !important; 
+  font-family: 'IBM Plex Mono', monospace !important;
+}
+
+/* Fluid spacing */
+.trading-p-xs { padding: var(--trading-gap-xs) !important; }
+.trading-p-sm { padding: var(--trading-gap-sm) !important; }
+.trading-p-md { padding: var(--trading-gap-md) !important; }
+.trading-p-lg { padding: var(--trading-gap-lg) !important; }
+.trading-p-xl { padding: var(--trading-gap-xl) !important; }
+
+.trading-px-xs { padding-left: var(--trading-gap-xs) !important; padding-right: var(--trading-gap-xs) !important; }
+.trading-px-sm { padding-left: var(--trading-gap-sm) !important; padding-right: var(--trading-gap-sm) !important; }
+.trading-px-md { padding-left: var(--trading-gap-md) !important; padding-right: var(--trading-gap-md) !important; }
+.trading-px-lg { padding-left: var(--trading-gap-lg) !important; padding-right: var(--trading-gap-lg) !important; }
+
+.trading-py-xs { padding-top: var(--trading-gap-xs) !important; padding-bottom: var(--trading-gap-xs) !important; }
+.trading-py-sm { padding-top: var(--trading-gap-sm) !important; padding-bottom: var(--trading-gap-sm) !important; }
+.trading-py-md { padding-top: var(--trading-gap-md) !important; padding-bottom: var(--trading-gap-md) !important; }
+.trading-py-lg { padding-top: var(--trading-gap-lg) !important; padding-bottom: var(--trading-gap-lg) !important; }
+
+.trading-gap-xs { gap: var(--trading-gap-xs) !important; }
+.trading-gap-sm { gap: var(--trading-gap-sm) !important; }
+.trading-gap-md { gap: var(--trading-gap-md) !important; }
+.trading-gap-lg { gap: var(--trading-gap-lg) !important; }
+.trading-gap-xl { gap: var(--trading-gap-xl) !important; }
+
+/* Fluid border radius */
+.trading-rounded-sm { border-radius: var(--trading-radius-sm) !important; }
+.trading-rounded-md { border-radius: var(--trading-radius-md) !important; }
+.trading-rounded-lg { border-radius: var(--trading-radius-lg) !important; }
+
+/* Fluid heights */
+.trading-h-input-sm { height: var(--input-height-sm) !important; min-height: var(--input-height-sm) !important; }
+.trading-h-input-md { height: var(--input-height-md) !important; min-height: var(--input-height-md) !important; }
+.trading-h-input-lg { height: var(--input-height-lg) !important; min-height: var(--input-height-lg) !important; }
+
+.trading-h-btn-sm { height: var(--btn-height-sm) !important; min-height: var(--btn-height-sm) !important; }
+.trading-h-btn-md { height: var(--btn-height-md) !important; min-height: var(--btn-height-md) !important; }
+.trading-h-btn-lg { height: var(--btn-height-lg) !important; min-height: var(--btn-height-lg) !important; }
+
+/* ===== RESPONSIVE VISIBILITY CLASSES ===== */
 
 /* Hide on mobile */
 @media (max-width: 767px) {
-  .hide-mobile {
+  .hide-mobile,
+  .trading-hide-mobile {
     display: none !important;
   }
 }
 
 /* Hide on tablet */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .hide-tablet {
+  .hide-tablet,
+  .trading-hide-tablet {
+    display: none !important;
+  }
+}
+
+/* Hide on small desktop */
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .hide-desktop-sm,
+  .trading-hide-desktop-sm {
     display: none !important;
   }
 }
 
 /* Hide on desktop */
 @media (min-width: 1024px) {
-  .hide-desktop {
+  .hide-desktop,
+  .trading-hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile */
+@media (min-width: 768px) {
+  .show-mobile-only,
+  .trading-show-mobile-only {
+    display: none !important;
+  }
+}
+
+/* Show only on 2K+ */
+@media (max-width: 2399px) {
+  .show-2k-only,
+  .trading-show-2k-only {
+    display: none !important;
+  }
+}
+
+/* Show only on 4K */
+@media (max-width: 3199px) {
+  .show-4k-only,
+  .trading-show-4k-only {
     display: none !important;
   }
 }
@@ -55,7 +165,9 @@
 
 /* Focus visible for keyboard navigation */
 .trading-terminal button:focus-visible,
-.trading-terminal a:focus-visible {
+.trading-terminal a:focus-visible,
+.trading-terminal input:focus-visible,
+.trading-terminal select:focus-visible {
   outline: 2px solid rgba(59, 130, 246, 0.8);
   outline-offset: 2px;
 }
@@ -70,12 +182,29 @@
   }
 }
 
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .trading-terminal {
+    --border-panel: rgba(255, 255, 255, 0.3);
+  }
+  
+  .order-row-price.ask {
+    color: #ff6b6b;
+  }
+  
+  .order-row-price.bid {
+    color: #51cf66;
+  }
+}
+
 /* ===== PERFORMANCE OPTIMIZATIONS ===== */
 
 /* GPU acceleration for smooth animations */
 .trading-form-panel,
-.positions-panel {
+.positions-panel,
+.orderbook-panel {
   will-change: transform;
+  transform: translateZ(0);
 }
 
 /* Prevent layout shifts */
@@ -84,20 +213,56 @@
   display: block;
 }
 
+/* Content visibility for off-screen elements */
+.trading-positions-table-container,
+.orderbook-content {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
 /* ===== PRINT STYLES ===== */
 @media print {
   .trading-terminal {
-    background: white;
-    color: black;
+    background: white !important;
+    color: black !important;
   }
   
   .trading-form-panel,
   .positions-panel,
-  .orderbook-panel {
-    display: none;
+  .orderbook-panel,
+  .ticker-carousel-panel {
+    display: none !important;
   }
   
   .chart-panel {
     page-break-inside: avoid;
+    width: 100% !important;
+  }
+  
+  .trading-workspace {
+    display: block !important;
+  }
+}
+
+/* ===== RESOLUTION-SPECIFIC GLOBAL ADJUSTMENTS ===== */
+
+/* HD (1280×720) - Compact everything */
+@media (max-width: 1366px) {
+  .trading-terminal {
+    --global-scale: 0.85;
+  }
+}
+
+/* 2K (2560×1440) - Comfortable */
+@media (min-width: 2400px) and (max-width: 3199px) {
+  .trading-terminal {
+    --global-scale: 1.25;
+  }
+}
+
+/* 4K (3840×2160) - Spacious */
+@media (min-width: 3200px) {
+  .trading-terminal {
+    --global-scale: 1.75;
   }
 }

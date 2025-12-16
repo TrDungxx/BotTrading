@@ -1,17 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-export type PositionFilter = 'all' | 'long' | 'short' | 'current';
+export type PositionFilter = 'all' | 'long' | 'short';
 
 interface SymbolFilterDropdownProps {
   value: PositionFilter;
   onChange: (filter: PositionFilter) => void;
-  currentSymbol?: string; // Symbol đang hiển thị trên chart
+  hideOtherSymbols: boolean;
+  onHideOtherSymbolsChange: (hide: boolean) => void;
+  currentSymbol?: string;
 }
 
 const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({ 
   value, 
   onChange,
+  hideOtherSymbols,
+  onHideOtherSymbolsChange,
   currentSymbol 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,12 +23,10 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
-  // Lấy currentSymbol từ localStorage nếu không được truyền vào
   const [activeSymbol, setActiveSymbol] = useState<string>(() => {
     return currentSymbol || localStorage.getItem('selectedSymbol') || '';
   });
 
-  // Lắng nghe thay đổi symbol từ chart
   useEffect(() => {
     const handleSymbolChange = (e: CustomEvent) => {
       if (e.detail?.symbol) {
@@ -41,7 +43,6 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
     window.addEventListener('chart-symbol-change-request', handleSymbolChange as EventListener);
     window.addEventListener('storage', handleStorageChange);
 
-    // Check localStorage periodically for changes within same tab
     const interval = setInterval(() => {
       const stored = localStorage.getItem('selectedSymbol');
       if (stored && stored !== activeSymbol) {
@@ -56,14 +57,12 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
     };
   }, [activeSymbol]);
 
-  // Cập nhật từ prop
   useEffect(() => {
     if (currentSymbol) {
       setActiveSymbol(currentSymbol);
     }
   }, [currentSymbol]);
 
-  // Tính toán vị trí dropdown
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
@@ -74,7 +73,6 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
     }
   }, [isOpen]);
 
-  // Click outside để đóng
   useEffect(() => {
     if (!isOpen) return;
 
@@ -93,34 +91,21 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const getDisplayLabel = () => {
-    if (value === 'current' && activeSymbol) {
-      return `Symbol (${activeSymbol})`;
-    }
-    return 'Symbol';
-  };
-
-  const options: { value: PositionFilter; label: string; description?: string }[] = [
-    { value: 'all', label: 'Mặc định',  },
-    { value: 'long', label: 'Lệnh Long',  },
-    { value: 'short', label: 'Lệnh Short',  },
-    { 
-      value: 'current', 
-      label: 'Ẩn symbol khác', 
-      
-    },
+  const options: { value: PositionFilter; label: string }[] = [
+    { value: 'all', label: 'Mặc định' },
+    { value: 'long', label: 'Lệnh Long' },
+    { value: 'short', label: 'Lệnh Short' },
   ];
 
   return (
-    <>
-      {/* Trigger Button */}
+    <div className="flex flex-col gap-1.5">
+      {/* Row 1: Symbol dropdown */}
       <div
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1 cursor-pointer select-none hover:text-[#fcd535] transition-colors"
       >
-        <span>{getDisplayLabel()}</span>
-        {/* Triangle icon - giống Binance */}
+        <span>SYMBOL</span>
         <svg
           width="8"
           height="5"
@@ -132,11 +117,61 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
         </svg>
       </div>
 
-      {/* Dropdown Menu - Portal to body */}
+      {/* Row 2: Custom Checkbox - Hide other Symbols */}
+      <div 
+        className="flex items-center gap-2 cursor-pointer select-none group"
+        onClick={(e) => {
+          e.stopPropagation();
+          onHideOtherSymbolsChange(!hideOtherSymbols);
+        }}
+      >
+        {/* Custom Checkbox */}
+        <div 
+          className={`
+            relative w-[14px] h-[14px] rounded-[3px] border transition-all duration-200
+            flex items-center justify-center shrink-0
+            ${hideOtherSymbols 
+              ? 'bg-[#256ec2ff] border-[#256ec2ff]' 
+              : 'bg-transparent border-[#474d57] group-hover:border-[#848e9c]'
+            }
+          `}
+        >
+          {/* Checkmark */}
+          {hideOtherSymbols && (
+            <svg 
+              width="10" 
+              height="8" 
+              viewBox="0 0 10 8" 
+              fill="none"
+              className="text-[#1e2329]"
+            >
+              <path 
+                d="M1 4L3.5 6.5L9 1" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </div>
+        
+        {/* Label */}
+        <span 
+          className={`
+            text-[11px] whitespace-nowrap transition-colors duration-200
+            ${hideOtherSymbols ? 'text-[#eaecef]' : 'text-[#848e9c] group-hover:text-[#eaecef]'}
+          `}
+        >
+          Hide other Symbols
+        </span>
+      </div>
+
+      {/* Dropdown Menu */}
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[9999] bg-[#1e2329] border border-[#2b3139] rounded shadow-lg py-1 min-w-[160px]"
+          className="fixed z-[9999] bg-[#1e2329] border border-[#2b3139] rounded shadow-lg py-1 min-w-[140px]"
           style={{
             top: position.top,
             left: position.left,
@@ -150,24 +185,15 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
                 setIsOpen(false);
               }}
               className={`
-                px-3 py-2 cursor-pointer transition-colors
+                px-3 py-2 cursor-pointer transition-colors text-xs
                 hover:bg-[#2b3139]
-                ${value === opt.value ? 'bg-[#2b3139]' : ''}
+                ${value === opt.value ? 'bg-[#2b3139] text-[#f1f1edff]' : 'text-[#eaecef]'}
               `}
             >
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className={`text-xs ${value === opt.value ? 'text-[#fcd535]' : 'text-[#eaecef]'}`}>
-                    {opt.label}
-                  </div>
-                  {opt.description && (
-                    <div className="text-[10px] text-[#848e9c]">
-                      {opt.description}
-                    </div>
-                  )}
-                </div>
+                <span>{opt.label}</span>
                 {value === opt.value && (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fcd535">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#f7f70cff">
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                   </svg>
                 )}
@@ -177,7 +203,7 @@ const SymbolFilterDropdown: React.FC<SymbolFilterDropdownProps> = ({
         </div>,
         document.body
       )}
-    </>
+    </div>
   );
 };
 

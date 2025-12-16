@@ -386,7 +386,7 @@ export default function Settings() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -404,7 +404,7 @@ export default function Settings() {
 
       {/* Global message */}
       {message && (
-        <div className={`flex items-center gap-3 p-4 rounded-lg ${
+        <div className={`flex items-center gap-fluid-3 p-fluid-4 rounded-lg ${
           message.type === 'success' 
             ? 'bg-success-500/10 border border-success-500/20' 
             : 'bg-danger-500/10 border border-danger-500/20'
@@ -414,7 +414,7 @@ export default function Settings() {
           ) : (
             <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
           )}
-          <p className={`text-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
+          <p className={`text-fluid-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
             {message.text}
           </p>
         </div>
@@ -427,7 +427,7 @@ export default function Settings() {
             <nav className="space-y-1">
               <button
                 onClick={() => setActiveTab('profile')}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-none ${
+                className={`flex items-center w-full px-fluid-4 py-fluid-3 text-fluid-sm font-medium rounded-none ${
                   activeTab === 'profile'
                     ? 'bg-primary-500/10 text-primary-500 border-l-4 border-primary-500'
                     : 'text-dark-300 hover:bg-dark-700 hover:text-dark-200'
@@ -438,7 +438,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab('security')}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-none ${
+                className={`flex items-center w-full px-fluid-4 py-fluid-3 text-fluid-sm font-medium rounded-none ${
                   activeTab === 'security'
                     ? 'bg-primary-500/10 text-primary-500 border-l-4 border-primary-500'
                     : 'text-dark-300 hover:bg-dark-700 hover:text-dark-200'
@@ -449,7 +449,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab('api')}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-none ${
+                className={`flex items-center w-full px-fluid-4 py-fluid-3 text-fluid-sm font-medium rounded-none ${
                   activeTab === 'api'
                     ? 'bg-primary-500/10 text-primary-500 border-l-4 border-primary-500'
                     : 'text-dark-300 hover:bg-dark-700 hover:text-dark-200'
@@ -460,7 +460,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab('notifications')}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-none ${
+                className={`flex items-center w-full px-fluid-4 py-fluid-3 text-fluid-sm font-medium rounded-none ${
                   activeTab === 'notifications'
                     ? 'bg-primary-500/10 text-primary-500 border-l-4 border-primary-500'
                     : 'text-dark-300 hover:bg-dark-700 hover:text-dark-200'
@@ -471,7 +471,7 @@ export default function Settings() {
               </button>
               <button
                 onClick={() => setActiveTab('payment')}
-                className={`flex items-center w-full px-4 py-3 text-sm font-medium rounded-none ${
+                className={`flex items-center w-full px-fluid-4 py-fluid-3 text-fluid-sm font-medium rounded-none ${
                   activeTab === 'payment'
                     ? 'bg-primary-500/10 text-primary-500 border-l-4 border-primary-500'
                     : 'text-dark-300 hover:bg-dark-700 hover:text-dark-200'
@@ -495,12 +495,12 @@ export default function Settings() {
                 
                 <div className="space-y-6">
                   {/* Account Status Info */}
-                  <div className="bg-dark-700/30 rounded-lg p-4">
-                    <h3 className="text-sm font-medium mb-3">Account Information</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="bg-dark-700/30 rounded-lg p-fluid-4">
+                    <h3 className="text-fluid-sm font-medium mb-3">Account Information</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-fluid-4 text-fluid-sm">
                       <div>
                         <span className="text-dark-400">Account Type:</span>
-                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                        <div className={`mt-1 px-2 py-fluid-1 rounded text-xs inline-block ${
                           profileData.type === 1 ? 'bg-danger-500/10 text-danger-500' :
                           profileData.type === 2 ? 'bg-warning-300/10 text-warning-300' :
                           'bg-primary-500/10 text-primary-500'
@@ -510,7 +510,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <span className="text-dark-400">Status:</span>
-                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                        <div className={`mt-1 px-2 py-fluid-1 rounded text-xs inline-block ${
                           profileData.status === 1 ? 'bg-success-500/10 text-success-500' : 'bg-danger-500/10 text-danger-500'
                         }`}>
                           {getUserStatusLabel(profileData.status)}
@@ -518,7 +518,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <span className="text-dark-400">Approval:</span>
-                        <div className={`mt-1 px-2 py-1 rounded text-xs inline-block ${
+                        <div className={`mt-1 px-2 py-fluid-1 rounded text-xs inline-block ${
                           profileData.approved === 1 ? 'bg-success-500/10 text-success-500' :
                           profileData.approved === 0 ? 'bg-warning-300/10 text-warning-300' :
                           'bg-danger-500/10 text-danger-500'
@@ -616,7 +616,7 @@ export default function Settings() {
       setProfileData(prev => ({ ...prev, DiscordNotificationsEnabled: e.target.checked }))
     }
   />
-  <label className="ml-2 text-sm">Bật thông báo Discord</label>
+  <label className="ml-2 text-fluid-sm">Bật thông báo Discord</label>
 </div>
 
 {profileData.type !== 0 && (
@@ -643,7 +643,7 @@ export default function Settings() {
 
 
                       
-                     {/* <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                     {/* <div className="grid grid-cols-1 gap-fluid-4 sm:grid-cols-2">
                          <div>
                           <label htmlFor="timezone" className="form-label">
                             <FormattedMessage id="settings.timezone" />
@@ -713,7 +713,7 @@ export default function Settings() {
                 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-medium mb-4">
+                    <h3 className="text-fluid-base font-medium mb-4">
                       <FormattedMessage id="settings.updatePassword" />
                     </h3>
                     <div className="space-y-4">
@@ -775,10 +775,10 @@ export default function Settings() {
                   </div>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <h3 className="text-base font-medium mb-4">
+                    <h3 className="text-fluid-base font-medium mb-4">
                       <FormattedMessage id="settings.enable2FA" />
                     </h3>
-                    <p className="text-dark-400 text-sm mb-4">
+                    <p className="text-dark-400 text-fluid-sm mb-4">
                       Two-factor authentication adds an extra layer of security to your account by requiring more than just a password to sign in.
                     </p>
                     
@@ -788,17 +788,17 @@ export default function Settings() {
                   </div>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <h3 className="text-base font-medium mb-4">
+                    <h3 className="text-fluid-base font-medium mb-4">
                       <FormattedMessage id="settings.sessions" />
                     </h3>
-                    <p className="text-dark-400 text-sm mb-4">
+                    <p className="text-dark-400 text-fluid-sm mb-4">
                       These are the devices that are currently logged into your account.
                     </p>
                     
-                    <div className="card bg-dark-700 p-4">
+                    <div className="card bg-dark-700 p-fluid-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium">Chrome on Windows</p>
+                          <p className="text-fluid-sm font-medium">Chrome on Windows</p>
                           <p className="text-xs text-dark-400">Last active 2 minutes ago • New York, USA</p>
                         </div>
                         <span className="badge badge-success">Current</span>
@@ -826,27 +826,27 @@ export default function Settings() {
                   
                   <div className="space-y-4">
                     {apiKeys.map((apiKey) => (
-                      <div key={apiKey.id} className="card bg-dark-700 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <div key={apiKey.id} className="card bg-dark-700 p-fluid-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
                           <div>
-                            <p className="text-sm font-medium">{apiKey.name}</p>
+                            <p className="text-fluid-sm font-medium">{apiKey.name}</p>
                             <p className="text-xs text-dark-400">
                               {apiKey.exchange} • Created {new Date(apiKey.createdAt).toLocaleDateString()}
                               {apiKey.lastUsed && ` • Last used ${new Date(apiKey.lastUsed).toLocaleDateString()}`}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-1 rounded text-xs ${
+                          <div className="flex items-center gap-fluid-2">
+                            <span className={`px-2 py-fluid-1 rounded text-xs ${
                               apiKey.status === 'active' 
                                 ? 'bg-success-500/10 text-success-500' 
                                 : 'bg-dark-600 text-dark-300'
                             }`}>
                               {apiKey.status}
                             </span>
-                            <button className="btn btn-outline py-1 px-3 text-xs">Edit</button>
+                            <button className="btn btn-outline py-fluid-1 px-fluid-3 text-xs">Edit</button>
                             <button 
                               onClick={() => handleDeleteApiKey(apiKey.id)}
-                              className="btn btn-outline py-1 px-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10"
+                              className="btn btn-outline py-fluid-1 px-fluid-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10"
                             >
                               Delete
                             </button>
@@ -875,13 +875,13 @@ export default function Settings() {
                 
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-medium mb-4">Email Notifications</h3>
+                    <h3 className="text-fluid-base font-medium mb-4">Email Notifications</h3>
                     
                     <div className="space-y-4">
                       {Object.entries(notificationSettings.emailNotifications).map(([key, value]) => (
                         <div key={key} className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium">
+                            <p className="text-fluid-sm font-medium">
                               {key === 'botActivity' && 'Bot Activity'}
                               {key === 'marketAlerts' && 'Market Alerts'}
                               {key === 'securityAlerts' && 'Security Alerts'}
@@ -915,13 +915,13 @@ export default function Settings() {
                   </div>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <h3 className="text-base font-medium mb-4">Push Notifications</h3>
+                    <h3 className="text-fluid-base font-medium mb-4">Push Notifications</h3>
                     
                     <div className="space-y-4">
                       {Object.entries(notificationSettings.pushNotifications).map(([key, value]) => (
                         <div key={key} className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm font-medium">
+                            <p className="text-fluid-sm font-medium">
                               {key === 'tradingSignals' && 'Trading Signals'}
                               {key === 'priceAlerts' && 'Price Alerts'}
                             </p>
@@ -979,21 +979,21 @@ export default function Settings() {
                     Manage your payment methods for premium subscriptions and marketplace purchases.
                   </p>
                   
-                  <div className="card bg-dark-700 p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="card bg-dark-700 p-fluid-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
                       <div className="flex items-center">
-                        <div className="h-10 w-16 bg-dark-600 rounded flex items-center justify-center">
+                        <div className="h-fluid-input w-16 bg-dark-600 rounded flex items-center justify-center">
                           <CreditCard className="h-6 w-6 text-dark-300" />
                         </div>
                         <div className="ml-4">
-                          <p className="text-sm font-medium">•••• •••• •••• 4242</p>
+                          <p className="text-fluid-sm font-medium">•••• •••• •••• 4242</p>
                           <p className="text-xs text-dark-400">Visa • Expires 12/2025</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-fluid-2">
                         <span className="badge badge-success">Default</span>
-                        <button className="btn btn-outline py-1 px-3 text-xs">Edit</button>
-                        <button className="btn btn-outline py-1 px-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10">
+                        <button className="btn btn-outline py-fluid-1 px-fluid-3 text-xs">Edit</button>
+                        <button className="btn btn-outline py-fluid-1 px-fluid-3 text-xs text-danger-500 border-danger-500 hover:bg-danger-500/10">
                           Delete
                         </button>
                       </div>
@@ -1006,70 +1006,70 @@ export default function Settings() {
                   </button>
                   
                   <div className="border-t border-dark-700 pt-6">
-                    <h3 className="text-base font-medium mb-4">Billing History</h3>
+                    <h3 className="text-fluid-base font-medium mb-4">Billing History</h3>
                     
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-dark-700">
                         <thead>
                           <tr>
-                            <th className="py-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-0">Date</th>
-                            <th className="px-3 py-3.5 text-left text-xs font-medium text-dark-400">Description</th>
-                            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">Amount</th>
-                            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">Status</th>
+                            <th className="py-fluid-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-0">Date</th>
+                            <th className="px-fluid-3 py-fluid-3.5 text-left text-xs font-medium text-dark-400">Description</th>
+                            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">Amount</th>
+                            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-700">
                           <tr>
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-0">
+                            <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm font-medium sm:pl-0">
                               Mar 12, 2023
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm">
                               Pro Plan Subscription
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <FormattedNumber
                                 value={49.99}
                                 style="currency"
                                 currency="USD"
                               />
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <span className="badge badge-success">Paid</span>
                             </td>
                           </tr>
                           <tr>
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-0">
+                            <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm font-medium sm:pl-0">
                               Feb 12, 2023
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm">
                               Pro Plan Subscription
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <FormattedNumber
                                 value={49.99}
                                 style="currency"
                                 currency="USD"
                               />
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <span className="badge badge-success">Paid</span>
                             </td>
                           </tr>
                           <tr>
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-0">
+                            <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm font-medium sm:pl-0">
                               Jan 25, 2023
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm">
                               ETH Breakout Hunter Bot
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <FormattedNumber
                                 value={59.99}
                                 style="currency"
                                 currency="USD"
                               />
                             </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                            <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                               <span className="badge badge-success">Paid</span>
                             </td>
                           </tr>

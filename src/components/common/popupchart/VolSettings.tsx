@@ -67,24 +67,24 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
         {/* Header tabs */}
         <div className="flex items-center border-b border-[#2b3139] bg-[#181a20]">
           
-          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
+          <button className="px-6 py-fluid-3 text-fluid-sm text-[#848e9c] hover:text-white">
             Chỉ báo chính
           </button>
-          <button className="px-6 py-3 text-sm font-medium text-white border-b-2 border-[#fcd535] bg-[#1e2329]">
+          <button className="px-6 py-fluid-3 text-fluid-sm font-medium text-white border-b-2 border-[#fcd535] bg-[#1e2329]">
             Chỉ báo phụ
           </button>
-          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
+          <button className="px-6 py-fluid-3 text-fluid-sm text-[#848e9c] hover:text-white">
             Dữ liệu Giao dịch Chỉ số phụ
           </button>
-          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
+          <button className="px-6 py-fluid-3 text-fluid-sm text-[#848e9c] hover:text-white">
             Tùy chỉnh
           </button>
-          <button className="px-6 py-3 text-sm text-[#848e9c] hover:text-white">
+          <button className="px-6 py-fluid-3 text-fluid-sm text-[#848e9c] hover:text-white">
             Kiểm định
           </button>
           <button
             onClick={onClose}
-            className="ml-auto p-3 text-[#848e9c] hover:text-white"
+            className="ml-auto p-fluid-3 text-[#848e9c] hover:text-white"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 6 6 18"/>
@@ -97,44 +97,44 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
         <div className="flex h-[500px]">
           {/* Sidebar */}
           <div className="w-[180px] bg-[#181a20] border-r border-[#2b3139] overflow-y-auto">
-            <div className="p-3 text-xs text-[#848e9c] font-medium">Sub</div>
+            <div className="p-fluid-3 text-xs text-[#848e9c] font-medium">Sub</div>
             
-            <button className="w-full px-4 py-2.5 text-left text-sm text-white bg-[#1e2329] border-l-2 border-[#fcd535] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-white bg-[#1e2329] border-l-2 border-[#fcd535] flex items-center justify-between">
               <span>VOL</span>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#848e9c]">
                 <path d="m9 18 6-6-6-6"/>
               </svg>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>MACD</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>RSI</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>MFI</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>KDJ</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>OBV</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>CCI</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>StochRSI</span>
             </button>
 
-            <button className="w-full px-4 py-2.5 text-left text-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
+            <button className="w-full px-fluid-4 py-2.5 text-left text-fluid-sm text-[#848e9c] hover:bg-[#1e2329] flex items-center justify-between">
               <span>WR</span>
             </button>
           </div>
@@ -148,11 +148,11 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
 
             {/* Long dropdown */}
             <div className="mb-4">
-              <label className="block text-sm text-[#848e9c] mb-2">Long</label>
+              <label className="block text-fluid-sm text-[#848e9c] mb-2">Long</label>
               <select
                 value={longMode}
                 onChange={(e) => setLongMode(e.target.value)}
-                className="w-full bg-[#2b3139] border border-[#2b3139] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#fcd535]"
+                className="w-full bg-[#2b3139] border border-[#2b3139] rounded px-fluid-3 py-2 text-white text-fluid-sm focus:outline-none focus:border-[#fcd535]"
               >
                 <option>Đường...</option>
                 <option>Cột</option>
@@ -162,11 +162,11 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
 
             {/* Short dropdown */}
             <div className="mb-6">
-              <label className="block text-sm text-[#848e9c] mb-2">Short</label>
+              <label className="block text-fluid-sm text-[#848e9c] mb-2">Short</label>
               <select
                 value={shortMode}
                 onChange={(e) => setShortMode(e.target.value)}
-                className="w-full bg-[#2b3139] border border-[#2b3139] rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-[#fcd535]"
+                className="w-full bg-[#2b3139] border border-[#2b3139] rounded px-fluid-3 py-2 text-white text-fluid-sm focus:outline-none focus:border-[#fcd535]"
               >
                 <option>Đường...</option>
                 <option>Cột</option>
@@ -175,14 +175,14 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
             </div>
 
             {/* MAVOL1 */}
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-fluid-4 mb-4">
               <input
                 type="checkbox"
                 checked={visible.mavol1}
                 onChange={(e) => setVisible((prev) => ({ ...prev, mavol1: e.target.checked }))}
                 className="w-4 h-4 rounded border-[#2b3139] bg-[#2b3139] text-[#0ecb81] focus:ring-0 focus:ring-offset-0 cursor-pointer"
               />
-              <span className="text-sm text-white min-w-[80px]">MAVOL1</span>
+              <span className="text-fluid-sm text-white min-w-[80px]">MAVOL1</span>
               <input
                 type="text"
                 value={periods.mavol1 || ''}
@@ -193,7 +193,7 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
                     setPeriods((prev) => ({ ...prev, mavol1: 1 }));
                   }
                 }}
-                className="w-24 bg-[#2b3139] border border-[#2b3139] rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:border-[#fcd535]"
+                className="w-24 bg-[#2b3139] border border-[#2b3139] rounded px-fluid-3 py-fluid-1.5 text-white text-fluid-sm focus:outline-none focus:border-[#fcd535]"
                 placeholder="7"
               />
               <div className="flex-1" />
@@ -201,20 +201,20 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
                 type="color"
                 value={colors.mavol1}
                 onChange={(e) => setColors((prev) => ({ ...prev, mavol1: e.target.value }))}
-                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                className="w-8 h-fluid-input-sm rounded cursor-pointer bg-transparent border-none"
                 title="Chọn màu MAVOL1"
               />
             </div>
 
             {/* MAVOL2 */}
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-fluid-4 mb-4">
               <input
                 type="checkbox"
                 checked={visible.mavol2}
                 onChange={(e) => setVisible((prev) => ({ ...prev, mavol2: e.target.checked }))}
                 className="w-4 h-4 rounded border-[#2b3139] bg-[#2b3139] text-[#eb40b5] focus:ring-0 focus:ring-offset-0 cursor-pointer"
               />
-              <span className="text-sm text-white min-w-[80px]">MAVOL2</span>
+              <span className="text-fluid-sm text-white min-w-[80px]">MAVOL2</span>
               <input
                 type="text"
                 value={periods.mavol2 || ''}
@@ -225,7 +225,7 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
                     setPeriods((prev) => ({ ...prev, mavol2: 1 }));
                   }
                 }}
-                className="w-24 bg-[#2b3139] border border-[#2b3139] rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:border-[#fcd535]"
+                className="w-24 bg-[#2b3139] border border-[#2b3139] rounded px-fluid-3 py-fluid-1.5 text-white text-fluid-sm focus:outline-none focus:border-[#fcd535]"
                 placeholder="14"
               />
               <div className="flex-1" />
@@ -233,7 +233,7 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
                 type="color"
                 value={colors.mavol2}
                 onChange={(e) => setColors((prev) => ({ ...prev, mavol2: e.target.value }))}
-                className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                className="w-8 h-fluid-input-sm rounded cursor-pointer bg-transparent border-none"
                 title="Chọn màu MAVOL2"
               />
             </div>
@@ -241,16 +241,16 @@ const VOLSettings: React.FC<VOLSettingsProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#2b3139] bg-[#181a20]">
+        <div className="flex items-center justify-end gap-fluid-3 px-6 py-fluid-4 border-t border-[#2b3139] bg-[#181a20]">
           <button
             onClick={handleReset}
-            className="px-6 py-2 rounded text-sm font-medium text-[#848e9c] hover:text-white transition-colors"
+            className="px-6 py-2 rounded text-fluid-sm font-medium text-[#848e9c] hover:text-white transition-colors"
           >
             Đặt lại
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 rounded text-sm font-medium bg-[#fcd535] text-[#181a20] hover:bg-[#f0b90b] transition-colors"
+            className="px-6 py-2 rounded text-fluid-sm font-medium bg-[#fcd535] text-[#181a20] hover:bg-[#f0b90b] transition-colors"
           >
             Lưu lại
           </button>

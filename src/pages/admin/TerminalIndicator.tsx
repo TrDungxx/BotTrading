@@ -103,13 +103,13 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   const [open, setOpen] = useState(!!defaultOpen);
   return (
     <div className="bg-dark-800 border border-dark-700 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-fluid-4 py-fluid-3">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center justify-between gap-3 flex-1 text-left hover:bg-dark-700/40 px-2 py-1.5 rounded-xl"
+          className="flex items-center justify-between gap-fluid-3 flex-1 text-left hover:bg-dark-700/40 px-2 py-fluid-1.5 rounded-xl"
         >
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-fluid-sm font-semibold">{title}</span>
           <span className={`transition-transform ${open ? "" : "rotate-180"}`}>
             ▾
           </span>
@@ -118,7 +118,7 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
           {right ?? <button className="btn btn-xs">Video tutorial</button>}
         </div>
       </div>
-      {open && <div className="p-4">{children}</div>}
+      {open && <div className="p-fluid-4">{children}</div>}
     </div>
   );
 };
@@ -151,9 +151,9 @@ const LeftPanel: React.FC<{
   return (
     <div className="space-y-4">
       <AccordionItem title="PnL / Price (Running)" defaultOpen>
-        <div className="space-y-2">
+        <div className="gap-fluid-2">
           {list.length === 0 && (
-            <div className="rounded border border-dark-600 bg-dark-700 p-3 text-sm text-gray-400">
+            <div className="rounded border border-dark-600 bg-dark-700 p-fluid-3 text-fluid-sm text-gray-400">
               No Bot Running
             </div>
           )}
@@ -182,14 +182,14 @@ const LeftPanel: React.FC<{
             return (
               <div
                 key={`${m.symbol}-${m.indicatorId}-${m.side}-${idx}`}
-                className="rounded border border-dark-600 bg-dark-800 px-3 py-2"
+                className="rounded border border-dark-600 bg-dark-800 px-fluid-3 py-2"
               >
                 <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-6 gap-y-1">
                   {/* Side + Bot name */}
                   <div className="flex flex-col items-start">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-fluid-2">
                       <span
-                        className={`px-2 py-0.5 text-[11px] rounded ${
+                        className={`px-2 py-0.5 text-fluid-xs rounded ${
                           m.side === "long"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                             : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
@@ -200,12 +200,12 @@ const LeftPanel: React.FC<{
 
                       {/* trạng thái */}
                       {isArmed && (
-                        <span className="px-1.5 py-0.5 text-[10px] rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                        <span className="px-1.5 py-0.5 text-fluid-2xs rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">
                           Wait for match
                         </span>
                       )}
                       {isTriggered && (
-                        <span className="px-1.5 py-0.5 text-[10px] rounded border border-primary/30 bg-primary/10 text-primary">
+                        <span className="px-1.5 py-0.5 text-fluid-2xs rounded border border-primary/30 bg-primary/10 text-primary">
                           RUNNING
                         </span>
                       )}
@@ -218,9 +218,9 @@ const LeftPanel: React.FC<{
 
                   {/* Entry + time */}
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-fluid-2">
                       <span className="text-xs text-gray-400">Entry:</span>
-                      <span className="text-sm text-gray-200 font-medium">
+                      <span className="text-fluid-sm text-gray-200 font-medium">
                         {fmt(m.entry, d)} {/* 👈 dùng fmt */}
                       </span>
                     </div>
@@ -231,10 +231,10 @@ const LeftPanel: React.FC<{
 
                   {/* Current price */}
                   <div className="text-right">
-                    <div className="text-[10px] text-gray-400">
+                    <div className="text-fluid-2xs text-gray-400">
                       Current ({m.symbol})
                     </div>
-                    <div className="text-sm font-medium">
+                    <div className="text-fluid-sm font-medium">
                       {typeof cur === "number" ? fmt(cur, d) : "—"}{" "}
                       {/* 👈 dùng fmt */}
                     </div>
@@ -242,9 +242,9 @@ const LeftPanel: React.FC<{
 
                   {/* PnL%: chỉ hiện khi đã khớp */}
                   <div className="text-right min-w-[88px]">
-                    <div className="text-[10px] text-gray-400">PnL %</div>
+                    <div className="text-fluid-2xs text-gray-400">PnL %</div>
                     <div
-                      className={`text-sm font-semibold ${
+                      className={`text-fluid-sm font-semibold ${
                         (pnlPct ?? 0) >= 0
                           ? "text-emerald-400"
                           : "text-rose-400"
@@ -807,17 +807,17 @@ useEffect(() => {
       className="h-[calc(100dvh-4rem)] bg-dark-900 flex flex-col"
       data-test="terminal-indicator"
     >
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.2fr_1.3fr_0.9fr] gap-3 p-3">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.2fr_1.3fr_0.9fr] gap-fluid-3 p-fluid-3">
         {/* LEFT */}
         <div className="min-h-0 overflow-hidden">
           <div className="card h-full flex flex-col min-h-0">
             <div className="card-header flex items-center justify-between">
-              <p className="text-sm font-semibold">Configuration</p>
+              <p className="text-fluid-sm font-semibold">Configuration</p>
 
               {/* Toggle filter */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-fluid-1">
                 <button
-                  className={`px-3 py-1 text-xs rounded font-medium transition ${
+                  className={`px-fluid-3 py-fluid-1 text-xs rounded font-medium transition ${
                     filterMode === "bot"
                       ? "bg-primary-600 text-white shadow-sm"
                       : "bg-dark-700 text-gray-300 hover:bg-dark-600"
@@ -829,7 +829,7 @@ useEffect(() => {
                 </button>
 
                 <button
-                  className={`px-3 py-1 text-xs rounded font-medium transition ${
+                  className={`px-fluid-3 py-fluid-1 text-xs rounded font-medium transition ${
                     filterMode === "all"
                       ? "bg-primary-600 text-white shadow-sm"
                       : "bg-dark-700 text-gray-300 hover:bg-dark-600"
@@ -856,14 +856,14 @@ useEffect(() => {
         </div>
 
         {/* MIDDLE */}
-        <div className="min-h-0 overflow-hidden flex flex-col gap-3">
+        <div className="min-h-0 overflow-hidden flex flex-col gap-fluid-3">
           <section className="rounded-2xl border border-dark-700 bg-dark-800 overflow-hidden">
             {/* Header giữ padding */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-dark-700">
-              <h2 className="text-sm font-semibold">Chart</h2>
+            <div className="flex items-center justify-between px-fluid-3 py-2 border-b border-dark-700">
+              <h2 className="text-fluid-sm font-semibold">Chart</h2>
             </div>
 
-            <div className="h-64 md:h-72 lg:h-80 xl:h-96">
+            <div className="h-64 md:h-72 lg:h-fluid-input-sm0 xl:h-96">
               <ChartWithToolbar
                 symbol={selectedSymbol}
                 interval={interval}
@@ -1017,8 +1017,8 @@ useEffect(() => {
           </section>
 
           <section className="min-h-0 flex-1 rounded-2xl border border-dark-700 bg-dark-800 flex flex-col">
-            <header className="border-b border-dark-700 p-3">
-              <h2 className="text-sm font-semibold">Orders History</h2>
+            <header className="border-b border-dark-700 p-fluid-3">
+              <h2 className="text-fluid-sm font-semibold">Orders History</h2>
             </header>
             <div className="flex-1 min-h-0 overflow-auto">
               <IndicatorHistory />
@@ -1028,9 +1028,9 @@ useEffect(() => {
 
         {/* RIGHT */}
         <div className="min-h-0">
-          <section className="sticky top-3 rounded-2xl border border-dark-700 bg-dark-800 p-3 max-h-[calc(100dvh-5rem)] overflow-auto">
+          <section className="sticky top-fluid-3 rounded-2xl border border-dark-700 bg-dark-800 p-fluid-3 max-h-[calc(100dvh-5rem)] overflow-auto">
             <header className="mb-3">
-              <h2 className="text-sm font-semibold">Trade Panel</h2>
+              <h2 className="text-fluid-sm font-semibold">Trade Panel</h2>
             </header>
 
             <IndicatorMainConfig

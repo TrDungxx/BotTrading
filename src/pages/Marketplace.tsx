@@ -121,7 +121,7 @@ export default function Marketplace() {
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">
             <FormattedMessage id="marketplace.title" />
@@ -140,10 +140,10 @@ export default function Marketplace() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {featuredBots.map((bot) => (
             <div key={bot.id} className="bg-dark-700 rounded-lg overflow-hidden border border-dark-600 hover:border-primary-500 transition-colors">
-              <div className="p-4 border-b border-dark-600">
+              <div className="p-fluid-4 border-b border-dark-600">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className={`h-10 w-10 rounded-md flex items-center justify-center ${
+                    <div className={`h-fluid-input w-10 rounded-fluid-md flex items-center justify-center ${
                       bot.type === 'Grid Bot' ? 'bg-primary-500/10' :
                       bot.type === 'DCA Bot' ? 'bg-success-500/10' : 
                       bot.type === 'SMART Trade' ? 'bg-warning-300/10' : 'bg-dark-600'
@@ -161,15 +161,15 @@ export default function Marketplace() {
                   </div>
                   <div className="flex items-center">
                     <Star className="h-4 w-4 text-warning-300" fill="currentColor" />
-                    <span className="ml-1 text-sm">{bot.rating}</span>
+                    <span className="ml-1 text-fluid-sm">{bot.rating}</span>
                   </div>
                 </div>
               </div>
-              <div className="p-4">
-                <p className="text-sm text-dark-300 line-clamp-2 h-10">{bot.description}</p>
-                <div className="flex flex-wrap gap-1 mt-3">
+              <div className="p-fluid-4">
+                <p className="text-fluid-sm text-dark-300 line-clamp-fluid-2 h-fluid-input">{bot.description}</p>
+                <div className="flex flex-wrap gap-fluid-1 mt-3">
                   {bot.tags.map((tag, index) => (
-                    <span key={index} className="inline-flex rounded-full bg-dark-600 px-2 py-1 text-xs">
+                    <span key={index} className="inline-flex rounded-full bg-dark-600 px-2 py-fluid-1 text-xs">
                       {tag}
                     </span>
                   ))}
@@ -198,18 +198,18 @@ export default function Marketplace() {
       </div>
       
       {/* Category filter and search */}
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-fluid-4">
         <div className="md:w-64 space-y-6">
-          <div className="card p-4">
-            <h3 className="text-sm font-medium mb-3">
+          <div className="card p-fluid-4">
+            <h3 className="text-fluid-sm font-medium mb-3">
               <FormattedMessage id="marketplace.categories" />
             </h3>
-            <div className="space-y-2">
+            <div className="gap-fluid-2">
               {botCategories.map((category) => (
                 <button
                   key={category.id}
                   onClick={() => setSelectedCategory(category.id)}
-                  className={`flex items-center w-full rounded-md px-3 py-2 text-sm ${
+                  className={`flex items-center w-full rounded-fluid-md px-fluid-3 py-2 text-fluid-sm ${
                     selectedCategory === category.id
                       ? 'bg-primary-500/10 text-primary-500'
                       : 'text-dark-300 hover:bg-dark-700'
@@ -221,11 +221,11 @@ export default function Marketplace() {
             </div>
           </div>
           
-          <div className="card p-4">
-            <h3 className="text-sm font-medium mb-3">
+          <div className="card p-fluid-4">
+            <h3 className="text-fluid-sm font-medium mb-3">
               <FormattedMessage id="marketplace.priceRange" />
             </h3>
-            <div className="space-y-2">
+            <div className="gap-fluid-2">
               <div className="flex items-center justify-between">
                 <input
                   type="range"
@@ -241,15 +241,15 @@ export default function Marketplace() {
             </div>
           </div>
           
-          <div className="card p-4">
-            <h3 className="text-sm font-medium mb-3">
+          <div className="card p-fluid-4">
+            <h3 className="text-fluid-sm font-medium mb-3">
               <FormattedMessage id="marketplace.rating" />
             </h3>
-            <div className="space-y-2">
+            <div className="gap-fluid-2">
               {[5, 4, 3, 2, 1].map((rating) => (
                 <button
                   key={rating}
-                  className="flex items-center w-full rounded-md px-3 py-2 text-sm text-dark-300 hover:bg-dark-700"
+                  className="flex items-center w-full rounded-fluid-md px-fluid-3 py-2 text-fluid-sm text-dark-300 hover:bg-dark-700"
                 >
                   <div className="flex items-center">
                     {Array.from({ length: 5 }).map((_, index) => (
@@ -268,7 +268,7 @@ export default function Marketplace() {
         </div>
         
         <div className="flex-1 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-fluid-4">
             <div className="relative flex-1">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <Search className="h-4 w-4 text-dark-400" />
@@ -293,10 +293,10 @@ export default function Marketplace() {
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {filteredBots.map((bot) => (
               <div key={bot.id} className="card overflow-hidden hover:border-primary-500 transition-colors border border-dark-700">
-                <div className="p-4 border-b border-dark-700">
+                <div className="p-fluid-4 border-b border-dark-700">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <div className={`h-10 w-10 rounded-md flex items-center justify-center ${
+                      <div className={`h-fluid-input w-10 rounded-fluid-md flex items-center justify-center ${
                         bot.type === 'Grid Bot' ? 'bg-primary-500/10' :
                         bot.type === 'DCA Bot' ? 'bg-success-500/10' : 
                         bot.type === 'SMART Trade' ? 'bg-warning-300/10' : 'bg-dark-600'
@@ -320,12 +320,12 @@ export default function Marketplace() {
                   </div>
                 </div>
                 
-                <div className="p-4">
-                  <p className="text-sm text-dark-300 line-clamp-2 h-10">{bot.description}</p>
+                <div className="p-fluid-4">
+                  <p className="text-fluid-sm text-dark-300 line-clamp-fluid-2 h-fluid-input">{bot.description}</p>
                   
-                  <div className="flex flex-wrap gap-1 mt-3">
+                  <div className="flex flex-wrap gap-fluid-1 mt-3">
                     {bot.tags.map((tag, index) => (
-                      <span key={index} className="inline-flex rounded-full bg-dark-700 px-2 py-1 text-xs">
+                      <span key={index} className="inline-flex rounded-full bg-dark-700 px-2 py-fluid-1 text-xs">
                         {tag}
                       </span>
                     ))}
@@ -344,7 +344,7 @@ export default function Marketplace() {
                     </div>
                     <div className="flex items-center">
                       <Star className="h-4 w-4 text-warning-300" fill="currentColor" />
-                      <span className="ml-1 text-sm">{bot.rating}</span>
+                      <span className="ml-1 text-fluid-sm">{bot.rating}</span>
                       <span className="ml-1 text-xs text-dark-400">({bot.reviews} <FormattedMessage id="marketplace.reviews" />)</span>
                     </div>
                   </div>
@@ -357,7 +357,7 @@ export default function Marketplace() {
                         currency="USD"
                       />
                     </span>
-                    <button className="btn btn-primary py-1.5 px-3 text-xs">
+                    <button className="btn btn-primary py-fluid-1.5 px-fluid-3 text-xs">
                       <ShoppingBag className="mr-1 h-3 w-3" />
                       <FormattedMessage id="marketplace.buyNow" />
                     </button>

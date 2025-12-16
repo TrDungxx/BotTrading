@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   createChart,
@@ -16,17 +16,14 @@ import FloatingPositionTag from '../tabposition/FloatingPositionTag';
 import { binanceWS } from '../binancewebsocket/BinanceWebSocketService';
 import { copyPrice } from '../clickchart/CopyPrice';
 import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
-// import BollingerBandsIndicator from './functionchart/BollingerBandsIndicator'; // ⚠️ Disabled - has internal error
 import '../../style/Hidetradingviewlogo.css';
-import LineIndicatorHeader from './popupchart/LineIndicatorHeader';
-import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
-import { IndicatorValue } from './popupchart/LineIndicatorHeader';
-import { MainIndicatorConfig, VolumeIndicatorConfig, IndicatorPeriods, IndicatorColors } from './popupchart/LineIndicatorSettings';
 import ChartContextMenu from '../clickchart/ChartContextMenu';
-// ✅ Import refactored modules
-import { calculateMA, calculateEMA, calculateBollingerBands, calculateVolumeMA } from './utils/calculations';
-import { useIndicators } from './hooks/useIndicators';
-import { useBollingerBands } from './hooks/useBollingerBands';
+
+// ✅ NEW: Dynamic Indicators
+import { useDynamicIndicators } from './hooks/useDynamicIndicators';
+import { DynamicIndicatorConfig, IndicatorLine, BollConfig } from './hooks/indicatorTypes';
+import LineIndicatorHeader, { IndicatorValue } from './popupchart/LineIndicatorHeader';
+import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
 
 export type ChartType =
   | 'Bars'
@@ -170,53 +167,42 @@ const TradingBinance: React.FC<Props> = ({
   const candleSeries = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeries = useRef<ISeriesApi<'Histogram'> | null>(null);
 
-  // ✅ USE REFACTORED HOOKS
+  // ============================================
+  // ✅ NEW: USE DYNAMIC INDICATORS HOOK
+  // ============================================
   const {
-    mainVisible,
-    setMainVisible,
-    volumeVisible,
-    setVolumeVisible,
-    indicatorPeriods,
-    setIndicatorPeriods,
-    indicatorColors,
-    setIndicatorColors,
-    bollFillVisible,
-    setBollFillVisible,
-    ma7Ref,
-    ma25Ref,
-    ma99Ref,
-    ema12Ref,
-    ema26Ref,
-    mavol1Ref,
-    mavol2Ref,
+    config,
+    setConfig,
+    lineSeriesRefs,
+    bollSeriesRefs,
+    volumeSeriesRefs,
+    initializeSeries,
     updateMainIndicators,
     updateVolumeIndicators,
     clearAllIndicators,
-    toggleAllMainIndicators,
-    toggleAllVolumeIndicators,
-    applyColorChanges,
-  } = useIndicators({ selectedSymbol, market });
-
-  const {
-    bollData,
-    setBollData,
-    bollUpperRef,
-    bollMiddleRef,
-    bollLowerRef,
-    bollCanvasRef,
-    initializeCanvas,
-    updateBollingerBands,
-    clearBollingerBands,
-    redrawBollFill,
-  } = useBollingerBands({
+    addLine,
+    removeLine,
+    updateLine,
+    addBoll,
+    removeBoll,
+    updateBoll,
+    addVolumeMA,
+    removeVolumeMA,
+    updateVolumeMA,
+    toggleLinesByType,
+    toggleAllBolls,
+    toggleAllVolumeMAs,
+    visibleLines,
+    visibleBolls,
+    visibleVolumeMAs,
+    hasAnyMainVisible,
+    hasAnyVolumeVisible,
+  } = useDynamicIndicators({
+    selectedSymbol,
+    market,
     chartRef,
-    candleSeriesRef: candleSeries,
+    volumeChartRef,
     mainChartContainerRef,
-    visible: mainVisible.boll,
-    fillVisible: bollFillVisible,
-    period: indicatorPeriods.boll.period,
-    stdDev: indicatorPeriods.boll.stdDev,
-    colors: indicatorColors.boll,
   });
 
   // Main chart & volume states
@@ -241,7 +227,6 @@ const TradingBinance: React.FC<Props> = ({
   const ctxClickYRef = useRef<number | null>(null);
   const ctxClickPriceRef = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  type PresetType = 'LIMIT' | 'STOP';
 
   const syncSourceRef = useRef<'main' | 'volume' | null>(null);
   const { updateSeriesData } = useChartType({
@@ -253,36 +238,30 @@ const TradingBinance: React.FC<Props> = ({
     market,
     sessionRef,
     updateMainIndicators,
-    updateBollingerBands,
+    updateBollingerBands: updateMainIndicators, // Use same function now
     addHLine,
     hlineKey,
   });
   const isSyncingRef = useRef(false);
+
   const snapToTick = (price: number) => {
     const cacheKey = `${market}:${selectedSymbol.toUpperCase()}`;
     const meta = symbolMetaCache.get(cacheKey) ?? heuristicMetaFromPrice(price);
-
     let tick = meta.tickSize ?? heuristicMetaFromPrice(price).tickSize;
-
     if (price < 10 && tick >= 0.05) tick = heuristicMetaFromPrice(price).tickSize;
-
-    const precision =
-      Math.max(
-        (String(tick).split('.')[1]?.length ?? 0),
-        meta.precision ?? 0
-      );
+    const precision = Math.max((String(tick).split('.')[1]?.length ?? 0), meta.precision ?? 0);
     return Number((Math.round(price / tick) * tick).toFixed(precision));
   };
+
   const [alertOpen, setAlertOpen] = useState(false);
-  
+
   // ===== BALANCE & LEVERAGE STATE =====
   const [availableBalance, setAvailableBalance] = useState<number>(0);
-  const [leverage, setLeverage] = useState<number>(10); // Default 10x
+  const [leverage, setLeverage] = useState<number>(10);
 
   // ===== SUBSCRIBE TO BALANCE UPDATES =====
   useEffect(() => {
     const handleMessage = (msg: any) => {
-      // Balance update từ accountInformation
       if (msg?.type === 'accountInformation' && msg?.data) {
         const bal = Number(msg.data.availableBalance ?? 0);
         if (Number.isFinite(bal) && bal >= 0) {
@@ -290,7 +269,6 @@ const TradingBinance: React.FC<Props> = ({
         }
       }
     };
-
     binanceWS.onMessage(handleMessage);
     return () => binanceWS.removeMessageHandler(handleMessage);
   }, []);
@@ -301,85 +279,23 @@ const TradingBinance: React.FC<Props> = ({
       try {
         const accId = binanceWS.getCurrentAccountId();
         const accountKey = accId ?? 'na';
-        
         const savedLeverage = localStorage.getItem(`tw_leverage_${accountKey}_${market}_${selectedSymbol}`);
         if (savedLeverage) {
           const lev = Number(savedLeverage);
           if (Number.isFinite(lev) && lev >= 1 && lev <= 125) {
-            setLeverage(prev => {
-              if (prev !== lev) {
-                console.log('[TradingBinance] Leverage synced:', lev);
-              }
-              return lev;
-            });
+            setLeverage(lev);
           }
         }
       } catch (e) {
         console.warn('[TradingBinance] Failed to load leverage:', e);
       }
     };
-
-    // Load initial
     loadLeverage();
-
-    // Poll every 1 second to sync with TradingForm changes
     const interval = setInterval(loadLeverage, 1000);
-    
     return () => clearInterval(interval);
   }, [market, selectedSymbol]);
 
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-
-    let dragStartX: number | null = null;
-    let dragStartLogical: number | null = null;
-
-    const handleMouseDown = (param: any) => {
-      if (!param || typeof param.point?.x !== 'number') return;
-      const logical = param.logical;
-      if (typeof logical === 'number') {
-        dragStartX = param.point.x;
-        dragStartLogical = logical;
-      }
-    };
-
-    const handleMouseMove = (param: any) => {
-      if (dragStartX !== null && dragStartLogical !== null && param?.point?.x !== undefined) {
-        const currentX = param.point.x;
-        const deltaX = currentX - dragStartX;
-
-        const barSpacing = chart.timeScale().options().barSpacing || 6;
-        const barsDelta = Math.round(deltaX / barSpacing);
-
-        if (barsDelta !== 0) {
-          dragStartX = currentX;
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      dragStartX = null;
-      dragStartLogical = null;
-    };
-
-    chart.subscribeClick(handleMouseDown);
-    chart.subscribeCrosshairMove(handleMouseMove);
-
-    const container = mainChartContainerRef.current;
-    if (container) {
-      container.addEventListener('mouseup', handleMouseUp);
-      container.addEventListener('mouseleave', handleMouseUp);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('mouseup', handleMouseUp);
-        container.removeEventListener('mouseleave', handleMouseUp);
-      }
-    };
-  }, []);
-
+  // Context menu handlers
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (!ctxOpenRef.current) return;
@@ -397,36 +313,19 @@ const TradingBinance: React.FC<Props> = ({
   const openCtxMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (!chartRef.current || !candleSeries.current) return;
 
-    // Lấy bounding rect từ element được click (e.currentTarget)
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
 
-    console.log('[Context Menu] Click position:', {
-      clientY: e.clientY,
-      rectTop: rect.top,
-      rectBottom: rect.bottom,
-      rectHeight: rect.height,
-      relativeY: y
-    });
-
-    // Tính giá trực tiếp từ Y coordinate
     try {
       const price = candleSeries.current.coordinateToPrice(y);
-      
       if (price !== null && Number.isFinite(price)) {
         ctxClickPriceRef.current = price;
-        console.log('[Context Menu] ✅ Price from coordinateToPrice:', price);
       } else {
-        // Fallback
-        const fallbackPrice = candles.at(-1)?.close ?? null;
-        ctxClickPriceRef.current = fallbackPrice;
-        console.log('[Context Menu] ⚠️ Using fallback price:', fallbackPrice);
+        ctxClickPriceRef.current = candles.at(-1)?.close ?? null;
       }
     } catch (err) {
-      console.warn('[Context Menu] ❌ coordinateToPrice error:', err);
       ctxClickPriceRef.current = candles.at(-1)?.close ?? null;
     }
 
@@ -438,16 +337,10 @@ const TradingBinance: React.FC<Props> = ({
   const updatePriceFormat = async (candles: Candle[]) => {
     const chart = chartRef.current;
     const cs = candleSeries.current;
-
-    if (!chart || !cs || candles.length === 0) {
-      return;
-    }
+    if (!chart || !cs || candles.length === 0) return;
 
     const lastPrice = candles.at(-1)?.close;
-
-    if (!lastPrice || !Number.isFinite(lastPrice) || lastPrice <= 0) {
-      return;
-    }
+    if (!lastPrice || !Number.isFinite(lastPrice) || lastPrice <= 0) return;
 
     let meta: SymbolMeta;
     try {
@@ -457,8 +350,6 @@ const TradingBinance: React.FC<Props> = ({
     }
 
     let { tickSize, precision } = meta;
-
-    // ✅ Điều chỉnh displayTickSize cho cột giá (bước nhảy nhỏ = nhiều mốc)
     let displayTickSize = tickSize;
 
     if (lastPrice < 1) {
@@ -470,36 +361,32 @@ const TradingBinance: React.FC<Props> = ({
         precision = 6;
       }
     } else if (lastPrice >= 1 && lastPrice < 10) {
-      displayTickSize = 0.001;  // Nhiều mốc: 2.330, 2.331, 2.332...
+      displayTickSize = 0.001;
       precision = 3;
     } else if (lastPrice >= 10 && lastPrice < 100) {
-      displayTickSize = 0.01;   // Nhiều mốc: 23.30, 23.31...
+      displayTickSize = 0.01;
       precision = 2;
     } else if (lastPrice >= 100) {
-      displayTickSize = 0.1;    // Nhiều mốc: 230.0, 230.1...
+      displayTickSize = 0.1;
       precision = 4;
     }
 
-    // ✅ Apply displayTickSize cho chart series (cột giá bên phải)
     cs.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma7Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma25Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ma99Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ema12Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
-    ema26Ref.current?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
 
-    // ✅ KHÔNG làm tròn giá live - hiển thị đúng giá gốc
+    // Apply to all line series
+    Object.values(lineSeriesRefs.current).forEach(series => {
+      series?.applyOptions({ priceFormat: { type: 'price', minMove: displayTickSize, precision } });
+    });
+
     chart.applyOptions({
       localization: {
         locale: 'vi-VN',
         priceFormatter: (p: number) => {
-          // KHÔNG có Math.round() - giữ nguyên giá gốc
           return p.toLocaleString('vi-VN', {
             minimumFractionDigits: precision,
             maximumFractionDigits: precision,
           });
         },
-        // ✅ FIX: Format time theo timezone Việt Nam (UTC+7) - Hiển thị khi HOVER
         timeFormatter: (timestamp: number) => {
           const date = new Date(timestamp * 1000);
           const time = date.toLocaleTimeString('vi-VN', {
@@ -513,25 +400,15 @@ const TradingBinance: React.FC<Props> = ({
             day: '2-digit',
             month: '2-digit',
           });
-          return `${time} ${day}`; // Format: "16:00 12-11"
+          return `${time} ${day}`;
         },
       },
     });
   };
 
-  // Sync bollData changes
-  useEffect(() => {
-    setBollData(null);
-  }, [selectedSymbol, selectedInterval, market]);
-
-  // ✅ Auto redraw BOLL fill when data changes
-  useEffect(() => {
-    if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-      requestAnimationFrame(() => redrawBollFill()); // Instant
-    }
-  }, [bollData, mainVisible.boll, bollFillVisible, redrawBollFill]);
-
-  // Main chart initialization
+  // ============================================
+  // MAIN CHART INITIALIZATION
+  // ============================================
   useEffect(() => {
     const mainEl = mainChartContainerRef.current;
     const volumeEl = volumeChartContainerRef.current;
@@ -543,7 +420,6 @@ const TradingBinance: React.FC<Props> = ({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
-      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
       localization: {
         locale: 'vi-VN',
         timeFormatter: (timestamp: number) => {
@@ -592,7 +468,6 @@ const TradingBinance: React.FC<Props> = ({
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
         visible: false,
-        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục (không có ngày/tháng)
         tickMarkFormatter: (time: UTCTimestamp) => {
           const date = new Date(time * 1000);
           return date.toLocaleTimeString('vi-VN', {
@@ -603,47 +478,19 @@ const TradingBinance: React.FC<Props> = ({
           });
         },
       },
-
       crosshair: {
         mode: 0,
-        vertLine: {
-          color: '#6e859bff',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#363c4e',
-          labelVisible: true,
-        },
-        horzLine: {
-          color: '#758696',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#363c4e',
-          labelVisible: true,
-        },
+        vertLine: { color: '#6e859bff', width: 1, style: 3, labelBackgroundColor: '#363c4e', labelVisible: true },
+        horzLine: { color: '#758696', width: 1, style: 3, labelBackgroundColor: '#363c4e', labelVisible: true },
       },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
       handleScale: {
         mouseWheel: true,
         pinch: true,
-        axisPressedMouseMove: {
-          time: true,
-          price: true,
-        },
-        axisDoubleClickReset: {
-          time: true,
-          price: true,
-        },
+        axisPressedMouseMove: { time: true, price: true },
+        axisDoubleClickReset: { time: true, price: true },
       },
-      kineticScroll: {
-        mouse: true,
-        touch: true,
-      },
-
+      kineticScroll: { mouse: true, touch: true },
     });
 
     chartRef.current = mainChart;
@@ -654,7 +501,6 @@ const TradingBinance: React.FC<Props> = ({
         background: { type: ColorType.Solid, color: '#181A20' },
         textColor: '#a7b1b9ff',
       },
-      // ✅ FIX: Thêm localization để format time theo timezone Việt Nam
       localization: {
         locale: 'vi-VN',
         timeFormatter: (timestamp: number) => {
@@ -699,7 +545,6 @@ const TradingBinance: React.FC<Props> = ({
         lockVisibleTimeRangeOnResize: true,
         rightBarStaysOnScroll: true,
         shiftVisibleRangeOnNewBar: false,
-        // ✅ FIX: Chỉ hiển thị giờ:phút trên trục
         tickMarkFormatter: (time: UTCTimestamp) => {
           const date = new Date(time * 1000);
           return date.toLocaleTimeString('vi-VN', {
@@ -712,58 +557,30 @@ const TradingBinance: React.FC<Props> = ({
       },
       crosshair: {
         mode: 0,
-        vertLine: {
-          color: '#6e859bff',
-          width: 1,
-          style: 3,
-          labelBackgroundColor: '#363c4e',
-          labelVisible: true,
-        },
-        horzLine: {
-          color: 'transparent',
-          width: 0,
-          style: 3,
-          labelBackgroundColor: '#363c4e',
-          labelVisible: false,
-        },
+        vertLine: { color: '#6e859bff', width: 1, style: 3, labelBackgroundColor: '#363c4e', labelVisible: true },
+        horzLine: { color: 'transparent', width: 0, style: 3, labelBackgroundColor: '#363c4e', labelVisible: false },
       },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-        horzTouchDrag: true,
-        vertTouchDrag: true,
-      },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: true },
       handleScale: {
         mouseWheel: true,
         pinch: true,
-        axisPressedMouseMove: {
-          time: true,
-          price: false,
-        },
-        axisDoubleClickReset: {
-          time: true,
-          price: true,
-        },
+        axisPressedMouseMove: { time: true, price: false },
+        axisDoubleClickReset: { time: true, price: true },
       },
-      kineticScroll: {
-        mouse: true,
-        touch: true,
-      },
-
+      kineticScroll: { mouse: true, touch: true },
     });
 
     volumeChartRef.current = volumeChart;
 
+    // Sync time scales
     const mainTimeScale = mainChart.timeScale();
     const volumeTimeScale = volumeChart.timeScale();
 
     const handleMainChartChange = (logicalRange: any) => {
       if (!logicalRange || isSyncingRef.current) return;
       if (syncSourceRef.current === 'volume') return;
-
       isSyncingRef.current = true;
       syncSourceRef.current = 'main';
-
       try {
         volumeTimeScale.setVisibleLogicalRange(logicalRange);
       } catch (err) {
@@ -777,10 +594,8 @@ const TradingBinance: React.FC<Props> = ({
     const handleVolumeChartChange = (logicalRange: any) => {
       if (!logicalRange || isSyncingRef.current) return;
       if (syncSourceRef.current === 'main') return;
-
       isSyncingRef.current = true;
       syncSourceRef.current = 'volume';
-
       try {
         mainTimeScale.setVisibleLogicalRange(logicalRange);
       } catch (err) {
@@ -794,6 +609,7 @@ const TradingBinance: React.FC<Props> = ({
     mainTimeScale.subscribeVisibleLogicalRangeChange(handleMainChartChange);
     volumeTimeScale.subscribeVisibleLogicalRangeChange(handleVolumeChartChange);
 
+    // Create main series
     candleSeries.current = mainChart.addCandlestickSeries({
       upColor: '#0ECB81',
       downColor: '#F6465D',
@@ -816,107 +632,11 @@ const TradingBinance: React.FC<Props> = ({
       base: 0,
     });
 
-    // ✅ Add MA series (refs from useIndicators)
-    ma7Ref.current = mainChart.addLineSeries({
-      color: indicatorColors.ma7,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.ma7,
-    });
-    ma25Ref.current = mainChart.addLineSeries({
-      color: indicatorColors.ma25,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.ma25,
-    });
-    ma99Ref.current = mainChart.addLineSeries({
-      color: indicatorColors.ma99,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.ma99,
-    });
+    // ✅ Initialize dynamic indicator series
+    initializeSeries();
 
-    // ✅ Add EMA series
-    ema12Ref.current = mainChart.addLineSeries({
-      color: indicatorColors.ema12,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.ema12,
-      lineStyle: 0,
-    });
-
-    ema26Ref.current = mainChart.addLineSeries({
-      color: indicatorColors.ema26,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.ema26,
-      lineStyle: 0,
-    });
-
-    // ✅ Add BOLL series (refs from useBollingerBands)
-    bollUpperRef.current = mainChart.addLineSeries({
-      color: indicatorColors.boll.upper,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.boll,
-      lineStyle: 0,
-    });
-
-    bollMiddleRef.current = mainChart.addLineSeries({
-      color: indicatorColors.boll.middle,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.boll,
-      lineStyle: 2,
-    });
-
-    bollLowerRef.current = mainChart.addLineSeries({
-      color: indicatorColors.boll.lower,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: mainVisible.boll,
-      lineStyle: 0,
-    });
-
-    // ✅ Initialize BOLL canvas overlay
-    initializeCanvas();
-
-    // ✅ Add volume MA series
-    mavol1Ref.current = volumeChart.addLineSeries({
-      color: indicatorColors.mavol1,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: volumeVisible.mavol1,
-    });
-
-    mavol2Ref.current = volumeChart.addLineSeries({
-      color: indicatorColors.mavol2,
-      lineWidth: 1,
-      lastValueVisible: false,
-      priceLineVisible: false,
-      visible: volumeVisible.mavol2,
-    });
-
-    // Subscribe to BOLL redraw events
-    mainChart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-      if (mainVisible.boll && bollFillVisible) {
-        requestAnimationFrame(() => redrawBollFill()); // Smooth 60fps
-      }
-    });
-
-    // ✅ Also redraw on crosshair move (for smooth updates)
-    let redrawTimeout: NodeJS.Timeout | null = null;
+    // Crosshair move handler
     const handleCrosshairMove = (param: any) => {
-      // Lấy giá từ Y coordinate (chính xác cho mọi vị trí trên chart)
       if (param.point && param.point.y !== undefined && candleSeries.current) {
         try {
           const price = candleSeries.current.coordinateToPrice(param.point.y);
@@ -924,7 +644,6 @@ const TradingBinance: React.FC<Props> = ({
             setHoverPrice(price);
           }
         } catch (e) {
-          // Fallback: lấy từ candle data
           if (param.time && param.seriesData.has(candleSeries.current)) {
             const candlePrice = param.seriesData.get(candleSeries.current)?.close;
             if (typeof candlePrice === 'number') {
@@ -935,7 +654,6 @@ const TradingBinance: React.FC<Props> = ({
           }
         }
       } else if (param.time && param.seriesData.has(candleSeries.current!)) {
-        // Fallback cũ: lấy từ candle
         const price = param.seriesData.get(candleSeries.current!)?.close;
         if (typeof price === 'number') {
           setHoverPrice(price);
@@ -944,33 +662,18 @@ const TradingBinance: React.FC<Props> = ({
         setHoverPrice(null);
       }
 
-      // Update hover time
       if (param.time) {
         setHoverTime(param.time as UTCTimestamp);
       } else {
         setHoverTime(null);
       }
-
-      // Debounced redraw for BOLL fill
-      if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-        requestAnimationFrame(() => redrawBollFill()); // Instant, no debounce
-      }
     };
 
     mainChart.subscribeCrosshairMove(handleCrosshairMove);
 
-    // ✅ Redraw BOLL fill on chart resize
+    // Resize observer
     const resizeObserver = new ResizeObserver(() => {
-      if (bollCanvasRef.current && chartRef.current) {
-        const mainEl = mainChartContainerRef.current;
-        if (mainEl) {
-          bollCanvasRef.current.width = mainEl.clientWidth;
-          bollCanvasRef.current.height = mainEl.clientHeight;
-        }
-      }
-      if (mainVisible.boll && bollFillVisible && bollData?.upper?.length) {
-        setTimeout(() => redrawBollFill(), 100);
-      }
+      // Handle resize if needed
     });
 
     if (mainEl) {
@@ -984,106 +687,64 @@ const TradingBinance: React.FC<Props> = ({
     };
   }, []);
 
-  // Data loading useEffect
+  // ============================================
+  // DATA LOADING
+  // ============================================
   useEffect(() => {
     if (!candleSeries.current || !volumeSeries.current || !chartRef.current) return;
 
     const mySession = ++sessionRef.current;
-
     console.log('[LoadHistory] 🔄 Starting load for', selectedSymbol, selectedInterval, market);
 
     try {
       candleSeries.current.setData([]);
       volumeSeries.current.setData([]);
-
-      // ✅ Clear indicators using hooks
       clearAllIndicators();
-      clearBollingerBands();
     } catch (e) {
       console.warn('[LoadHistory] ⚠️ Failed to clear series:', e);
     }
 
     try {
       if (wsRef.current) {
-        console.log('[WS] 🔌 Closing old WebSocket');
         wsRef.current.close();
         wsRef.current = null;
       }
     } catch { }
 
-    const restBase = market === 'futures'
-      ? 'https://fapi.binance.com'
-      : 'https://data.binance.com';
-
-    const wsBase = market === 'futures'
-      ? 'wss://fstream.binance.com/ws'
-      : 'wss://stream.binance.com:9443/ws';
+    const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://data.binance.com';
+    const wsBase = market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
 
     const controller = new AbortController();
 
     const loadHistory = async () => {
       const path = market === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
-      const symbolUpper = selectedSymbol.toUpperCase().trim(); // ✅ FIX: Trim whitespace
+      const symbolUpper = selectedSymbol.toUpperCase().trim();
       const url = `${restBase}${path}?symbol=${symbolUpper}&interval=${selectedInterval}&limit=500`;
 
       console.log('[LoadHistory] 🔄 Fetching:', url);
-      console.log('[LoadHistory] 📌 Symbol:', symbolUpper, '| Market:', market, '| Interval:', selectedInterval);
 
       try {
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'Accept': 'application/json',
-          }
-        });
-
-        // ✅ FIX: Log response status chi tiết
-        console.log('[LoadHistory] 📡 Response:', res.status, res.statusText);
+        const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
 
         if (!res.ok) {
           const errorText = await res.text();
           console.error('[LoadHistory] ❌ API Error:', errorText);
-
-          // ✅ FIX: Parse Binance error
-          try {
-            const errJson = JSON.parse(errorText);
-            if (errJson.code === -1121) {
-              console.error(`[LoadHistory] ❌ Symbol "${symbolUpper}" KHÔNG TỒN TẠI trên ${market.toUpperCase()}!`);
-            }
-          } catch { }
-
           throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
 
         const data = await res.json();
 
-        // ✅ FIX: Log data info
-        console.log('[LoadHistory] 📊 Data:', Array.isArray(data) ? `${data.length} klines` : typeof data);
-
         if (!Array.isArray(data)) {
           console.error('[LoadHistory] ❌ Invalid response:', data);
-          // ✅ FIX: Check Binance error object
-          if (data && typeof data === 'object' && 'code' in data) {
-            console.error('[LoadHistory] ❌ Binance Error:', data.code, data.msg);
-          }
           throw new Error('Expected array of klines');
         }
 
         if (data.length === 0) {
-          console.warn('[LoadHistory] ⚠️ Empty data for', symbolUpper, '- Coin có thể không có trên', market);
+          console.warn('[LoadHistory] ⚠️ Empty data for', symbolUpper);
           return;
         }
 
-        if (sessionRef.current !== mySession) {
-          console.log('[LoadHistory] ⏭️ Stale session:', mySession, '→', sessionRef.current);
-          return;
-        }
-
-        // ✅ FIX: Validate kline format
-        if (!Array.isArray(data[0]) || data[0].length < 6) {
-          console.error('[LoadHistory] ❌ Invalid kline format:', data[0]);
-          throw new Error('Invalid kline format');
-        }
+        if (sessionRef.current !== mySession) return;
 
         const cs: Candle[] = data.map((d: any) => ({
           time: toTs(d[0]),
@@ -1099,22 +760,17 @@ const TradingBinance: React.FC<Props> = ({
           color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
         }));
 
-        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles | Last:', cs[cs.length - 1]?.close);
+        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles');
 
-        // ✅ FIX: Check series refs before setData
-        if (!candleSeries.current || !volumeSeries.current) {
-          console.error('[LoadHistory] ❌ Chart series not ready!');
-          return;
-        }
+        if (!candleSeries.current || !volumeSeries.current) return;
 
         candleSeries.current.setData(cs);
         volumeSeries.current.setData(vs);
         setVolumeData(vs);
 
-        // ✅ Update indicators using hooks (no more duplication!)
+        // ✅ Update dynamic indicators
         updateMainIndicators(cs);
         updateVolumeIndicators(vs);
-        updateBollingerBands(cs);
 
         await updatePriceFormat(cs);
 
@@ -1131,18 +787,9 @@ const TradingBinance: React.FC<Props> = ({
             const visibleCount = Math.min(targetVisible, cs.length);
             const startIdx = Math.max(0, cs.length - visibleCount);
 
-            const range = {
-              from: cs[startIdx].time,
-              to: cs[cs.length - 1].time,
-            };
-
+            const range = { from: cs[startIdx].time, to: cs[cs.length - 1].time };
             const optimalBarSpacing = Math.max(8, Math.min(16, Math.floor(containerWidth / visibleCount * 0.85)));
-
-            const spacingOptions = {
-              rightOffset: 6,
-              barSpacing: optimalBarSpacing,
-              minBarSpacing: 6,
-            };
+            const spacingOptions = { rightOffset: 6, barSpacing: optimalBarSpacing, minBarSpacing: 6 };
 
             isSyncingRef.current = true;
             chartRef.current.timeScale().setVisibleRange(range);
@@ -1150,8 +797,6 @@ const TradingBinance: React.FC<Props> = ({
             volumeChartRef.current.timeScale().setVisibleRange(range);
             volumeChartRef.current.timeScale().applyOptions(spacingOptions);
             isSyncingRef.current = false;
-
-            console.log(`[InitialView] 📊 ${visibleCount}/${cs.length} nến (spacing=${optimalBarSpacing}px)`);
           }, 150);
         }
 
@@ -1166,7 +811,7 @@ const TradingBinance: React.FC<Props> = ({
 
         setCandles(cs);
 
-        // Setup WebSocket for real-time updates
+        // Setup WebSocket
         const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
         wsRef.current = ws;
 
@@ -1179,50 +824,29 @@ const TradingBinance: React.FC<Props> = ({
           const parsed = JSON.parse(ev.data) as KlineMessage;
           const k = parsed.k;
           const t = toTs(k.t);
-
           const isClosed = k.x === true;
 
-          const candle: Candle = {
-            time: t,
-            open: +k.o,
-            high: +k.h,
-            low: +k.l,
-            close: +k.c
-          };
-
-          const vol: VolumeBar = {
-            time: t,
-            value: +k.v,
-            color: +k.c >= +k.o ? '#0ECB81' : '#F6465D'
-          };
+          const candle: Candle = { time: t, open: +k.o, high: +k.h, low: +k.l, close: +k.c };
+          const vol: VolumeBar = { time: t, value: +k.v, color: +k.c >= +k.o ? '#0ECB81' : '#F6465D' };
 
           if (candleSeries.current && volumeSeries.current) {
-            // ✅ Dùng hook để update series
             updateSeriesData(candle);
             volumeSeries.current.update(vol);
 
             setVolumeData((prev) => {
               const i = prev.findIndex((v) => v.time === vol.time);
-              const next = i >= 0
-                ? [...prev.slice(0, i), vol, ...prev.slice(i + 1)]
-                : [...prev, vol];
-
+              const next = i >= 0 ? [...prev.slice(0, i), vol, ...prev.slice(i + 1)] : [...prev, vol];
               if (next.length > 500) next.shift();
-
               updateVolumeIndicators(next);
-
               return next;
             });
 
             if (isClosed) {
-              console.log('[WS] 🕯️ New candle closed at', new Date(t * 1000).toISOString());
               setTimeout(() => {
                 if (!chartRef.current || !volumeChartRef.current) return;
-
                 const mainTimeScale = chartRef.current.timeScale();
                 const volumeTimeScale = volumeChartRef.current.timeScale();
                 const logicalRange = mainTimeScale.getVisibleLogicalRange();
-
                 if (logicalRange) {
                   volumeTimeScale.setVisibleLogicalRange(logicalRange);
                 }
@@ -1233,15 +857,9 @@ const TradingBinance: React.FC<Props> = ({
           setCandles((prev) => {
             if (sessionRef.current !== mySession) return prev;
             const i = prev.findIndex((c) => c.time === candle.time);
-            const next = i >= 0
-              ? [...prev.slice(0, i), candle, ...prev.slice(i + 1)]
-              : [...prev, candle];
-
+            const next = i >= 0 ? [...prev.slice(0, i), candle, ...prev.slice(i + 1)] : [...prev, candle];
             if (next.length > 500) next.shift();
-
             updateMainIndicators(next);
-            updateBollingerBands(next);
-
             return next;
           });
         };
@@ -1255,23 +873,14 @@ const TradingBinance: React.FC<Props> = ({
         };
 
       } catch (err) {
-        // ✅ FIX: Better error handling
         if (err instanceof Error) {
-          if (err.name === 'AbortError') {
-            console.log('[LoadHistory] ⏹️ Request aborted (symbol changed)');
-            return; // Don't retry on abort
-          }
+          if (err.name === 'AbortError') return;
           console.error('[LoadHistory] ❌ Error:', err.message);
-        } else {
-          console.error('[LoadHistory] ❌ Unknown error:', err);
         }
 
         if (sessionRef.current === mySession) {
-          console.log('[LoadHistory] 🔄 Retrying in 3 seconds...');
           setTimeout(() => {
-            if (sessionRef.current === mySession) {
-              loadHistory();
-            }
+            if (sessionRef.current === mySession) loadHistory();
           }, 3000);
         }
       }
@@ -1280,105 +889,118 @@ const TradingBinance: React.FC<Props> = ({
     loadHistory();
 
     return () => {
-      console.log('[Cleanup] 🧹 Cleaning up for', selectedSymbol);
-
       try {
         if (candleSeries.current) {
           const prices = getAllLinePrices(candleSeries.current);
           localStorage.setItem(hlineKey(selectedSymbol, market), JSON.stringify(prices));
         }
       } catch { }
-
       controller.abort();
       if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch { }
+        try { wsRef.current.close(); } catch { }
       }
     };
   }, [selectedSymbol, selectedInterval, market]);
 
-  const mainIndicatorValues: IndicatorValue[] = [
-    mainVisible.ma7 && {
-      name: 'MA',
-      period: indicatorPeriods.ma7,
-      value: candles.at(-1)?.close ?? 0,
-      color: indicatorColors.ma7!,
-      visible: mainVisible.ma7,
-    },
-    mainVisible.ma25 && {
-      name: 'MA',
-      period: indicatorPeriods.ma25,
-      value: candles.at(-1)?.close ?? 0,
-      color: indicatorColors.ma25!,
-      visible: mainVisible.ma25,
-    },
-    mainVisible.ma99 && {
-      name: 'MA',
-      period: indicatorPeriods.ma99,
-      value: candles.at(-1)?.close ?? 0,
-      color: indicatorColors.ma99!,
-      visible: mainVisible.ma99,
-    },
-    mainVisible.ema12 && {
-      name: 'EMA',
-      period: indicatorPeriods.ema12,
-      value: candles.at(-1)?.close ?? 0,
-      color: indicatorColors.ema12!,
-      visible: mainVisible.ema12,
-    },
-    mainVisible.ema26 && {
-      name: 'EMA',
-      period: indicatorPeriods.ema26,
-      value: candles.at(-1)?.close ?? 0,
-      color: indicatorColors.ema26!,
-      visible: mainVisible.ema26,
-    },
-  ].filter(Boolean) as IndicatorValue[];
+  // ============================================
+  // ✅ NEW: DYNAMIC INDICATOR VALUES - SEPARATED BY TYPE
+  // ============================================
+  
+  // MA indicators
+  const maIndicatorValues: IndicatorValue[] = useMemo(() => {
+    return config.lines
+      .filter(line => line.type === 'MA' && line.visible)
+      .map(line => ({
+        id: line.id,
+        name: 'MA',
+        period: line.period,
+        value: candles.at(-1)?.close ?? 0,
+        color: line.color,
+        visible: line.visible,
+      }));
+  }, [config.lines, candles]);
 
-  const volumeIndicatorValues: IndicatorValue[] = [
-    volumeVisible.mavol1 && {
-      name: 'MA',
-      period: indicatorPeriods.mavol1,
-      value: volumeData.at(-1)?.value ?? 0,
-      color: indicatorColors.mavol1!,
-      visible: volumeVisible.mavol1,
-    },
-    volumeVisible.mavol2 && {
-      name: 'MA',
-      period: indicatorPeriods.mavol2,
-      value: volumeData.at(-1)?.value ?? 0,
-      color: indicatorColors.mavol2!,
-      visible: volumeVisible.mavol2,
-    },
-  ].filter(Boolean) as IndicatorValue[];
+  // EMA indicators
+  const emaIndicatorValues: IndicatorValue[] = useMemo(() => {
+    return config.lines
+      .filter(line => line.type === 'EMA' && line.visible)
+      .map(line => ({
+        id: line.id,
+        name: 'EMA',
+        period: line.period,
+        value: candles.at(-1)?.close ?? 0,
+        color: line.color,
+        visible: line.visible,
+      }));
+  }, [config.lines, candles]);
 
-  // ✅ Listen for symbol change requests from Position component
+  // BOLL indicators
+  const bollIndicatorValues: IndicatorValue[] = useMemo(() => {
+    return config.bollingerBands
+      .filter(boll => boll.visible)
+      .map(boll => ({
+        id: boll.id,
+        name: 'BOLL',
+        period: boll.period,
+        stdDev: boll.stdDev,
+        value: candles.at(-1)?.close ?? 0,
+        color: boll.colors.upper,
+        visible: boll.visible,
+        label: 'UP',
+        extraValues: [
+          { label: 'MID', value: candles.at(-1)?.close ?? 0, color: boll.colors.middle },
+          { label: 'LOW', value: candles.at(-1)?.close ?? 0, color: boll.colors.lower },
+        ],
+      }));
+  }, [config.bollingerBands, candles]);
+
+  // Check visibility by type
+  const hasAnyMAVisible = useMemo(() => 
+    config.lines.some(l => l.type === 'MA' && l.visible), 
+    [config.lines]
+  );
+  const hasAnyEMAVisible = useMemo(() => 
+    config.lines.some(l => l.type === 'EMA' && l.visible), 
+    [config.lines]
+  );
+  const hasAnyBOLLVisible = useMemo(() => 
+    config.bollingerBands.some(b => b.visible), 
+    [config.bollingerBands]
+  );
+
+  // Volume MA indicators
+  const volumeIndicatorValues: IndicatorValue[] = useMemo(() => {
+    return config.volumeMA
+      .filter(vol => vol.visible)
+      .map(vol => ({
+        id: vol.id,
+        name: 'MA',
+        period: vol.period,
+        value: volumeData.at(-1)?.value ?? 0,
+        color: vol.color,
+        visible: vol.visible,
+      }));
+  }, [config.volumeMA, volumeData]);
+
+  // Listen for symbol change requests
   useEffect(() => {
     const handler = (e: CustomEvent) => {
       const { symbol } = e.detail;
-      console.log("📊 Chart received symbol change request:", symbol);
-
       if (onRequestSymbolChange) {
         onRequestSymbolChange(symbol);
       }
     };
-
     window.addEventListener("chart-symbol-change-request", handler as EventListener);
     return () => window.removeEventListener("chart-symbol-change-request", handler as EventListener);
   }, [onRequestSymbolChange]);
 
+  // Hide TradingView logo
   useEffect(() => {
     const hideLogo = (svg: Element) => {
       if (svg.getAttribute('viewBox') === '0 0 35 19') {
         (svg as HTMLElement).style.display = 'none';
-
         const parent = svg.parentElement;
-        if (parent) {
-          (parent as HTMLElement).style.display = 'none';
-        }
-
-        console.log('✅ Đã ẩn logo TradingView');
+        if (parent) (parent as HTMLElement).style.display = 'none';
         return true;
       }
       return false;
@@ -1392,11 +1014,7 @@ const TradingBinance: React.FC<Props> = ({
         mutation.addedNodes.forEach((node) => {
           if (node.nodeType === 1) {
             const element = node as Element;
-
-            if (element.tagName === 'svg' && hideLogo(element)) {
-              return;
-            }
-
+            if (element.tagName === 'svg' && hideLogo(element)) return;
             const logos = element.querySelectorAll('svg[viewBox="0 0 35 19"]');
             logos.forEach(hideLogo);
           }
@@ -1407,179 +1025,189 @@ const TradingBinance: React.FC<Props> = ({
     const mainContainer = mainChartContainerRef.current;
     const volumeContainer = volumeChartContainerRef.current;
 
-    if (mainContainer) {
-      observer.observe(mainContainer, {
-        childList: true,
-        subtree: true,
-      });
-    }
+    if (mainContainer) observer.observe(mainContainer, { childList: true, subtree: true });
+    if (volumeContainer) observer.observe(volumeContainer, { childList: true, subtree: true });
 
-    if (volumeContainer) {
-      observer.observe(volumeContainer, {
-        childList: true,
-        subtree: true,
-      });
-    }
-
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, []);
 
+  // ============================================
+  // RENDER
+  // ============================================
+  
+  // Check if indicator TYPE exists in config (not just visible)
+  const hasMAInConfig = config.lines.some(l => l.type === 'MA');
+  const hasEMAInConfig = config.lines.some(l => l.type === 'EMA');
+  const hasBOLLInConfig = config.bollingerBands.length > 0;
+  const hasVolumeMAInConfig = config.volumeMA.length > 0;
+
+  // Calculate header positions - show header if type exists (regardless of visibility)
+  const HEADER_HEIGHT = 22; // Approximate height of each header row
+  let currentTop = 8;
+  
+  const maHeaderTop = currentTop;
+  if (hasMAInConfig) currentTop += HEADER_HEIGHT;
+  
+  const emaHeaderTop = currentTop;
+  if (hasEMAInConfig) currentTop += HEADER_HEIGHT;
+  
+  const bollHeaderTop = currentTop;
 
   return (
     <div className="relative w-full h-full bg-dark-900 text-dark-100 flex flex-col overflow-hidden">
-      {mainIndicatorVisible && (
-        <LineIndicatorHeader
-          type="main"
-          indicators={mainIndicatorValues}
-          visible={
-            mainVisible.ma7 ||
-            mainVisible.ma25 ||
-            mainVisible.ma99 ||
-            mainVisible.ema12 ||
-            mainVisible.ema26
-          }
-          onToggleVisible={toggleAllMainIndicators}
-          onOpenSetting={() => setShowMainSettings(true)}
-          onClose={() => {
-            setMainIndicatorVisible(false);
-            const allOff: MainIndicatorConfig = {
-              ma7: false,
-              ma25: false,
-              ma99: false,
-              ema12: false,
-              ema26: false,
-              boll: false,
-            };
-            setMainVisible(allOff);
-            ma7Ref.current?.applyOptions({ visible: false });
-            ma25Ref.current?.applyOptions({ visible: false });
-            ma99Ref.current?.applyOptions({ visible: false });
-            ema12Ref.current?.applyOptions({ visible: false });
-            ema26Ref.current?.applyOptions({ visible: false });
-          }}
-        />
-      )}
-
-      {mainVisible.boll && bollData?.upper?.length && (
-        <div
-          className="flex items-center gap-1.5 z-10"
-          style={{
-            position: 'absolute',
-            top: mainIndicatorVisible ? '34px' : '8px',
-            left: '8px'
-          }}
+      
+      {/* ✅ MA Header - Hiện nếu có MA trong config */}
+      {hasMAInConfig && (
+        <div 
+          className="absolute left-2 z-10 flex items-center gap-fluid-1.5"
+          style={{ top: `${maHeaderTop}px` }}
         >
           <LineIndicatorHeader
             type="main"
+            indicatorType="MA"
             noPosition={true}
-            indicators={[
-              {
-                name: 'BOLL',
-                period: indicatorPeriods.boll.period,
-                stdDev: indicatorPeriods.boll.stdDev,
-                value: bollData.upper[bollData.upper.length - 1]?.value || 0,
-                color: indicatorColors.boll.upper,
-                visible: mainVisible.boll,
-                label: 'UP',
-                extraValues: [
-                  {
-                    label: 'MID',
-                    value: bollData.middle[bollData.middle.length - 1]?.value || 0,
-                    color: indicatorColors.boll.middle,
-                  },
-                  {
-                    label: 'LOW',
-                    value: bollData.lower[bollData.lower.length - 1]?.value || 0,
-                    color: indicatorColors.boll.lower,
-                  }
-                ]
-              }
-            ]}
-            visible={mainVisible.boll}
-            onToggleVisible={() => {
-              setMainVisible({ ...mainVisible, boll: !mainVisible.boll });
-              bollUpperRef.current?.applyOptions({ visible: !mainVisible.boll });
-              bollMiddleRef.current?.applyOptions({ visible: !mainVisible.boll });
-              bollLowerRef.current?.applyOptions({ visible: !mainVisible.boll });
-              if (!mainVisible.boll) {
-                clearBollingerBands();
+            indicators={maIndicatorValues}
+            linesVisible={hasAnyMAVisible}
+            onToggleLinesVisible={() => {
+              const maLines = config.lines.filter(l => l.type === 'MA');
+              const anyVisible = maLines.some(l => l.visible);
+              maLines.forEach(line => updateLine(line.id, { visible: !anyVisible }));
+              if (!anyVisible && candles.length > 0) {
+                setTimeout(() => updateMainIndicators(candles), 0);
               }
             }}
             onOpenSetting={() => setShowMainSettings(true)}
             onClose={() => {
-              setMainVisible({ ...mainVisible, boll: false });
-              bollUpperRef.current?.applyOptions({ visible: false });
-              bollMiddleRef.current?.applyOptions({ visible: false });
-              bollLowerRef.current?.applyOptions({ visible: false });
-              clearBollingerBands();
+              // Đóng hẳn = xóa tất cả MA khỏi config
+              config.lines.filter(l => l.type === 'MA').forEach(line => removeLine(line.id));
             }}
+            onRemoveIndicator={(id) => removeLine(id)}
           />
-
-          {/* Fill toggle button */}
-          <button
-            onClick={() => {
-              setBollFillVisible(!bollFillVisible);
-              requestAnimationFrame(() => redrawBollFill()); // Instant
-            }}
-            className={`px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors ${bollFillVisible
-              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-              : 'bg-dark-800/80 text-dark-300 border border-dark-600/50 hover:bg-dark-700/80'
-              }`}
-          >
-            Fill
-          </button>
         </div>
       )}
 
+      {/* ✅ EMA Header - Hiện nếu có EMA trong config */}
+      {hasEMAInConfig && (
+        <div 
+          className="absolute left-2 z-10 flex items-center gap-fluid-1.5"
+          style={{ top: `${emaHeaderTop}px` }}
+        >
+          <LineIndicatorHeader
+            type="main"
+            indicatorType="EMA"
+            noPosition={true}
+            indicators={emaIndicatorValues}
+            linesVisible={hasAnyEMAVisible}
+            onToggleLinesVisible={() => {
+              const emaLines = config.lines.filter(l => l.type === 'EMA');
+              const anyVisible = emaLines.some(l => l.visible);
+              emaLines.forEach(line => updateLine(line.id, { visible: !anyVisible }));
+              if (!anyVisible && candles.length > 0) {
+                setTimeout(() => updateMainIndicators(candles), 0);
+              }
+            }}
+            onOpenSetting={() => setShowMainSettings(true)}
+            onClose={() => {
+              // Đóng hẳn = xóa tất cả EMA khỏi config
+              config.lines.filter(l => l.type === 'EMA').forEach(line => removeLine(line.id));
+            }}
+            onRemoveIndicator={(id) => removeLine(id)}
+          />
+        </div>
+      )}
+
+      {/* ✅ BOLL Header - Hiện nếu có BOLL trong config */}
+      {hasBOLLInConfig && (
+        <div 
+          className="absolute left-2 z-10 flex items-center gap-fluid-1.5"
+          style={{ top: `${bollHeaderTop}px` }}
+        >
+          <LineIndicatorHeader
+            type="main"
+            indicatorType="BOLL"
+            noPosition={true}
+            indicators={bollIndicatorValues}
+            linesVisible={hasAnyBOLLVisible}
+            onToggleLinesVisible={() => {
+              const anyVisible = config.bollingerBands.some(b => b.visible);
+              config.bollingerBands.forEach(boll => updateBoll(boll.id, { visible: !anyVisible }));
+              if (!anyVisible && candles.length > 0) {
+                setTimeout(() => updateMainIndicators(candles), 0);
+              }
+            }}
+            onOpenSetting={() => setShowMainSettings(true)}
+            onClose={() => {
+              // Đóng hẳn = xóa tất cả BOLL khỏi config
+              config.bollingerBands.forEach(boll => removeBoll(boll.id));
+            }}
+            onRemoveIndicator={(id) => removeBoll(id)}
+          />
+        </div>
+      )}
+
+      {/* ✅ Settings Modal - Dynamic */}
       {showMainSettings && createPortal(
         <LineIndicatorSettings
           type="main"
           defaultTab={1}
-          mainVisible={mainVisible}
-          volumeVisible={volumeVisible}
-          periods={indicatorPeriods}
-          colors={indicatorColors}
-          bollFillVisible={bollFillVisible}
-          onChange={(mainVis, volumeVis, _, per, col, bollFillVis) => {
-            if (mainVis) {
-              setMainVisible(mainVis);
-              ma7Ref.current?.applyOptions({ visible: mainVis.ma7 });
-              ma25Ref.current?.applyOptions({ visible: mainVis.ma25 });
-              ma99Ref.current?.applyOptions({ visible: mainVis.ma99 });
-              ema12Ref.current?.applyOptions({ visible: mainVis.ema12 });
-              ema26Ref.current?.applyOptions({ visible: mainVis.ema26 });
-              bollUpperRef.current?.applyOptions({ visible: mainVis.boll });
-              bollMiddleRef.current?.applyOptions({ visible: mainVis.boll });
-              bollLowerRef.current?.applyOptions({ visible: mainVis.boll });
-            }
-
-            if (bollFillVis !== undefined) {
-              setBollFillVisible(bollFillVis);
-            }
-
-            if (per) setIndicatorPeriods(per);
-
-            if (col) {
-              setIndicatorColors(col);
-              applyColorChanges(col);
-
-              if (col.boll) {
-                bollUpperRef.current?.applyOptions({ color: col.boll.upper });
-                bollMiddleRef.current?.applyOptions({ color: col.boll.middle });
-                bollLowerRef.current?.applyOptions({ color: col.boll.lower });
+          config={config}
+          onChange={(newConfig) => {
+            // ✅ FIX: Check if structure changed (add/remove) vs just properties changed
+            const linesChanged = newConfig.lines.length !== config.lines.length ||
+              newConfig.lines.some((l, i) => config.lines[i]?.id !== l.id);
+            const bollsChanged = newConfig.bollingerBands.length !== config.bollingerBands.length ||
+              newConfig.bollingerBands.some((b, i) => config.bollingerBands[i]?.id !== b.id);
+            const volumeChanged = newConfig.volumeMA.length !== config.volumeMA.length ||
+              newConfig.volumeMA.some((v, i) => config.volumeMA[i]?.id !== v.id);
+            
+            const structureChanged = linesChanged || bollsChanged || volumeChanged;
+            
+            setConfig(newConfig);
+            
+            // ✅ Only reinitialize if structure changed (add/remove indicators)
+            if (structureChanged) {
+              // ✅ Use longer delay to ensure React has re-rendered and configRef is updated
+              setTimeout(() => {
+                initializeSeries();
+                // Recalculate with current data after new series created
+                setTimeout(() => {
+                  if (candles.length > 0) {
+                    updateMainIndicators(candles);
+                  }
+                  if (volumeData.length > 0) {
+                    updateVolumeIndicators(volumeData);
+                  }
+                }, 50);
+              }, 50);
+            } else {
+              // ✅ Just apply visibility/color/period changes without reinitializing
+              newConfig.lines.forEach(line => {
+                const series = lineSeriesRefs.current[line.id];
+                if (series) {
+                  series.applyOptions({ 
+                    visible: line.visible,
+                    color: line.color,
+                    lineWidth: line.lineWidth as 1 | 2 | 3 | 4,
+                  });
+                }
+              });
+              
+              newConfig.bollingerBands.forEach(boll => {
+                const refs = bollSeriesRefs.current[boll.id];
+                if (refs) {
+                  refs.upper?.applyOptions({ visible: boll.visible, color: boll.colors.upper });
+                  refs.middle?.applyOptions({ visible: boll.visible, color: boll.colors.middle });
+                  refs.lower?.applyOptions({ visible: boll.visible, color: boll.colors.lower });
+                }
+              });
+              
+              // ✅ Recalculate if periods changed
+              if (candles.length > 0) {
+                updateMainIndicators(candles);
               }
-            }
-
-            // ✅ Recalculate khi periods thay đổi (no duplication!)
-            if (per && candles.length > 0) {
-              updateMainIndicators(candles);
-              updateBollingerBands(candles);
-            }
-
-            if (per && volumeData.length > 0) {
-              updateVolumeIndicators(volumeData);
+              if (volumeData.length > 0) {
+                updateVolumeIndicators(volumeData);
+              }
             }
           }}
           onClose={() => setShowMainSettings(false)}
@@ -1599,47 +1227,36 @@ const TradingBinance: React.FC<Props> = ({
       />
 
       <ChartContextMenu
-  open={ctxOpen}
-  position={ctxPos}
-  menuRef={menuRef}
-  hoverPrice={hoverPrice}
-  ctxClickPrice={ctxClickPriceRef.current}
-  lastCandleClose={candles.at(-1)?.close ?? null}
-  candleSeries={candleSeries.current}
-  selectedSymbol={selectedSymbol}
-  market={market}
-  tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize ?? 0.01}
-  precision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision ?? 2}
-  subMenuOpen={ctxSubOpen}
-  onSubMenuOpen={setCtxSubOpen}
-  onClose={() => setCtxOpen(false)}
-  onRefreshChart={() => {
-    console.log('Refresh chart');
-  }}
-  hlineKey={hlineKey(selectedSymbol, market)}
-  snapToTick={snapToTick}
-  // ⚠️ QUAN TRỌNG: Truyền balance và leverage từ TradingForm/WebSocket
-  availableBalance={availableBalance}  // Số dư khả dụng từ WebSocket
-  leverage={leverage}                  // Đòn bẩy hiện tại
-  // ⚠️ QUAN TRỌNG: Truyền callback đặt lệnh
-  onPlaceOrder={(params) => {
-    console.log('[Chart Order]', params);
-    binanceWS.placeOrder(params);
-  }}
-  
-/>
-
-
+        open={ctxOpen}
+        position={ctxPos}
+        menuRef={menuRef}
+        hoverPrice={hoverPrice}
+        ctxClickPrice={ctxClickPriceRef.current}
+        lastCandleClose={candles.at(-1)?.close ?? null}
+        candleSeries={candleSeries.current}
+        selectedSymbol={selectedSymbol}
+        market={market}
+        tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize ?? 0.01}
+        precision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision ?? 2}
+        subMenuOpen={ctxSubOpen}
+        onSubMenuOpen={setCtxSubOpen}
+        onClose={() => setCtxOpen(false)}
+        onRefreshChart={() => console.log('Refresh chart')}
+        hlineKey={hlineKey(selectedSymbol, market)}
+        snapToTick={snapToTick}
+        availableBalance={availableBalance}
+        leverage={leverage}
+        onPlaceOrder={(params) => {
+          console.log('[Chart Order]', params);
+          binanceWS.placeOrder(params);
+        }}
+      />
 
       <div className="relative w-full h-full flex flex-col">
         <div
           ref={mainChartContainerRef}
           className="relative w-full"
-          style={{
-            flex: '3 1 0%',
-            minHeight: '300px',
-            height: '75%'
-          }}
+          style={{ flex: '3 1 0%', minHeight: '300px', height: '75%' }}
           onContextMenu={openCtxMenu}
         />
 
@@ -1651,79 +1268,69 @@ const TradingBinance: React.FC<Props> = ({
         <div
           ref={volumeChartContainerRef}
           className="relative w-full"
-          style={{
-            flex: '1 1 0%',
-            minHeight: '100px',
-            height: '25%',
-            zIndex: 1,
-            position: 'relative'
-          }}
+          style={{ flex: '1 1 0%', minHeight: '100px', height: '25%', zIndex: 1, position: 'relative' }}
         >
-          {volumeIndicatorVisible && (
+          {/* ✅ Volume Indicators Header - Hiện nếu có Volume MA trong config */}
+          {hasVolumeMAInConfig && (
             <LineIndicatorHeader
               type="volume"
+              indicatorType="Volume"
               indicators={volumeIndicatorValues}
-              visible={volumeVisible.mavol1 || volumeVisible.mavol2}
-              onToggleVisible={toggleAllVolumeIndicators}
+              linesVisible={hasAnyVolumeVisible}
+              onToggleLinesVisible={() => {
+                const anyVisible = config.volumeMA.some(v => v.visible);
+                config.volumeMA.forEach(vol => updateVolumeMA(vol.id, { visible: !anyVisible }));
+                
+                if (!anyVisible && volumeData.length > 0) {
+                  setTimeout(() => updateVolumeIndicators(volumeData), 0);
+                }
+              }}
               onOpenSetting={() => setShowVolumeSettings(true)}
               onClose={() => {
-                setVolumeIndicatorVisible(false);
-                const allOff: VolumeIndicatorConfig = {
-                  mavol1: false,
-                  mavol2: false,
-                };
-                setVolumeVisible(allOff);
-                mavol1Ref.current?.applyOptions({ visible: false });
-                mavol2Ref.current?.applyOptions({ visible: false });
+                // Đóng hẳn = xóa tất cả Volume MA khỏi config
+                config.volumeMA.forEach(vol => removeVolumeMA(vol.id));
               }}
+              onRemoveIndicator={(id) => removeVolumeMA(id)}
             />
           )}
+
           {showVolumeSettings && createPortal(
             <LineIndicatorSettings
               type="volume"
               defaultTab={2}
-              mainVisible={mainVisible}
-              volumeVisible={volumeVisible}
-              periods={indicatorPeriods}
-              colors={indicatorColors}
-              bollFillVisible={bollFillVisible}
-              onChange={(mainVis, volumeVis, _, per, col, bollFillVis) => {
-                if (mainVis) {
-                  setMainVisible(mainVis);
-                  ma7Ref.current?.applyOptions({ visible: mainVis.ma7 });
-                  ma25Ref.current?.applyOptions({ visible: mainVis.ma25 });
-                  ma99Ref.current?.applyOptions({ visible: mainVis.ma99 });
-                  ema12Ref.current?.applyOptions({ visible: mainVis.ema12 });
-                  ema26Ref.current?.applyOptions({ visible: mainVis.ema26 });
-                }
-
-                if (bollFillVis !== undefined) {
-                  setBollFillVisible(bollFillVis);
-                }
-
-                if (volumeVis) {
-                  setVolumeVisible(volumeVis);
-                  mavol1Ref.current?.applyOptions({ visible: volumeVis.mavol1 });
-                  mavol2Ref.current?.applyOptions({ visible: volumeVis.mavol2 });
-                }
-                if (per) setIndicatorPeriods(per);
-                if (col) {
-                  setIndicatorColors(col);
-                  ma7Ref.current?.applyOptions({ color: col.ma7 });
-                  ma25Ref.current?.applyOptions({ color: col.ma25 });
-                  ma99Ref.current?.applyOptions({ color: col.ma99 });
-                  ema12Ref.current?.applyOptions({ color: col.ema12 });
-                  ema26Ref.current?.applyOptions({ color: col.ema26 });
-                  mavol1Ref.current?.applyOptions({ color: col.mavol1 });
-                  mavol2Ref.current?.applyOptions({ color: col.mavol2 });
-                }
-                // ✅ Recalculate (no duplication!)
-                if (per && candles.length > 0) {
-                  updateMainIndicators(candles);
-                }
-
-                if (per && volumeData.length > 0) {
-                  updateVolumeIndicators(volumeData);
+              config={config}
+              onChange={(newConfig) => {
+                // ✅ FIX: Check if structure changed
+                const volumeChanged = newConfig.volumeMA.length !== config.volumeMA.length ||
+                  newConfig.volumeMA.some((v, i) => config.volumeMA[i]?.id !== v.id);
+                
+                setConfig(newConfig);
+                
+                if (volumeChanged) {
+                  // ✅ Use longer delay to ensure configRef is updated
+                  setTimeout(() => {
+                    initializeSeries();
+                    setTimeout(() => {
+                      if (volumeData.length > 0) {
+                        updateVolumeIndicators(volumeData);
+                      }
+                    }, 50);
+                  }, 50);
+                } else {
+                  // ✅ Just apply changes without reinitializing
+                  newConfig.volumeMA.forEach(vol => {
+                    const series = volumeSeriesRefs.current[vol.id];
+                    if (series) {
+                      series.applyOptions({ 
+                        visible: vol.visible,
+                        color: vol.color,
+                      });
+                    }
+                  });
+                  
+                  if (volumeData.length > 0) {
+                    updateVolumeIndicators(volumeData);
+                  }
                 }
               }}
               onClose={() => setShowVolumeSettings(false)}

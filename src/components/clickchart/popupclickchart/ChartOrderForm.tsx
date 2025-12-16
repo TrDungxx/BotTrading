@@ -368,11 +368,11 @@ const ChartOrderForm: React.FC<Props> = ({
   }, [priceValue, amount, percent, buyQty, minQuantity, orderType, stopPrice]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-fluid-4 space-y-4">
       {/* Tabs Mở/Đóng */}
       <div className="flex bg-[#2b3139] rounded-lg p-1">
         <button
-          className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+          className={`flex-1 py-2 text-fluid-sm rounded-fluid-md transition-colors ${
             orderAction === "open"
               ? "bg-[#3c4043] text-white"
               : "text-[#848e9c] hover:text-white"
@@ -382,7 +382,7 @@ const ChartOrderForm: React.FC<Props> = ({
           Mở
         </button>
         <button
-          className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+          className={`flex-1 py-2 text-fluid-sm rounded-fluid-md transition-colors ${
             orderAction === "close"
               ? "bg-[#3c4043] text-white"
               : "text-[#848e9c] hover:text-white"
@@ -394,9 +394,9 @@ const ChartOrderForm: React.FC<Props> = ({
       </div>
 
       {/* Order Type Tabs */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-fluid-4">
         <button
-          className={`text-sm pb-1 border-b-2 transition-colors ${
+          className={`text-fluid-sm pb-1 border-b-2 transition-colors ${
             orderType === "limit"
               ? "text-[#f0b90b] border-[#f0b90b]"
               : "text-[#848e9c] border-transparent hover:text-white"
@@ -406,7 +406,7 @@ const ChartOrderForm: React.FC<Props> = ({
           Giới hạn
         </button>
         <button
-          className={`text-sm pb-1 border-b-2 transition-colors ${
+          className={`text-fluid-sm pb-1 border-b-2 transition-colors ${
             orderType === "stop-limit"
               ? "text-[#f0b90b] border-[#f0b90b]"
               : "text-[#848e9c] border-transparent hover:text-white"
@@ -432,10 +432,10 @@ const ChartOrderForm: React.FC<Props> = ({
               type="text"
               value={stopPrice}
               onChange={(e) => setStopPrice(e.target.value.replace(/[^\d.]/g, ""))}
-              className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-3 py-2.5 text-sm text-white outline-none focus:border-[#f0b90b]"
+              className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-fluid-3 py-2.5 text-fluid-sm text-white outline-none focus:border-[#f0b90b]"
               placeholder="0"
             />
-            <span className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-sm text-[#848e9c]">
+            <span className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-fluid-sm text-[#848e9c]">
               USDT
             </span>
           </div>
@@ -450,13 +450,13 @@ const ChartOrderForm: React.FC<Props> = ({
             type="text"
             value={priceValue}
             onChange={(e) => setPriceValue(e.target.value.replace(/[^\d.]/g, ""))}
-            className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-3 py-2.5 text-sm text-white outline-none focus:border-[#f0b90b]"
+            className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-fluid-3 py-2.5 text-fluid-sm text-white outline-none focus:border-[#f0b90b]"
             placeholder="0"
           />
-          <span className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] text-sm text-[#848e9c]">
+          <span className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] text-fluid-sm text-[#848e9c]">
             USDT
           </span>
-          <button className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-sm text-[#848e9c] hover:text-white">
+          <button className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-fluid-sm text-[#848e9c] hover:text-white">
             BBO
           </button>
         </div>
@@ -473,10 +473,10 @@ const ChartOrderForm: React.FC<Props> = ({
               setAmount(e.target.value.replace(/[^\d.]/g, ""));
               setPercent(0); // Reset slider khi nhập thủ công
             }}
-            className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-3 py-2.5 text-sm text-white outline-none focus:border-[#f0b90b]"
+            className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-fluid-3 py-2.5 text-fluid-sm text-white outline-none focus:border-[#f0b90b]"
             placeholder="0"
           />
-          <button className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-sm text-white flex items-center gap-1">
+          <button className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-fluid-sm text-white flex items-center gap-fluid-1">
             {coinName}
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -484,7 +484,7 @@ const ChartOrderForm: React.FC<Props> = ({
           </button>
         </div>
         {minQuantity > 0 && (
-          <p className="text-xs text-[#848e9c] mt-1 flex items-center gap-1">
+          <p className="text-xs text-[#848e9c] mt-1 flex items-center gap-fluid-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4M12 8h.01" />
@@ -530,18 +530,18 @@ const ChartOrderForm: React.FC<Props> = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3">
+      <div className="flex gap-fluid-3">
         <button
           onClick={() => handleSubmit("LONG")}
           disabled={!canPlaceOrder}
-          className="flex-1 py-2.5 bg-[#0ecb81] hover:bg-[#0ecb81]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+          className="flex-1 py-2.5 bg-[#0ecb81] hover:bg-[#0ecb81]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-fluid-sm font-medium rounded transition-colors"
         >
           Mở lệnh Long
         </button>
         <button
           onClick={() => handleSubmit("SHORT")}
           disabled={!canPlaceOrder}
-          className="flex-1 py-2.5 bg-[#f6465d] hover:bg-[#f6465d]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded transition-colors"
+          className="flex-1 py-2.5 bg-[#f6465d] hover:bg-[#f6465d]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white text-fluid-sm font-medium rounded transition-colors"
         >
           Mở lệnh Short
         </button>

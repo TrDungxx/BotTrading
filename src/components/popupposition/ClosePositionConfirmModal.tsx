@@ -124,9 +124,9 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-[420px] max-w-[92vw] rounded-xl border border-dark-600 bg-dark-800 p-4 shadow-xl">
+      <div className="relative w-[420px] max-w-[92vw] rounded-xl border border-dark-600 bg-dark-800 p-fluid-4 shadow-xl">
         <button
-          className="absolute right-3 top-3 text-dark-300 hover:text-white"
+          className="absolute right-3 top-fluid-3 text-dark-300 hover:text-white"
           onClick={onClose}
           aria-label="close"
         >
@@ -134,17 +134,17 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
         </button>
 
         <div className="text-white text-lg font-semibold">{symbol}</div>
-        <div className="text-[#9ca3af] text-sm mt-1">
+        <div className="text-[#9ca3af] text-fluid-sm mt-1">
           Đóng lệnh {(positionSide ?? "LONG").toLowerCase()}
         </div>
 
-        <div className="mt-4 space-y-3 text-sm">
+        <div className="mt-4 space-y-3 text-fluid-sm">
           {/* Giá */}
           <div className="flex items-center justify-between">
             <div className="text-dark-300">Giá</div>
             <div className="text-right">
               {mode === "market" ? (
-                <div className="px-2 py-1 rounded bg-dark-700 text-white">Thị trường</div>
+                <div className="px-2 py-fluid-1 rounded bg-dark-700 text-white">Thị trường</div>
               ) : (
                 <input
                   inputMode="decimal"
@@ -154,11 +154,11 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
                     setLocalPrice(v);
                     onInputsChange?.({ price: v, qty: localQty });
                   }}
-                  className="w-[150px] bg-dark-700 border border-dark-600 rounded px-2 py-1 text-white text-right"
+                  className="w-[150px] bg-dark-700 border border-dark-600 rounded px-2 py-fluid-1 text-white text-right"
                   placeholder={markPrice ? String(markPrice) : "Giá"}
                 />
               )}
-              <div className="text-[11px] text-dark-400 mt-1">
+              <div className="text-fluid-xs text-dark-400 mt-1">
                 Mark: {fmt(markPrice)} • Tick: {tickSize}
               </div>
             </div>
@@ -176,10 +176,10 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
                   setLocalQty(v);
                   onInputsChange?.({ price: localPrice, qty: v });
                 }}
-                className="w-[150px] bg-dark-700 border border-dark-600 rounded px-2 py-1 text-white text-right"
+                className="w-[150px] bg-dark-700 border border-dark-600 rounded px-2 py-fluid-1 text-white text-right"
                 placeholder={String(maxQty)}
               />
-              <div className="text-[11px] text-dark-400 mt-1">
+              <div className="text-fluid-xs text-dark-400 mt-1">
                 Tối đa: {fmt(maxQty)} • Step: {stepSize}
               </div>
             </div>
@@ -195,7 +195,7 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
 
           {/* Cảnh báo lệch giá (chỉ hiển thị khi cần) */}
           {bigDeviation && (
-            <div className="text-[12px] text-[#ef4444] bg-[#ef4444]/10 rounded p-2">
+            <div className="text-fluid-sm text-[#ef4444] bg-[#ef4444]/10 rounded p-fluid-2">
               Lệnh của bạn sẽ không thành công nếu giá thị trường lệch hơn 10% so với giá đánh dấu.
             </div>
           )}

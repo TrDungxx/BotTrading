@@ -69,17 +69,17 @@ const NewOrderModal: React.FC<Props> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="w-[420px] rounded-xl border border-dark-600 bg-dark-800 p-4">
+      <div className="w-[420px] rounded-xl border border-dark-600 bg-dark-800 p-fluid-4">
         <div className="text-lg font-semibold mb-3">Đặt lệnh mới • {symbol}</div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <select className="rounded-lg bg-dark-700 px-3 py-2" value={side}
+        <div className="grid grid-cols-2 gap-fluid-3">
+          <select className="rounded-lg bg-dark-700 px-fluid-3 py-2" value={side}
                   onChange={(e)=>setSide(e.target.value as Side)}>
             <option value="BUY">BUY</option>
             <option value="SELL">SELL</option>
           </select>
 
-          <select className="rounded-lg bg-dark-700 px-3 py-2" value={type}
+          <select className="rounded-lg bg-dark-700 px-fluid-3 py-2" value={type}
                   onChange={(e)=>setType(e.target.value as OrderType)}>
             <option value="LIMIT">LIMIT</option>
             <option value="STOP">DỪNG</option>
@@ -88,9 +88,9 @@ const NewOrderModal: React.FC<Props> = ({
 
         {type === 'LIMIT' && (
           <>
-            <label className="mt-3 block text-sm text-dark-300">Giá</label>
+            <label className="mt-3 block text-fluid-sm text-dark-300">Giá</label>
             <input
-              className="mt-1 w-full rounded-lg bg-dark-700 px-3 py-2 outline-none"
+              className="mt-1 w-full rounded-lg bg-dark-700 px-fluid-3 py-2 outline-none"
               inputMode="decimal"
               step={step}
               value={price}
@@ -107,9 +107,9 @@ const NewOrderModal: React.FC<Props> = ({
 
         {type === 'STOP' && (
           <>
-            <label className="mt-3 block text-sm text-dark-300">Giá dừng</label>
+            <label className="mt-3 block text-fluid-sm text-dark-300">Giá dừng</label>
             <input
-              className="mt-1 w-full rounded-lg bg-dark-700 px-3 py-2 outline-none"
+              className="mt-1 w-full rounded-lg bg-dark-700 px-fluid-3 py-2 outline-none"
               inputMode="decimal"
               step={step}
               value={stopPrice}
@@ -124,9 +124,9 @@ const NewOrderModal: React.FC<Props> = ({
           </>
         )}
 
-        <label className="mt-3 block text-sm text-dark-300">Số lượng</label>
+        <label className="mt-3 block text-fluid-sm text-dark-300">Số lượng</label>
         <input
-          className="mt-1 w-full rounded-lg bg-dark-700 px-3 py-2 outline-none"
+          className="mt-1 w-full rounded-lg bg-dark-700 px-fluid-3 py-2 outline-none"
           inputMode="decimal"
           value={qty}
           onChange={(e)=>{
@@ -138,10 +138,10 @@ const NewOrderModal: React.FC<Props> = ({
           placeholder="0.00"
         />
 
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="px-3 py-2 rounded-lg bg-dark-700" onClick={onClose}>Hủy</button>
+        <div className="mt-4 flex justify-end gap-fluid-2">
+          <button className="px-fluid-3 py-2 rounded-lg bg-dark-700" onClick={onClose}>Hủy</button>
           <button
-            className="px-3 py-2 rounded-lg bg-primary-600"
+            className="px-fluid-3 py-2 rounded-lg bg-primary-600"
             onClick={()=>{
               const q = qty === '' ? NaN : Number(qty);
               if (!Number.isFinite(q) || q<=0) return;

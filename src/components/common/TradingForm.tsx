@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom"; // ✅ THÊM IMPORT
-import * as Slider from "@radix-ui/react-slider";
+import PercentSlider from "../formtrading/PercentSlider";
 import MarginModeModal from "../modeltrading/MarginModeModal";
 import LeverageModal from "../modeltrading/LeverageModal";
 import { binanceWS } from "../binancewebsocket/BinanceWebSocketService";
@@ -223,7 +223,7 @@ useEffect(() => {
 
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<"base" | "quote">("base");
-  const [usdtMode, setUsdtMode] = useState<"total" | "margin">("total");
+  
   const [maxRiskError, setMaxRiskError] = useState(false);
   // UI/Order state
   const [isPriceOverridden, setIsPriceOverridden] = useState(false);
@@ -232,7 +232,7 @@ useEffect(() => {
   const [priceValue, setPriceValue] = useState("");
   const [amount, setAmount] = useState("");
   const [percent, setPercent] = useState(0);
-  const [reduceOnly, setReduceOnly] = useState(false);
+  
   const [sliderQty, setSliderQty] = useState(0);
   const [tif, setTif] = useState<"GTC" | "IOC" | "FOK">(() => {
     const saved = localStorage.getItem("tradingForm_tif");
@@ -707,23 +707,9 @@ useEffect(() => {
     ]
   );
 
-  const maxBuyQty = useMemo(() => {
-    if (!priceNum || priceNum <= 0) return 0;
+  
 
-    const buyingPower =
-      selectedMarket === "futures"
-        ? internalBalance * leverage
-        : internalBalance;
-
-    const rawQty = buyingPower / priceNum;
-    const result = Math.floor(rawQty / stepSize) * stepSize;
-
-    return result;
-  }, [priceNum, internalBalance, leverage, selectedMarket, stepSize]);
-
-  const maxSellQty = useMemo(() => {
-    return currentPosition;
-  }, [currentPosition]);
+  
 
   const baseAsset = selectedSymbol.replace("USDT", "");
 
@@ -1055,26 +1041,7 @@ useEffect(() => {
       });
   };
 
-  // ✅ buyAmount/sellAmount cho backward compatibility
-  const buyAmount = buyQty;
-  const sellAmount = sellQty;
-
-  const convertAmount = (
-    value: string,
-    from: "base" | "quote",
-    to: "base" | "quote"
-  ): string => {
-    if (from === to || !value || !priceNum || priceNum <= 0) return value;
-
-    const num = parseFloat(value);
-    if (!Number.isFinite(num) || num <= 0) return "";
-
-    if (from === "base" && to === "quote") {
-      return (num * priceNum).toFixed(2);
-    } else {
-      return (num / priceNum).toFixed(qtyDecimals(stepSize));
-    }
-  };
+  
 
   const handleAmountChange = (value: string) => {
     setAmount(value);
@@ -1085,8 +1052,7 @@ useEffect(() => {
     }
   };
 
-  // ✅ Clear TP input khi đổi mode - CHỈ KHI USER ĐỔI, KHÔNG PHẢI KHI LOAD
-const tpModeChangedByUser = useRef(false);
+  
 
  useEffect(() => {
   if (!tpSlLoadedRef.current) return; // ✅ Skip khi đang load
@@ -1443,23 +1409,23 @@ useEffect(() => {
         )}
 
       {/* MAIN FORM CONTAINER */}
-      <div className="p-1 space-y-1">
-        <div className="flex items-center space-x-2">
+      <div className="p-fluid-2 space-y-3">
+        <div className="  flex items-center gap-fluid-2 ">
           <button
             onClick={() => setIsMarginOpen(true)}
-            className="btn btn-outline px-3 py-1 text-xs"
+            className="btn btn-outline px-fluid-3 py-fluid-1 text-fluid-sm"
           >
             {marginMode === "cross" ? "Cross" : "Isolated"}
           </button>
           <button
             onClick={() => setIsLeverageOpen(true)}
-            className="btn btn-outline px-3 py-1 text-xs"
+            className="btn btn-outline px-fluid-3 py-fluid-1 text-fluid-sm"
           >
             {leverage}x
           </button>
           <button
   onClick={() => setIsMultiAssetsOpen(true)}
-  className={`text-xs px-2 py-1 rounded hover:ring-1 ring-primary-500 ${
+  className={`text-fluid-sm px-2 py-fluid-1 rounded hover:ring-1 ring-primary-500 ${
     dualSide 
       ? "bg-yellow-600 text-black font-semibold"  // HEDGE - nổi bật
       : "bg-dark-700 text-white"                   // ONE-WAY
@@ -1473,7 +1439,7 @@ useEffect(() => {
         {/* Tab Mở/Đóng */}
         <div className="relative flex bg-dark-800/50 rounded-lg p-0.5 border border-dark-700/50">
           <div
-            className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-dark-600 rounded-md shadow-lg transition-all duration-200 ease-out ${orderAction === "close"
+            className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-dark-600 rounded-fluid-md shadow-lg transition-all duration-200 ease-out ${orderAction === "close"
                 ? "translate-x-[calc(100%+4px)]"
                 : "translate-x-0"
               }`}
@@ -1481,7 +1447,7 @@ useEffect(() => {
 
           <button
             onClick={() => setOrderAction("open")}
-            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${orderAction === "open"
+            className={`relative z-10 flex-1 px-fluid-4 py-fluid-2.5 text-fluid-sm font-semibold transition-colors duration-200 ${orderAction === "open"
                 ? "text-white"
                 : "text-dark-400 hover:text-dark-200"
               }`}
@@ -1490,7 +1456,7 @@ useEffect(() => {
           </button>
           <button
             onClick={() => setOrderAction("close")}
-            className={`relative z-10 flex-1 px-4 py-2.5 text-sm font-semibold transition-colors duration-200 ${orderAction === "close"
+            className={`relative z-10 flex-1 px-fluid-4 py-fluid-2.5 text-fluid-sm font-semibold transition-colors duration-200 ${orderAction === "close"
                 ? "text-white"
                 : "text-dark-400 hover:text-dark-200"
               }`}
@@ -1500,12 +1466,12 @@ useEffect(() => {
         </div>
 
         {/* Tabs Order Type */}
-        <div className="flex space-x-2 text-sm">
+        <div className="justify-left flex gap-fluid-2 text-fluid-sm">
           {(["limit", "market", "stop-limit"] as OrderTypeBin[]).map((t) => (
             <button
               key={t}
-              className={`px-3 py-1 rounded ${orderType === t
-                  ? "bg-primary-500 text-white"
+              className={`px-fluid-3 py-fluid-1 rounded ${orderType === t
+                  ? "bg-primary-700 text-white"
                   : "text-dark-400 hover:text-white"
                 }`}
               onClick={() => setOrderType(t)}
@@ -1519,7 +1485,7 @@ useEffect(() => {
           ))}
         </div>
 
-        <div className="pl-12 text-xs space-y-0.5">
+        <div className="pl-12 text-fluid-sm space-y-0.5">
        {/*   <div className="text-dark-400">
     Tổng số dư ví:{" "}
     <span className="text-dark-300 font-medium">
@@ -1538,7 +1504,7 @@ useEffect(() => {
         {(orderType === "limit" || orderType === "stop-limit") && (
           <div>
             <label className="form-label mt-0 mb-1">Giá</label>
-            <div className="flex gap-2">
+            <div className="flex gap-fluid-2">
               <input
                 type="text"
                 className="form-input"
@@ -1546,7 +1512,7 @@ useEffect(() => {
                 onFocus={() => setIsPriceOverridden(true)}
                 onChange={(e) => setPriceValue(e.target.value)}
               />
-              <span className="text-xs text-dark-400">USDT</span>
+              <span className="text-fluid-sm text-dark-400">USDT</span>
             </div>
           </div>
         )}
@@ -1554,7 +1520,7 @@ useEffect(() => {
         {orderType === "stop-limit" && (
           <div>
             <label className="form-label">Giá Stop</label>
-            <div className="flex gap-2">
+            <div className="flex gap-fluid-2">
               <input
                 type="text"
                 className="form-input"
@@ -1567,7 +1533,7 @@ useEffect(() => {
                 onChange={(e) =>
                   setStopPriceType(e.target.value as "MARK_PRICE" | "LAST")
                 }
-                className="form-select text-xs w-[80px]"
+                className="form-select text-fluid-sm w-[80px]"
               >
                 <option value="MARK_PRICE">Mark</option>
                 <option value="LAST">Last</option>
@@ -1598,7 +1564,7 @@ useEffect(() => {
 
             {/* Badge % - Trái */}
             {percent > 0 && (
-              <div className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-0.5 text-dark-300 text-xs font-medium">
+              <div className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-0.5 text-dark-300 text-fluid-sm font-medium">
                 {percent}%
               </div>
             )}
@@ -1606,7 +1572,7 @@ useEffect(() => {
             {/* Unit button - Phải */}
             <button
               onClick={() => setIsUnitModalOpen(true)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-dark-400 hover:text-white transition-colors px-2 py-1 hover:bg-dark-700 rounded flex items-center gap-1"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-fluid-sm text-dark-400 hover:text-white transition-colors px-2 py-fluid-1 hover:bg-dark-700 rounded flex items-center gap-fluid-1"
             >
               {selectedUnit === "base" ? baseAsset : "USDT"}
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -1622,14 +1588,18 @@ useEffect(() => {
           {/* ✅ MIN QUANTITY BADGE với shake + background đỏ */}
           {minQuantity > 0 && (
             <div
-              className={`mt-1.5 flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 transition-all duration-300 ${minQtyError
-                  ? 'bg-red-500/20 border border-red-500 text-red-400 animate-pulse shadow-lg shadow-red-500/50'
-                  : 'bg-transparent text-dark-400'
-                }`}
-              style={minQtyError ? {
-                animation: 'pulse 1s ease-in-out 3, shake 0.5s ease-in-out'
-              } : {}}
-            >
+  className={`mt-1.5 flex items-center gap-fluid-1.5 text-fluid-sm rounded-lg pr-fluid-3 py-fluid-2 transition-all duration-300 ${
+    minQtyError
+      ? 'bg-red-500/20 border border-red-500 text-red-400 animate-pulse shadow-lg shadow-red-500/50'
+      : 'bg-transparent text-dark-400'
+  } pl-fluid-1`}
+  style={
+    minQtyError
+      ? { animation: 'pulse 1s ease-in-out 3, shake 0.5s ease-in-out' }
+      : {}
+  }
+>
+
               <svg
                 className={`w-4 h-4 ${minQtyError ? 'text-red-400' : ''}`}
                 fill="none"
@@ -1661,7 +1631,7 @@ useEffect(() => {
           {/* ✅ MAX RISK 5% WARNING BADGE - CHỈ HIỆN KHI ERROR */}
           {maxRiskError && (
             <div
-              className="mt-1.5 flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 bg-orange-500/20 border border-orange-500 text-orange-400 animate-pulse shadow-lg shadow-orange-500/50 transition-all duration-300"
+              className="mt-1.5 flex items-center gap-fluid-1.5 text-fluid-sm rounded-lg px-fluid-3 py-fluid-2 bg-orange-500/20 border border-orange-500 text-orange-400 animate-pulse shadow-lg shadow-orange-500/50 transition-all duration-300"
               style={{
                 animation: 'pulse 1s ease-in-out 3, shake 0.5s ease-in-out'
               }}
@@ -1687,183 +1657,79 @@ useEffect(() => {
           )}
         </div>
         <div className="pt-3">
-  {percent > 0 && amount === "" && (
-    <div className="flex justify-between items-center mb-3 text-xs">
-      <span className="text-dark-400">
-        Mua{" "}
-        <span className="text-white font-medium">
-          {/* ✅ FIX: Dùng buyQty - đã tính phí cho Long */}
-          {buyQty.toLocaleString(undefined, { maximumFractionDigits: qtyDecimals(stepSize) })}{" "}
-          {baseAsset}
-        </span>
-      </span>
-
-      <span className="text-dark-400">
-        Bán{" "}
-        <span className="text-white font-medium">
-          {/* ✅ FIX: Dùng sellQty - đã tính phí cho Short */}
-          {sellQty.toLocaleString(undefined, { maximumFractionDigits: qtyDecimals(stepSize) })}{" "}
-          {baseAsset}
-        </span>
-      </span>
-    </div>
-  )}
-
-  {/* ✅ MODERN SLIDER với thumb position mapping - NO TEXT SELECTION */}
-  <div className="relative mb-3 py-1.5 select-none">  {/* ✅ THÊM select-none */}
-    {/* ✅ Hidden slider chỉ để control logic */}
-    <Slider.Root
-      className="relative flex items-center select-none w-full h-2 opacity-0 absolute inset-0 pointer-events-none"
-      value={[percent]}
-      onValueChange={([v]) => {
-        const snapped = findNearestAllowedPercent(v);
-        setPercent(snapped);
-        if (snapped > 0) setAmount(""); // ✅ Clear amount khi kéo slider
-      }}
-      min={0}
-      max={4}
-      step={0.5}
-    />
-
-    {/* ✅ Visual slider track */}
-    <div className="relative w-full h-2 bg-dark-700/50 rounded-full border border-dark-600 select-none">  {/* ✅ THÊM select-none */}
-      {/* Progress fill */}
-      <div 
-        className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full shadow-lg shadow-blue-500/20 transition-all duration-200"
-        style={{
-          width: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 4) * 100}%`
-        }}
-      />
-
-      {/* ✅ Dots */}
-      {ALLOWED_PERCENTAGES.map((mark, index) => (
-        <div
-          key={mark}
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-1 rounded-full transition-all duration-300 select-none ${  /* ✅ THÊM select-none */
-            percent >= mark 
-              ? 'bg-blue-400 shadow-lg shadow-blue-400/50 scale-110 z-10' 
-              : 'bg-dark-600 shadow-inner'
-          }`}
-          style={{
-            left: `${(index / 4) * 100}%`
-          }}
-        >
-          {percent >= mark && (
-            <span className="absolute inset-0 rounded-full bg-blue-300/50 animate-pulse"></span>
-          )}
+          <PercentSlider
+            percent={percent}
+            setPercent={setPercent}
+            setAmount={setAmount}
+            buyQty={buyQty}
+            sellQty={sellQty}
+            baseAsset={baseAsset}
+            qtyDecimals={qtyDecimals(stepSize)}
+            amount={amount}
+          />
         </div>
-      ))}
-
-      {/* ✅ Custom draggable thumb */}
-      <div
-        className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-gradient-to-b from-blue-400 to-blue-500 rounded-full shadow-xl shadow-blue-500/50 hover:shadow-blue-400/70 focus:outline-none focus:ring-2 focus:ring-blue-400/50 transition-all cursor-grab active:cursor-grabbing active:scale-125 border-2 border-white/20 hover:border-white/40 z-20 select-none" 
-        style={{
-          left: `${(ALLOWED_PERCENTAGES.indexOf(percent) / 4) * 100}%`
-        }}
-        onMouseDown={(e) => {
-          e.preventDefault(); // ✅ THÊM preventDefault
-          
-          const track = e.currentTarget.parentElement;
-          if (!track) return;
-
-          const handleMove = (moveEvent: MouseEvent) => {
-            moveEvent.preventDefault(); // ✅ THÊM preventDefault
-            
-            const rect = track.getBoundingClientRect();
-            const x = moveEvent.clientX - rect.left;
-            const percentage = Math.max(0, Math.min(1, x / rect.width));
-            
-            // Map to nearest allowed index
-            const targetIndex = Math.round(percentage * 4);
-            const snapped = ALLOWED_PERCENTAGES[targetIndex] || 0;
-            setPercent(snapped);
-            if (snapped > 0) setAmount(""); // ✅ Clear amount khi kéo slider
-          };
-
-          const handleUp = () => {
-            document.removeEventListener('mousemove', handleMove);
-            document.removeEventListener('mouseup', handleUp);
-          };
-
-          document.addEventListener('mousemove', handleMove);
-          document.addEventListener('mouseup', handleUp);
-        }}
-      >
-        <span className="absolute inset-0 rounded-full bg-blue-400/30 animate-ping opacity-0 group-active:opacity-100"></span>
-      </div>
-    </div>
-  </div>
-{/* ✅ Labels */}
-<div className="relative text-[10px] text-dark-500 h-4 mb-1 select-none">
-  {ALLOWED_PERCENTAGES.map((mark, index) => (
-    <button
-      key={mark}
-      onClick={() => {
-        setPercent(mark);
-        if (mark > 0) setAmount(""); // ✅ Clear amount khi click vào %
-      }}
-      className={`absolute -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 font-medium select-none ${
-  percent === mark 
-    ? 'text-blue-400 bg-blue-500/10 shadow-lg shadow-blue-500/20 scale-105'
-    : 'text-dark-400 hover:text-blue-300 hover:bg-dark-700/50'
-}`}
-      style={{
-        left: `${(index / 4) * 100}%`
-      }}
-    >
-      {mark}%
-    </button>
-  ))}
-</div>
-</div>
 
         {/* TP/SL Section */}
         {orderAction === "open" && (
-          <div className="space-y-1 mt-2 text-xs text-white select-none">
+          <div className="space-y-1 mt-4 text-fluid-xs text-white select-none">
             <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-  type="checkbox"
-  checked={tpSl}
-  onChange={() => {
-    const newValue = !tpSl;
-    setTpSl(newValue);
+              <div 
+                className="flex items-center gap-fluid-2 cursor-pointer group"
+                onClick={() => {
+                  const newValue = !tpSl;
+                  setTpSl(newValue);
 
-    // ✅ Khi tick vào (enable TP/SL), set default values
-    if (newValue) {
-      const saved = loadTpSlSettings(selectedSymbol);
-      
-      // Set mode về ROI
-      if (!saved || !saved.tpMode) {
-        setTpMode("roi");
-      }
-      if (!saved || !saved.slMode) {
-        setSlMode("roi");
-      }
-
-      // ✅ THÊM: Set default TP = 500%, SL = -300% nếu chưa có giá trị
-     // setTpSlValues((prev) => ({
-     //   ...prev,
-     //   takeProfitPrice: prev.takeProfitPrice || "500",
-     //   stopLossPrice: prev.stopLossPrice || "-300",
-     //   takeProfitEnabled: true,
-     //   stopLossEnabled: true,
-     // }));
-    }
-  }}
-  className="form-checkbox"
-/>
+                  if (newValue) {
+                    const saved = loadTpSlSettings(selectedSymbol);
+                    if (!saved || !saved.tpMode) {
+                      setTpMode("roi");
+                    }
+                    if (!saved || !saved.slMode) {
+                      setSlMode("roi");
+                    }
+                  }
+                }}
+              >
+                {/* Custom Checkbox */}
+                <div 
+                  className={`
+                    relative w-[14px] h-[14px] rounded-[3px] border transition-all duration-200
+                    flex items-center justify-center shrink-0
+                    ${tpSl 
+                      ? 'bg-[#256ec2ff] border-[#256ec2ff]' 
+                      : 'bg-transparent border-[#474d57] group-hover:border-[#848e9c]'
+                    }
+                  `}
+                >
+                  {tpSl && (
+                    <svg 
+                      width="10" 
+                      height="8" 
+                      viewBox="0 0 10 8" 
+                      fill="none"
+                      className="text-[#1e2329]"
+                    >
+                      <path 
+                        d="M1 4L3.5 6.5L9 1" 
+                        stroke="currentColor" 
+                        strokeWidth="2" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
                 <span className="font-semibold">TP/SL</span>
-              </label>
+              </div>
               <button
                 type="button"
                 onClick={() => {
-                  console.log("🔥 Opening TP/SL Modal");
+                  
                   setIsTpSlModalOpen(true);
                 }}
-                className="flex items-center text-warning-500 hover:text-warning-400 space-x-1 transition-colors"
+                className="flex items-center text-warning-500 hover:text-warning-400 gap-fluid-1 transition-colors"
               >
-                <span className="text-xs font-medium">Nâng cao</span>
+                <span className="text-fluid-sm font-medium">Nâng cao</span>
                 <ExternalLink size={12} />
               </button>
             </div>
@@ -1873,10 +1739,10 @@ useEffect(() => {
                 {/* Take Profit */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs text-slate-400 font-medium">
+                    <label className="text-fluid-sm text-slate-400 font-medium">
                       Take Profit 
                     </label>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-fluid-1.5">
                       <TriggerTypeSelect
                         value={tpTriggerType}
                         onChange={setTpTriggerType}
@@ -1890,7 +1756,7 @@ useEffect(() => {
                       onFocus={() => setTpTooltipShow(true)}
                       onBlur={() => setTpTooltipShow(false)}
                       type="text"
-                      className="form-input w-full text-sm pr-12"
+                      className="form-input w-full text-fluid-sm pr-12"
                       placeholder={TpSlConverter.getPlaceholder(tpMode, "tp")}
                       value={tpSlValues.takeProfitPrice}
                       onChange={(e) => {
@@ -1906,7 +1772,7 @@ useEffect(() => {
                         }));
                       }}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-400 pointer-events-none">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-fluid-sm text-dark-400 pointer-events-none">
                       {tpMode === "price"
                         ? "USDT"
                         : tpMode === "pnl"
@@ -1919,10 +1785,10 @@ useEffect(() => {
                 {/* Stop Loss */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs text-slate-400 font-medium">
+                    <label className="text-fluid-sm text-slate-400 font-medium">
                       Stop Loss 
                     </label>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-fluid-1.5">
                       <TriggerTypeSelect
                         value={slTriggerType}
                         onChange={setSlTriggerType}
@@ -1936,7 +1802,7 @@ useEffect(() => {
                       onFocus={() => setSlTooltipShow(true)}
                       onBlur={() => setSlTooltipShow(false)}
                       type="text"
-                      className="form-input w-full text-sm pr-12"
+                      className="form-input w-full text-fluid-sm pr-12"
                       placeholder={TpSlConverter.getPlaceholder(slMode, "sl")}
                       value={tpSlValues.stopLossPrice}
                       onChange={(e) => {
@@ -1957,7 +1823,7 @@ useEffect(() => {
                         }));
                       }}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-dark-400 pointer-events-none">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-fluid-sm text-dark-400 pointer-events-none">
                       {slMode === "price"
                         ? "USDT"
                         : slMode === "pnl"
@@ -1971,10 +1837,10 @@ useEffect(() => {
           </div>
         )}
 
-        <div className="space-y-2 mt-2 text-xs text-white select-none">
+        <div className="gap-fluid-2 mt-2 text-fluid-sm text-white select-none">
           <div className="flex items-center space-x-4">
             {orderAction === "close" && (
-              <label className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
+              <label className="flex items-center gap-fluid-2 opacity-50 cursor-not-allowed">
                 <input
                   type="checkbox"
                   checked={true}
@@ -1985,12 +1851,12 @@ useEffect(() => {
               </label>
             )}
             {orderType !== "market" && (
-              <div className="flex items-center gap-1.5 ml-auto">
+              <div className="flex items-center gap-fluid-2 ml-auto">
                 <div className="relative inline-block">
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-transparent  ">
-                    <span className="text-slate-400 text-xs">TIF</span>
+                  <div className="flex items-center gap-fluid-2 px-2.5 py-fluid-1 bg-transparent  ">
+                    <span className="text-slate-400 text-fluid-sm">TIF</span>
                     <select
-                      className="bg-transparent border-0 text-white text-xs outline-none cursor-pointer appearance-none pr-4"
+                      className="bg-transparent border-0 text-white text-fluid-sm outline-none cursor-pointer appearance-none pr-4"
                       value={tif}
                       onChange={(e) => setTif(e.target.value as any)}
                     >
@@ -2026,7 +1892,7 @@ useEffect(() => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-fluid-2">
           {orderAction === "open" ? (
             <>
               <button

@@ -189,7 +189,7 @@ export default function MarketAnalysis() {
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">
             <FormattedMessage id="market.title" />
@@ -206,12 +206,12 @@ export default function MarketAnalysis() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-primary-500/10">
                   <BarChart3 className="h-6 w-6 text-primary-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="market.globalCap" />
                 </h2>
                 <p className="text-2xl font-semibold">
@@ -245,12 +245,12 @@ export default function MarketAnalysis() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-primary-500/10">
                   <Clock className="h-6 w-6 text-primary-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="market.volume" />
                 </h2>
                 <p className="text-2xl font-semibold">
@@ -282,12 +282,12 @@ export default function MarketAnalysis() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-success-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-success-500/10">
                   <TrendingUp className="h-6 w-6 text-success-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="market.dominance" />
                 </h2>
                 <p className="text-2xl font-semibold">
@@ -317,14 +317,14 @@ export default function MarketAnalysis() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-warning-300/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-warning-300/10">
                   <svg className="h-6 w-6 text-warning-300" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="market.fearGreed" />
                 </h2>
                 <p className="text-2xl font-semibold">62</p>
@@ -343,7 +343,7 @@ export default function MarketAnalysis() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'overview'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -353,7 +353,7 @@ export default function MarketAnalysis() {
           </button>
           <button
             onClick={() => setActiveTab('signals')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'signals'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -363,7 +363,7 @@ export default function MarketAnalysis() {
           </button>
           <button
             onClick={() => setActiveTab('news')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'news'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -375,7 +375,7 @@ export default function MarketAnalysis() {
       </div>
       
       {/* Filters and search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-fluid-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-4 w-4 text-dark-400" />
@@ -403,23 +403,23 @@ export default function MarketAnalysis() {
             <table className="min-w-full divide-y divide-dark-700">
               <thead>
                 <tr>
-                  <th className="py-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-6">#</th>
-                  <th className="py-3.5 pl-3 pr-3 text-left text-xs font-medium text-dark-400">
+                  <th className="py-fluid-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-6">#</th>
+                  <th className="py-fluid-3.5 pl-3 pr-3 text-left text-xs font-medium text-dark-400">
                     <FormattedMessage id="portfolio.asset" />
                   </th>
-                  <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                  <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     <FormattedMessage id="common.price" />
                   </th>
-                  <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">24h %</th>
-                  <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">7d %</th>
-                  <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400 hidden md:table-cell">
+                  <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">24h %</th>
+                  <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">7d %</th>
+                  <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400 hidden md:table-cell">
                     <FormattedMessage id="market.volume" />
                   </th>
-                  <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400 hidden lg:table-cell">
+                  <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400 hidden lg:table-cell">
                     <FormattedMessage id="market.globalCap" />
                   </th>
-                  <th className="px-3 py-3.5 text-center text-xs font-medium text-dark-400">Signal</th>
-                  <th className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                  <th className="px-fluid-3 py-fluid-3.5 text-center text-xs font-medium text-dark-400">Signal</th>
+                  <th className="relative py-fluid-3.5 pl-3 pr-4 sm:pr-6">
                     <span className="sr-only">
                       <FormattedMessage id="market.favorite" />
                     </span>
@@ -429,12 +429,12 @@ export default function MarketAnalysis() {
               <tbody className="divide-y divide-dark-700">
                 {filteredMarketData.map((coin, index) => (
                   <tr key={coin.id} className="hover:bg-dark-700/40 cursor-pointer">
-                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-6">
+                    <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm font-medium sm:pl-6">
                       {index + 1}
                     </td>
-                    <td className="whitespace-nowrap py-4 pl-3 pr-3 text-sm">
+                    <td className="whitespace-nowrap py-fluid-4 pl-3 pr-3 text-fluid-sm">
                       <div className="flex items-center">
-                        <div className="h-8 w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
+                        <div className="h-fluid-input-sm w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
                           <span className="text-xs font-medium">{coin.symbol.substring(0, 1)}</span>
                         </div>
                         <div className="ml-3">
@@ -443,7 +443,7 @@ export default function MarketAnalysis() {
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right font-medium">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right font-medium">
                       <FormattedNumber
                         value={coin.price}
                         style="currency"
@@ -452,7 +452,7 @@ export default function MarketAnalysis() {
                         maximumFractionDigits={coin.price < 1 ? 4 : 2}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                       <span
                         className={`inline-flex items-center ${
                           coin.change24h >= 0 ? 'text-success-500' : 'text-danger-500'
@@ -470,7 +470,7 @@ export default function MarketAnalysis() {
                         />
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                       <span
                         className={`inline-flex items-center ${
                           coin.change7d >= 0 ? 'text-success-500' : 'text-danger-500'
@@ -488,7 +488,7 @@ export default function MarketAnalysis() {
                         />
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right hidden md:table-cell">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right hidden md:table-cell">
                       <FormattedNumber
                         value={coin.volume24h}
                         style="currency"
@@ -497,7 +497,7 @@ export default function MarketAnalysis() {
                         minimumFractionDigits={2}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-right hidden lg:table-cell">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right hidden lg:table-cell">
                       <FormattedNumber
                         value={coin.marketCap}
                         style="currency"
@@ -506,7 +506,7 @@ export default function MarketAnalysis() {
                         minimumFractionDigits={2}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-center">
+                    <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-center">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                           coin.signal === 'buy' 
@@ -519,7 +519,7 @@ export default function MarketAnalysis() {
                         <FormattedMessage id={`market.signal.${coin.signal}`} />
                       </span>
                     </td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
+                    <td className="relative whitespace-nowrap py-fluid-4 pl-3 pr-4 text-right text-fluid-sm sm:pr-6">
                       <button
                         className={`text-dark-400 hover:text-warning-300 ${
                           coin.favorite ? 'text-warning-300' : ''
@@ -540,9 +540,9 @@ export default function MarketAnalysis() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {marketSignals.map((signal) => (
             <div key={signal.id} className="card overflow-hidden">
-              <div className="p-4 border-b border-dark-700 flex justify-between items-center">
+              <div className="p-fluid-4 border-b border-dark-700 flex justify-between items-center">
                 <div className="flex items-center">
-                  <div className={`h-10 w-10 rounded-md flex items-center justify-center ${
+                  <div className={`h-fluid-input w-10 rounded-fluid-md flex items-center justify-center ${
                     signal.signal === 'buy' ? 'bg-success-500/10' : 'bg-danger-500/10'
                   }`}>
                     {signal.signal === 'buy' ? (
@@ -552,7 +552,7 @@ export default function MarketAnalysis() {
                     )}
                   </div>
                   <div className="ml-3">
-                    <div className="text-base font-medium">{signal.pair}</div>
+                    <div className="text-fluid-base font-medium">{signal.pair}</div>
                     <div className="text-xs text-dark-400">{signal.timeframe} timeframe</div>
                   </div>
                 </div>
@@ -567,13 +567,13 @@ export default function MarketAnalysis() {
                 </span>
               </div>
               
-              <div className="p-4">
-                <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="p-fluid-4">
+                <div className="grid grid-cols-2 gap-fluid-4 mb-4">
                   <div>
                     <div className="text-xs text-dark-400">
                       <FormattedMessage id="common.price" />
                     </div>
-                    <div className="text-sm font-medium">
+                    <div className="text-fluid-sm font-medium">
                       <FormattedNumber
                         value={signal.price}
                         style="currency"
@@ -584,7 +584,7 @@ export default function MarketAnalysis() {
                   </div>
                   <div>
                     <div className="text-xs text-dark-400">Target Price</div>
-                    <div className="text-sm font-medium">
+                    <div className="text-fluid-sm font-medium">
                       <FormattedNumber
                         value={signal.targetPrice}
                         style="currency"
@@ -595,15 +595,15 @@ export default function MarketAnalysis() {
                   </div>
                   <div>
                     <div className="text-xs text-dark-400">Confidence</div>
-                    <div className="text-sm font-medium capitalize">{signal.confidence}</div>
+                    <div className="text-fluid-sm font-medium capitalize">{signal.confidence}</div>
                   </div>
                   <div>
                     <div className="text-xs text-dark-400">Generated</div>
-                    <div className="text-sm font-medium">{signal.timestamp}</div>
+                    <div className="text-fluid-sm font-medium">{signal.timestamp}</div>
                   </div>
                 </div>
                 
-                <button className="w-full py-2 rounded-md text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white">
+                <button className="w-full py-2 rounded-fluid-md text-fluid-sm font-medium bg-primary-500 hover:bg-primary-600 text-white">
                   View Details
                 </button>
               </div>
@@ -624,8 +624,8 @@ export default function MarketAnalysis() {
                     className="h-full w-full object-cover"
                   />
                 </div>
-                <div className="w-2/3 p-4">
-                  <h3 className="font-medium line-clamp-2">{news.title}</h3>
+                <div className="w-2/3 p-fluid-4">
+                  <h3 className="font-medium line-clamp-fluid-2">{news.title}</h3>
                   <div className="mt-2 flex items-center text-xs text-dark-400">
                     <span>{news.source}</span>
                     <span className="mx-2">•</span>

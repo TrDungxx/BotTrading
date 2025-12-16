@@ -153,7 +153,7 @@ export default function PortfolioChart({ timeRange }: PortfolioChartProps) {
   if (isLoading) {
     return (
       <div className="flex h-[300px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
+        <div className="h-fluid-input-sm w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent"></div>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function PortfolioChart({ timeRange }: PortfolioChartProps) {
           <span className="text-xl sm:text-2xl font-semibold">${lastValue.toLocaleString()}</span>
           <div className="flex items-center mt-1">
             <span
-              className={`flex items-center text-sm font-medium ${
+              className={`flex items-center text-fluid-sm font-medium ${
                 isPositive ? 'text-success-500' : 'text-danger-500'
               }`}
             >

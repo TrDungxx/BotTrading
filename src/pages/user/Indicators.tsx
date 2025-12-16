@@ -312,7 +312,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
   return (
     <div className="w-full max-w-full overflow-x-hidden">
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
           <div>
             <h1 className="text-2xl font-bold">Indicators</h1>
             <p className="text-dark-400">Manage trading indicators and signals</p>
@@ -331,7 +331,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-fluid-4">
           <div className="relative flex-1">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <Search className="h-4 w-4 text-dark-400" />
@@ -347,20 +347,20 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
         </div>
 
         <div className="overflow-hidden">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-fluid-4">
   {filteredIndicators.map((indicator) => (
     <div
       key={indicator.id}
-      className="card bg-dark-800 border border-dark-700 rounded-lg p-4 relative hover:ring-2 hover:ring-primary-500 transition"
+      className="card bg-dark-800 border border-dark-700 rounded-lg p-fluid-4 relative hover:ring-2 hover:ring-primary-500 transition"
     >
       {/* Header: Name */}
-      <div className="flex items-center space-x-2 mb-1">
+      <div className="flex items-center gap-fluid-2 mb-1">
         <div className="text-xl">🤖</div>
         <h3 className="text-lg font-semibold">{indicator.Name}</h3>
       </div>
 
       {/* Description */}
-      <p className="text-sm text-dark-400 mb-2 line-clamp-2">
+      <p className="text-fluid-sm text-dark-400 mb-2 line-clamp-fluid-2">
         {indicator.Description || 'No description provided'}
       </p>
 
@@ -370,14 +370,14 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
       </div>*/}
 
       {/* Symbol + Status */}
-      <div className="flex justify-between text-sm text-dark-300">
+      <div className="flex justify-between text-fluid-sm text-dark-300">
         <div>{indicator.Symbol}</div>
         <div className={`${indicator.Status === 1 ? 'text-success-500' : 'text-danger-500'}`}>
           {indicator.Status === 1 ? 'Active' : 'Inactive'}
         </div>
       </div>
       {/* Exchange info */}
-<div className="mt-4 flex items-center justify-center space-x-2 text-xs text-dark-300">
+<div className="mt-4 flex items-center justify-center gap-fluid-2 text-xs text-dark-300">
   <img
     src={getExchangeLabel(indicator.Symbol).icon}
     alt="exchange"
@@ -422,7 +422,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
         {/* Form Modal */}
         {isFormOpen && (
-          <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
             <div className="card w-full max-w-2xl">
               <div className="card-header flex justify-between items-center">
                 <h2 className="text-lg font-medium">
@@ -463,7 +463,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-fluid-4">
                   <div>
                     <label htmlFor="leverage" className="form-label">Leverage</label>
                     <input
@@ -551,7 +551,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
                   </select>
                 </div>
 
-                <div className="flex justify-end space-x-2 pt-4">
+                <div className="flex justify-end gap-fluid-2 pt-4">
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -573,10 +573,10 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
         {/* Delete Confirmation Modal */}
         {deletingIndicator && (
-          <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
             <div className="card w-full max-w-md">
               <div className="p-6">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
+                <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-danger-500/10 mx-auto mb-4">
                   <AlertTriangle className="h-6 w-6 text-danger-500" />
                 </div>
 
@@ -607,11 +607,11 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
 
         {tvPopupOpen && selectedIndicator && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-fluid-4">
             <div className="bg-dark-900 dark:bg-dark-800 p-6 rounded-lg w-full max-w-xl relative overflow-y-auto max-h-[90vh]">
               <button
                 onClick={() => setTvPopupOpen(false)}
-                className="absolute top-2 right-2 text-dark-400 hover:text-danger-500"
+                className="absolute top-fluid-2 right-2 text-dark-400 hover:text-danger-500"
               >
                 ✖
               </button>
@@ -620,12 +620,12 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-center">Signal Preview: {selectedIndicator?.Name}</h2>
-                <p className="text-sm text-dark-400 text-center">
+                <p className="text-fluid-sm text-dark-400 text-center">
                   API Webhook: <code className="text-primary-500">http://45.77.33.141/listen/indicator</code>
                 </p>
 
                 {/* 4 nút chia 2 hàng, 2 cột */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-fluid-4">
                   <button className="btn btn-primary w-full" onClick={() => setSelectedType('long')}>Long Message</button>
                   <button className="btn btn-primary w-full" onClick={() => setSelectedType('short')}>Short Message</button>
                   <button className="btn btn-primary w-full" onClick={() => setSelectedType('exit_long')}>Exit Long</button>
@@ -634,7 +634,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
                 {/* Nếu có selectedType thì hiện message JSON */}
                 {selectedType && (
-                  <pre className="mt-4 text-sm bg-dark-700 text-white p-4 rounded whitespace-pre-wrap break-all max-h-[400px] overflow-auto">
+                  <pre className="mt-4 text-fluid-sm bg-dark-700 text-white p-fluid-4 rounded whitespace-pre-wrap break-all max-h-[400px] overflow-auto">
                     {generateMessage(selectedType)}
                   </pre>
                 )}

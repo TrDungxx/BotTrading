@@ -34,7 +34,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-fluid-4">
       <div className="bg-[#1e2329] w-full max-w-lg rounded-lg shadow-xl border border-dark-700">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-dark-700">
@@ -56,7 +56,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
             {/* Single Asset Mode Card */}
             <button
               onClick={() => setSelectedMode(false)}
-              className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+              className={`w-full text-left p-fluid-4 rounded-lg border-2 transition-all ${
                 !selectedMode 
                   ? 'border-blue-500 bg-blue-500/10' 
                   : 'border-dark-600 bg-dark-800/50 hover:border-dark-500'
@@ -64,7 +64,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
             >
               <div className="flex items-start space-x-4">
                 {/* Icon */}
-                <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                <div className={`flex-shrink-0 w-12 h-fluid-input-lg rounded-lg flex items-center justify-center ${
                   !selectedMode ? 'bg-blue-500/20' : 'bg-dark-700'
                 }`}>
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-cyan-400">
@@ -75,7 +75,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
 
                 {/* Content */}
                 <div className="flex-1">
-                  <h3 className="text-base font-medium text-white mb-2">Chế độ Tài sản đơn lẻ</h3>
+                  <h3 className="text-fluid-base font-medium text-white mb-2">Chế độ Tài sản đơn lẻ</h3>
                   <p className="text-xs text-dark-400 leading-relaxed">
                     Mỗi tài sản ký quỹ chỉ áp dụng cho cặp giao dịch tương ứng. 
                     Không bù trừ PNL giữa các cặp.
@@ -102,7 +102,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
             {/* Multi-Assets Mode Card */}
             <button
               onClick={() => setSelectedMode(true)}
-              className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+              className={`w-full text-left p-fluid-4 rounded-lg border-2 transition-all ${
                 selectedMode 
                   ? 'border-blue-500 bg-blue-500/10' 
                   : 'border-dark-600 bg-dark-800/50 hover:border-dark-500'
@@ -110,24 +110,24 @@ const MultiAssetsModeModal: React.FC<Props> = ({
             >
               <div className="flex items-start space-x-4">
                 {/* Icon - Multi Coins */}
-                <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center relative ${
+                <div className={`flex-shrink-0 w-12 h-fluid-input-lg rounded-lg flex items-center justify-center relative ${
                   selectedMode ? 'bg-blue-500/20' : 'bg-dark-700'
                 }`}>
                   <div className="relative w-9 h-9">
                     {/* BTC */}
-                    <div className="absolute top-0 left-0 w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-[11px] font-bold text-white shadow-lg z-10 border-2 border-[#1e2329]">
+                    <div className="absolute top-0 left-0 w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-fluid-xs font-bold text-white shadow-lg z-10 border-2 border-[#1e2329]">
                       ₿
                     </div>
                     {/* ETH */}
-                    <div className="absolute top-0.5 left-2 w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-[11px] font-bold text-white shadow-lg z-20 border-2 border-[#1e2329]">
+                    <div className="absolute top-0.5 left-2 w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-fluid-xs font-bold text-white shadow-lg z-20 border-2 border-[#1e2329]">
                       Ξ
                     </div>
                     {/* USDT */}
-                    <div className="absolute top-1 left-4 w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-[11px] font-bold text-white shadow-lg z-30 border-2 border-[#1e2329]">
+                    <div className="absolute top-1 left-4 w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-fluid-xs font-bold text-white shadow-lg z-30 border-2 border-[#1e2329]">
                       ₮
                     </div>
                     {/* Plus */}
-                    <div className="absolute top-1.5 left-6 w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-[13px] font-bold text-white shadow-lg z-40 border-2 border-[#1e2329]">
+                    <div className="absolute top-1.5 left-6 w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-fluid-sm font-bold text-white shadow-lg z-40 border-2 border-[#1e2329]">
                       +
                     </div>
                   </div>
@@ -135,7 +135,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
 
                 {/* Content */}
                 <div className="flex-1">
-                  <h3 className="text-base font-medium text-white mb-2">Chế độ Đa tài sản</h3>
+                  <h3 className="text-fluid-base font-medium text-white mb-2">Chế độ Đa tài sản</h3>
                   <p className="text-xs text-dark-400 leading-relaxed">
                     Cho phép bù trừ PNL giữa nhiều cặp giao dịch cùng một tài sản ký quỹ (vd: USDT). 
                     Hỗ trợ quản lý margin hiệu quả hơn.
@@ -161,14 +161,14 @@ const MultiAssetsModeModal: React.FC<Props> = ({
           </div>
 
           {/* Warning Notice */}
-          <div className="bg-dark-900/50 rounded-lg p-4 mb-5">
+          <div className="bg-dark-900/50 rounded-lg p-fluid-4 mb-5">
             <p className="text-xs text-dark-400 leading-relaxed">
               * Xin lưu ý rằng việc thay đổi chế độ ký quỹ cũng sẽ áp dụng cho các vị thế mở và lệnh đang mở.
             </p>
           </div>
 
           {/* Additional Info (Optional) */}
-          <div className="text-xs text-dark-400 leading-relaxed space-y-2">
+          <div className="text-xs text-dark-400 leading-relaxed gap-fluid-2">
             <p>
               <span className="text-yellow-500">*</span> Xin lưu ý rằng người dùng chỉ có thể dùng BFUSD làm tài sản thế chấp ở Chế độ đa tài sản. 
               Việc chuyển sang Chế độ một tài sản có thể làm thay đổi giá thanh lý vị thế do giảm mức ký quỹ.
@@ -195,7 +195,7 @@ const MultiAssetsModeModal: React.FC<Props> = ({
           <button
             onClick={handleConfirm}
             disabled={!isChanged}
-            className={`w-full py-3 rounded-lg font-medium transition-all ${
+            className={`w-full py-fluid-3 rounded-lg font-medium transition-all ${
               isChanged
                 ? 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
                 : 'bg-dark-700 text-dark-500 cursor-not-allowed'

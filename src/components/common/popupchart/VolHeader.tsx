@@ -20,13 +20,13 @@ const VOLHeader: React.FC<VOLHeaderProps> = ({
   onClose,
 }) => {
   return (
-    <div className="absolute top-2 left-2 z-10 flex items-center gap-2 text-xs select-none bg-[#181A20]/80 rounded px-2 py-1">
+    <div className="absolute top-fluid-2 left-2 z-10 flex items-center gap-fluid-2 text-xs select-none bg-[#181A20]/80 rounded px-2 py-fluid-1">
       {/* VOL label */}
       <span className="text-[#848e9c] font-medium">VOL</span>
 
       {/* MAVOL values */}
       {visible && maValues.map((ma) => (
-        <div key={ma.period} className="flex items-center gap-1">
+        <div key={ma.period} className="flex items-center gap-fluid-1">
           <span style={{ color: ma.color }} className="font-medium text-xs">
             MAVOL{ma.period}:
           </span>

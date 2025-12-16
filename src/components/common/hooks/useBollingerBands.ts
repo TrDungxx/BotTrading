@@ -46,15 +46,17 @@ export function useBollingerBands({
   // Canvas overlay for fill
   const bollCanvasRef = useRef<HTMLCanvasElement | null>(null);
   
-  // Refs to track state in closures
+  // ✅ Refs to track state in closures
   const bollDataRef = useRef(bollData);
   const fillVisibleRef = useRef(fillVisible);
   const visibleRef = useRef(visible);
+  const periodRef = useRef(period);
+  const stdDevRef = useRef(stdDev);
   
   // Animation frame ref
   const redrawAnimationFrameRef = useRef<number | null>(null);
 
-  // Sync refs with state
+  // ✅ Sync refs with state/props
   useEffect(() => {
     bollDataRef.current = bollData;
   }, [bollData]);
@@ -66,6 +68,14 @@ export function useBollingerBands({
   useEffect(() => {
     visibleRef.current = visible;
   }, [visible]);
+
+  useEffect(() => {
+    periodRef.current = period;
+  }, [period]);
+
+  useEffect(() => {
+    stdDevRef.current = stdDev;
+  }, [stdDev]);
 
   /**
    * Draw BOLL fill on canvas overlay
@@ -222,16 +232,23 @@ export function useBollingerBands({
   }, [mainChartContainerRef]);
 
   /**
-   * Calculate and update BOLL data
+   * ✅ FIX: Calculate and update BOLL data
+   * ALWAYS calculate and setData (regardless of visibility)
+   * Visibility is controlled via applyOptions({ visible: ... })
    */
   const updateBollingerBands = useCallback(
     (candles: CandlestickData[]) => {
-      if (candles.length < period || !visible) {
+      const currentPeriod = periodRef.current;
+      const currentStdDev = stdDevRef.current;
+
+      // ✅ Only check if we have enough data, NOT visibility
+      if (candles.length < currentPeriod) {
         return;
       }
 
-      const calculated = calculateBollingerBands(candles, period, stdDev);
+      const calculated = calculateBollingerBands(candles, currentPeriod, currentStdDev);
 
+      // ✅ ALWAYS setData - visibility is controlled separately
       if (bollUpperRef.current) bollUpperRef.current.setData(calculated.upper);
       if (bollMiddleRef.current) bollMiddleRef.current.setData(calculated.middle);
       if (bollLowerRef.current) bollLowerRef.current.setData(calculated.lower);
@@ -239,13 +256,13 @@ export function useBollingerBands({
       setBollData(calculated);
 
       // Redraw fill if visible
-      if (fillVisible) {
+      if (fillVisibleRef.current && visibleRef.current) {
         setTimeout(() => {
           redrawBollFill();
         }, 50);
       }
     },
-    [period, stdDev, visible, fillVisible, redrawBollFill]
+    [redrawBollFill]
   );
 
   /**

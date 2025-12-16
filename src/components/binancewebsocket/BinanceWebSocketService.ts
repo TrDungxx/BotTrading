@@ -46,6 +46,10 @@ export interface PlaceOrderPayload {
 
   // trigger theo Binance Futures
   workingType?: WorkingType; // 'MARK' | 'LAST'
+  
+  // ✅ THÊM MỚI: closePosition cho TP/SL toàn bộ vị thế
+  // Khi closePosition='true' → KHÔNG được truyền quantity (Binance tự đóng hết)
+  closePosition?: 'true' | 'false';
 }
 
 // === OpenOrders LS + Event bus ===
@@ -1009,9 +1013,15 @@ writePositionsLS(merged);
 
   // ========= Orders =========
   public placeOrder(payload: PlaceOrderPayload) {
-  this.sendAuthed({ action: 'placeOrder', ...payload });
-  setTimeout(() => this.getPositions(), 400);   // ⬅️ ép kéo snapshot nhẹ
-}
+    // ✅ FIX: Binance rule - khi closePosition='true', KHÔNG được truyền quantity
+    const finalPayload = { ...payload };
+    if (finalPayload.closePosition === 'true') {
+      delete finalPayload.quantity;
+    }
+    
+    this.sendAuthed({ action: 'placeOrder', ...finalPayload });
+    setTimeout(() => this.getPositions(), 400);   // ⬅️ ép kéo snapshot nhẹ
+  }
 
   /** Lấy danh sách lệnh mở theo market (và optional symbol) */
   public getOpenOrders(market: 'spot' | 'futures', symbol?: string, onResult?: (orders: any[]) => void) {

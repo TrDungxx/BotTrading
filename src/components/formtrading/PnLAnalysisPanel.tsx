@@ -153,9 +153,9 @@ const PnLAnalysisPanel: React.FC<Props> = ({
       {/* Header - Collapsible Toggle */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between py-3 text-left hover:bg-dark-700/30 transition-colors"
+        className="w-full flex items-center justify-between py-fluid-3 text-left hover:bg-dark-700/30 transition-colors"
       >
-        <span className="text-sm font-medium text-slate-200">
+        <span className="text-fluid-sm font-medium text-slate-200">
           Profit and Loss Analysis
         </span>
         <ChevronDown
@@ -175,8 +175,8 @@ const PnLAnalysisPanel: React.FC<Props> = ({
         <div className="pb-4 space-y-3">
           {/* Balance Row */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">Balance</span>
-            <div className="flex items-center gap-2">
+            <span className="text-fluid-sm text-slate-400">Balance</span>
+            <div className="flex items-center gap-fluid-2">
               {/* Trend Icons */}
               <div className="flex items-center gap-0.5">
                 <TrendingDown
@@ -196,7 +196,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
                   }
                 />
               </div>
-              <span className="text-sm text-white font-medium">
+              <span className="text-fluid-sm text-white font-medium">
                 {formatNumber(displayData.balance)} USDT
               </span>
             </div>
@@ -204,8 +204,8 @@ const PnLAnalysisPanel: React.FC<Props> = ({
 
           {/* Realized PNL */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">Realized PNL</span>
-            <span className={`text-sm font-medium ${getPnLColor(displayData.realizedPnl)}`}>
+            <span className="text-fluid-sm text-slate-400">Realized PNL</span>
+            <span className={`text-fluid-sm font-medium ${getPnLColor(displayData.realizedPnl)}`}>
               {displayData.realizedPnl >= 0 ? "+" : ""}
               {formatNumber(displayData.realizedPnl)} USDT
             </span>
@@ -213,8 +213,8 @@ const PnLAnalysisPanel: React.FC<Props> = ({
 
           {/* Unrealized PNL */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">Unrealized PNL</span>
-            <span className={`text-sm font-medium ${getPnLColor(displayData.unrealizedPnl)}`}>
+            <span className="text-fluid-sm text-slate-400">Unrealized PNL</span>
+            <span className={`text-fluid-sm font-medium ${getPnLColor(displayData.unrealizedPnl)}`}>
               {displayData.unrealizedPnl >= 0 ? "+" : ""}
               {formatNumber(displayData.unrealizedPnl)} USDT
             </span>
@@ -222,8 +222,8 @@ const PnLAnalysisPanel: React.FC<Props> = ({
 
           {/* PNL KPI */}
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">PNL KPI</span>
-            <span className={`text-sm font-medium ${getPnLColor(displayData.pnlKpi)}`}>
+            <span className="text-fluid-sm text-slate-400">PNL KPI</span>
+            <span className={`text-fluid-sm font-medium ${getPnLColor(displayData.pnlKpi)}`}>
               {displayData.pnlKpi >= 0 ? "+" : ""}
               {formatNumber(displayData.pnlKpi)} USDT
             </span>
@@ -232,7 +232,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
           {/* Daily PnL Section */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-400">Daily PnL</span>
+              <span className="text-fluid-sm text-slate-400">Daily PnL</span>
             </div>
 
             {/* Month Picker */}
@@ -240,7 +240,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-dark-700 border border-dark-600 rounded px-3 py-1.5 text-sm text-white outline-none focus:border-primary-500 cursor-pointer"
+                className="bg-dark-700 border border-dark-600 rounded px-fluid-3 py-fluid-1.5 text-fluid-sm text-white outline-none focus:border-primary-500 cursor-pointer"
               >
                 {monthOptions.map((m) => (
                   <option key={m} value={m} className="bg-dark-800">
@@ -257,7 +257,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
                 {weekDays.map((day, i) => (
                   <div
                     key={i}
-                    className="text-center text-[11px] text-slate-500 font-medium py-1.5"
+                    className="text-center text-fluid-xs text-slate-500 font-medium py-fluid-1.5"
                   >
                     {day}
                   </div>
@@ -287,7 +287,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
                     >
                       {day && (
                         <>
-                          <div className="text-[13px] text-slate-200 font-medium leading-none">
+                          <div className="text-fluid-sm text-slate-200 font-medium leading-none">
                             {day.date}
                           </div>
                           {day.pnl !== 0 && (

@@ -58,78 +58,78 @@ export default function SystemStats() {
       </div>
 
       {error && (
-        <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-4 rounded-md flex items-center gap-3">
+        <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-fluid-4 rounded-fluid-md flex items-center gap-fluid-3">
           <AlertTriangle className="h-5 w-5" />
           {error}
         </div>
       )}
 
       {/* Selector UI */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-fluid-2">
         {/* Main Stats */}
         <div
-          className={`card p-4 cursor-pointer transition ${selectedSection === 'main' ? 'ring-2 ring-primary-500' : ''}`}
+          className={`card p-fluid-4 cursor-pointer transition ${selectedSection === 'main' ? 'ring-2 ring-primary-500' : ''}`}
           onClick={() => setSelectedSection('main')}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-primary-500/10">
                 <BarChart3 className="h-4 w-4 text-primary-500" />
               </div>
             </div>
             <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Main Stats</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Main Stats</p>
             </div>
           </div>
         </div>
 
         {/* Processor */}
         <div
-          className={`card p-4 cursor-pointer transition ${selectedSection === 'processor' ? 'ring-2 ring-warning-300' : ''}`}
+          className={`card p-fluid-4 cursor-pointer transition ${selectedSection === 'processor' ? 'ring-2 ring-warning-300' : ''}`}
           onClick={() => setSelectedSection('processor')}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-300/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-warning-300/10">
                 <Settings className="h-4 w-4 text-warning-300" />
               </div>
             </div>
             <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Processor</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Processor</p>
             </div>
           </div>
         </div>
 
         {/* System Info */}
         <div
-          className={`card p-4 cursor-pointer transition ${selectedSection === 'info' ? 'ring-2 ring-dark-500' : ''}`}
+          className={`card p-fluid-4 cursor-pointer transition ${selectedSection === 'info' ? 'ring-2 ring-dark-500' : ''}`}
           onClick={() => setSelectedSection('info')}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-dark-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-dark-500/10">
                 <Info className="h-4 w-4 text-dark-500" />
               </div>
             </div>
             <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">System Info</p>
+              <p className="text-fluid-sm font-medium text-dark-400">System Info</p>
             </div>
           </div>
         </div>
 
         {/* Health */}
         <div
-          className={`card p-4 cursor-pointer transition ${selectedSection === 'health' ? 'ring-2 ring-success-500' : ''}`}
+          className={`card p-fluid-4 cursor-pointer transition ${selectedSection === 'health' ? 'ring-2 ring-success-500' : ''}`}
           onClick={() => setSelectedSection('health')}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-success-500/10">
                 <Activity className="h-4 w-4 text-success-500" />
               </div>
             </div>
             <div className="ml-3 min-w-0">
-              <p className="text-sm font-medium text-dark-400">Health</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Health</p>
             </div>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function SystemStats() {
 
       {/* Section render */}
       {selectedSection === 'main' && stats && (
-        <div className="card p-4 space-y-2">
+        <div className="card p-fluid-4 gap-fluid-2">
           <h2 className="text-lg font-semibold">Main Stats</h2>
           <p>Total Requests: {stats.mainStats.totalRequests}</p>
           <p>Success: {stats.mainStats.successfulRequests} ({stats.mainStats.successRate}%)</p>
@@ -148,7 +148,7 @@ export default function SystemStats() {
       )}
 
       {selectedSection === 'processor' && stats?.processorStats?.processing && (
-        <div className="card p-4 space-y-2">
+        <div className="card p-fluid-4 gap-fluid-2">
           <h2 className="text-lg font-semibold">Processor Stats</h2>
           <p>Processed: {stats.processorStats.processing.totalProcessed}</p>
           <p>Successful Trades: {stats.processorStats.processing.successfulTrades}</p>
@@ -159,7 +159,7 @@ export default function SystemStats() {
       )}
 
       {selectedSection === 'info' && stats && (
-        <div className="card p-4 space-y-2 text-sm text-dark-400">
+        <div className="card p-fluid-4 gap-fluid-2 text-fluid-sm text-dark-400">
           <h2 className="text-lg font-semibold text-dark-300">System Info</h2>
           <p>Status: <span className="text-success-500 font-semibold">{stats.status}</span></p>
           <p>Timestamp: {new Date(stats.timestamp).toLocaleString()}</p>
@@ -168,14 +168,14 @@ export default function SystemStats() {
 
       {selectedSection === 'health' && health && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="card p-4 space-y-2">
+          <div className="card p-fluid-4 gap-fluid-2">
             <h2 className="text-lg font-semibold">Health: Processing</h2>
             <p>Status: {health.components.processing.status}</p>
             <p>Success Rate: {health.components.processing.successRate}</p>
             <p>Total Processed: {health.components.processing.totalProcessed}</p>
           </div>
 
-          <div className="card p-4 space-y-2">
+          <div className="card p-fluid-4 gap-fluid-2">
             <h2 className="text-lg font-semibold">Health: Cache</h2>
             <p>Size: {health.components.cache.cache.size}</p>
             <p>Utilization: {health.components.cache.cache.utilizationRate}</p>

@@ -36,19 +36,19 @@ export default function GuestLayout() {
       
       <div className="flex flex-1 flex-col min-h-screen">
         <Header setSidebarOpen={setSidebarOpen} />
-        <main className="flex-1 p-4 lg:p-6 mt-16 lg:ml-64 w-full">
+        <main className="flex-1 p-fluid-4 lg:p-6 mt-16 lg:ml-64 w-full">
             {/* Guest mode banner */}
-            <div className="mb-6 p-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
+            <div className="mb-6 p-fluid-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-warning-300">Guest Mode</h3>
+                  <h3 className="text-fluid-sm font-medium text-warning-300">Guest Mode</h3>
                   <p className="text-xs text-warning-300/80 mt-1">
                     You're viewing in guest mode with limited access. Sign in for full features.
                   </p>
                 </div>
                 <a
                   href="/login"
-                  className="btn btn-primary py-2 px-4 text-sm"
+                  className="btn btn-primary py-2 px-fluid-4 text-fluid-sm"
                 >
                   Sign In
                 </a>

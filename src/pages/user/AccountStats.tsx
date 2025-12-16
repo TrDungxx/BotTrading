@@ -17,8 +17,8 @@ dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
 
 const Card = ({ title, value, className = '' }: { title: string; value: any; className?: string }) => (
-  <div className="bg-dark-700 p-4 rounded-lg">
-    <div className="text-sm text-dark-300">{title}</div>
+  <div className="bg-dark-700 p-fluid-4 rounded-lg">
+    <div className="text-fluid-sm text-dark-300">{title}</div>
     <div className={`text-lg font-semibold ${className}`}>{value}</div>
   </div>
 );
@@ -209,7 +209,7 @@ export default function AccountStats() {
           <button
             onClick={handleSyncAccount}
             disabled={syncLoading}
-            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white text-sm px-4 py-1.5 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-fluid-2 bg-primary-500 hover:bg-primary-600 text-white text-fluid-sm px-fluid-4 py-fluid-1.5 rounded-fluid-md transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {syncLoading ? (
               <>
@@ -233,7 +233,7 @@ export default function AccountStats() {
 
       {/* ✅ Hiển thị thời gian sau khi sync */}
       {syncSummary && (
-        <p className="text-sm text-dark-300 mt-2 flex items-center gap-1">
+        <p className="text-fluid-sm text-dark-300 mt-2 flex items-center gap-fluid-1">
           <Clock className="w-4 h-4 text-primary-500" />
           Đã đồng bộ trong: <strong>{syncSummary.durationFormatted}</strong>
         </p>
@@ -241,9 +241,9 @@ export default function AccountStats() {
 
       {user?.type !== 0 && accounts.length > 0 && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-white mb-1">Chọn tài khoản:</label>
+          <label className="block text-fluid-sm font-medium text-white mb-1">Chọn tài khoản:</label>
           <select
-            className="bg-dark-700 border border-dark-500 text-white rounded-md px-3 py-2 text-sm"
+            className="bg-dark-700 border border-dark-500 text-white rounded-fluid-md px-fluid-3 py-2 text-fluid-sm"
             value={selectedAccountId}
             onChange={(e) => setSelectedAccountId(e.target.value)}
           >
@@ -254,7 +254,7 @@ export default function AccountStats() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 items-center mb-4">
+      <div className="flex flex-wrap gap-fluid-2 items-center mb-4">
         {['1 ngày', '1 Tuần', '1 Tháng', '3 Tháng'].map((label, idx) => {
           const now = dayjs();
           let start;
@@ -269,7 +269,7 @@ export default function AccountStats() {
             <button
               key={idx}
               onClick={() => setRange([{ ...range[0], startDate: start.toDate(), endDate: now.toDate() }])}
-              className="bg-dark-700 text-white text-sm px-3 py-1 rounded-md hover:bg-primary-500"
+              className="bg-dark-700 text-white text-fluid-sm px-fluid-3 py-fluid-1 rounded-fluid-md hover:bg-primary-500"
             >
               {label}
             </button>
@@ -279,7 +279,7 @@ export default function AccountStats() {
         <div className="relative">
           <button
             onClick={() => setShowCalendar(!showCalendar)}
-            className="flex items-center px-3 py-1 bg-dark-700 text-white rounded-md text-sm hover:bg-dark-600"
+            className="flex items-center px-fluid-3 py-fluid-1 bg-dark-700 text-white rounded-fluid-md text-fluid-sm hover:bg-dark-600"
           >
             <Calendar className="w-4 h-4 mr-1" />
             {startDate && endDate
@@ -302,12 +302,12 @@ export default function AccountStats() {
       </div>
 
       <div className="flex gap-6 border-b border-dark-500 mb-4">
-        <button onClick={() => setActiveTab('pnl')} className={`pb-2 text-sm font-medium ${activeTab === 'pnl' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>PNL</button>
-        <button onClick={() => setActiveTab('indicatorStats')} className={`pb-2 text-sm font-medium ${activeTab === 'indicatorStats' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>Indicator Stats</button>
+        <button onClick={() => setActiveTab('pnl')} className={`pb-2 text-fluid-sm font-medium ${activeTab === 'pnl' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>PNL</button>
+        <button onClick={() => setActiveTab('indicatorStats')} className={`pb-2 text-fluid-sm font-medium ${activeTab === 'indicatorStats' ? 'text-white border-b-2 border-primary-500' : 'text-dark-400'}`}>Indicator Stats</button>
       </div>
 
       {activeTab === 'pnl' && summary && (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-white">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-fluid-4 text-white">
           <Card title="Tổng khối lượng" value={`${summary.totalVolume?.toFixed(2)} USDT`} />
           <Card title="Realized PnL" value={`${summary.totalRealizedPL?.toFixed(4)} USDT`} className={summary.totalRealizedPL >= 0 ? 'text-green-400' : 'text-red-400'} />
           <Card title="Phí (Commission)" value={`${summary.totalCommission?.toFixed(4)} USDT`} />
@@ -319,28 +319,28 @@ export default function AccountStats() {
 
       {activeTab === 'indicatorStats' && (
         <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-sm text-white border border-dark-600">
+          <table className="min-w-full text-fluid-sm text-white border border-dark-600">
             <thead className="bg-dark-700 text-left">
               <tr>
-                <th className="px-4 py-2">Chỉ báo</th>
-                <th className="px-4 py-2 text-right">Số lệnh</th>
-                <th className="px-4 py-2 text-right">Winrate</th>
-                <th className="px-4 py-2 text-right">PnL</th>
-                <th className="px-4 py-2 text-right">ROI TB</th>
-                <th className="px-4 py-2 text-right">Profit Factor</th>
-                <th className="px-4 py-2 text-right">Drawdown</th>
+                <th className="px-fluid-4 py-2">Chỉ báo</th>
+                <th className="px-fluid-4 py-2 text-right">Số lệnh</th>
+                <th className="px-fluid-4 py-2 text-right">Winrate</th>
+                <th className="px-fluid-4 py-2 text-right">PnL</th>
+                <th className="px-fluid-4 py-2 text-right">ROI TB</th>
+                <th className="px-fluid-4 py-2 text-right">Profit Factor</th>
+                <th className="px-fluid-4 py-2 text-right">Drawdown</th>
               </tr>
             </thead>
             <tbody>
               {indicatorPerf.map((row, index) => (
                 <tr key={index} className="border-b border-dark-700">
-                  <td className="px-4 py-2">{row.indicatorCall}</td>
-                  <td className="px-4 py-2 text-right">{row.totalTrades}</td>
-                  <td className="px-4 py-2 text-right">{row.winRate?.toFixed(2)}%</td>
-                  <td className={`px-4 py-2 text-right ${row.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{row.netPnl?.toFixed(4)} USDT</td>
-                  <td className="px-4 py-2 text-right">{row.avgPnl?.toFixed(4)}</td>
-                  <td className="px-4 py-2 text-right">{row.profitFactor?.toFixed(2)}</td>
-                  <td className="px-4 py-2 text-right">{row.maxDrawdown?.toFixed(2)}%</td>
+                  <td className="px-fluid-4 py-2">{row.indicatorCall}</td>
+                  <td className="px-fluid-4 py-2 text-right">{row.totalTrades}</td>
+                  <td className="px-fluid-4 py-2 text-right">{row.winRate?.toFixed(2)}%</td>
+                  <td className={`px-fluid-4 py-2 text-right ${row.netPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{row.netPnl?.toFixed(4)} USDT</td>
+                  <td className="px-fluid-4 py-2 text-right">{row.avgPnl?.toFixed(4)}</td>
+                  <td className="px-fluid-4 py-2 text-right">{row.profitFactor?.toFixed(2)}</td>
+                  <td className="px-fluid-4 py-2 text-right">{row.maxDrawdown?.toFixed(2)}%</td>
                 </tr>
               ))}
             </tbody>

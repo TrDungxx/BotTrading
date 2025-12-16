@@ -147,8 +147,8 @@ const TpSlCalculator: React.FC<Props> = ({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-dark-700">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-fluid-3 py-2 border-b border-dark-700">
+        <div className="flex items-center gap-fluid-2">
           <Calculator className="w-3.5 h-3.5 text-blue-500" />
           <span className="text-xs font-medium text-white">
             {isTP ? "Take Profit" : "Stop Loss"}
@@ -163,12 +163,12 @@ const TpSlCalculator: React.FC<Props> = ({
       </div>
 
       {/* Body */}
-      <div className="p-3 space-y-3">
+      <div className="p-fluid-3 space-y-3">
         {/* Trigger Info */}
-        <div className="text-[10px] space-y-1">
+        <div className="text-fluid-2xs space-y-1">
           {/* Current Triggers với highlight */}
           {calculated && (
-            <div className="bg-dark-900 rounded px-2 py-1.5 space-y-1">
+            <div className="bg-dark-900 rounded px-2 py-fluid-1.5 space-y-1">
               <div className="flex justify-between">
                 <span className="text-slate-500">Buy Trigger:</span>
                 <span className="text-green-500 font-medium">
@@ -205,7 +205,7 @@ const TpSlCalculator: React.FC<Props> = ({
 
         {/* Input based on mode */}
         <div>
-          <label className="block text-[10px] text-slate-400 mb-1">
+          <label className="block text-fluid-2xs text-slate-400 mb-1">
             {mode === "price"
               ? `${isTP ? "Trigger" : "Stop"} Price`
               : mode === "pnl"
@@ -218,7 +218,7 @@ const TpSlCalculator: React.FC<Props> = ({
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="0"
-              className="w-full px-2.5 py-1.5 bg-dark-900 border border-dark-700 rounded text-white text-sm focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-fluid-1.5 bg-dark-900 border border-dark-700 rounded text-white text-fluid-sm focus:outline-none focus:border-blue-500"
             />
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
               {mode === "roi" ? "%" : mode === "price" ? "USDT" : ""}
@@ -228,14 +228,14 @@ const TpSlCalculator: React.FC<Props> = ({
 
         {/* Calculated Values */}
         {calculated && (
-          <div className="bg-dark-900 rounded p-2 space-y-1.5">
-            <div className="flex justify-between text-[11px]">
+          <div className="bg-dark-900 rounded p-fluid-2 space-y-1.5">
+            <div className="flex justify-between text-fluid-xs">
               <span className="text-slate-500">Price</span>
               <span className="text-white font-medium">
                 {calculated.price.toFixed(4)}
               </span>
             </div>
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-fluid-xs">
               <span className="text-slate-500">PnL</span>
               <span
                 className={`font-medium ${
@@ -246,7 +246,7 @@ const TpSlCalculator: React.FC<Props> = ({
                 {calculated.pnl.toFixed(2)} USDT
               </span>
             </div>
-            <div className="flex justify-between text-[11px]">
+            <div className="flex justify-between text-fluid-xs">
               <span className="text-slate-500">ROI</span>
               <span
                 className={`font-medium ${
@@ -262,7 +262,7 @@ const TpSlCalculator: React.FC<Props> = ({
 
         {/* Validation Error */}
         {calculated && !isValid && (
-          <div className="text-[10px] text-red-500">
+          <div className="text-fluid-2xs text-red-500">
             {isTP
               ? "Take Profit phải sinh lãi"
               : "Stop Loss phải sinh lỗ"}
@@ -271,10 +271,10 @@ const TpSlCalculator: React.FC<Props> = ({
       </div>
 
       {/* Footer */}
-      <div className="flex gap-2 px-3 pb-3">
+      <div className="flex gap-fluid-2 px-fluid-3 pb-3">
         <button
           onClick={onClose}
-          className="flex-1 py-1.5 px-3 bg-dark-800 hover:bg-dark-700 text-white text-xs rounded transition-colors"
+          className="flex-1 py-fluid-1.5 px-fluid-3 bg-dark-800 hover:bg-dark-700 text-white text-xs rounded transition-colors"
         >
           Cancel
         </button>
@@ -287,7 +287,7 @@ const TpSlCalculator: React.FC<Props> = ({
             }
           }}
           disabled={!isValid}
-          className={`flex-1 py-1.5 px-3 text-xs rounded transition-colors ${
+          className={`flex-1 py-fluid-1.5 px-fluid-3 text-xs rounded transition-colors ${
             isValid
               ? "bg-blue-600 hover:bg-blue-700 text-white"
               : "bg-dark-700 text-slate-600 cursor-not-allowed"

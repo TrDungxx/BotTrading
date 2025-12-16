@@ -95,9 +95,9 @@ export default function CustomIntervalModal({ open, onClose, onSubmit }: Props) 
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm text-dark-300">Loại</label>
+            <label className="mb-1 block text-fluid-sm text-dark-300">Loại</label>
             <select
-              className="w-full rounded-xl border border-dark-600 bg-dark-700 p-2.5 text-sm text-white outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-dark-600 bg-dark-700 p-fluid-2.5 text-fluid-sm text-white outline-none focus:border-blue-500"
               value={unit}
               onChange={(e) => {
                 
@@ -112,14 +112,14 @@ export default function CustomIntervalModal({ open, onClose, onSubmit }: Props) 
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-dark-300">Khung thời gian</label>
+            <label className="mb-1 block text-fluid-sm text-dark-300">Khung thời gian</label>
             <input
               ref={inputRef}
               type="number"
               min={1}
               step={1}
               placeholder="VD: 7"
-              className="w-full rounded-xl border border-dark-600 bg-dark-700 p-2.5 text-sm text-white outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-dark-600 bg-dark-700 p-fluid-2.5 text-fluid-sm text-white outline-none focus:border-blue-500"
               value={value}
               onChange={(e) => {
                 
@@ -139,18 +139,18 @@ export default function CustomIntervalModal({ open, onClose, onSubmit }: Props) 
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6 flex gap-fluid-3">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-xl border border-dark-600 bg-dark-700 py-2.5 text-sm font-medium text-white hover:bg-dark-600"
+            className="flex-1 rounded-xl border border-dark-600 bg-dark-700 py-2.5 text-fluid-sm font-medium text-white hover:bg-dark-600"
           >
             Hủy
           </button>
           <button
             type="button"
             onClick={handleAdd}
-            className="flex-1 rounded-xl bg-[#fcd535] py-2.5 text-sm font-semibold text-black hover:brightness-95"
+            className="flex-1 rounded-xl bg-[#fcd535] py-2.5 text-fluid-sm font-semibold text-black hover:brightness-95"
           >
             Thêm
           </button>

@@ -836,7 +836,7 @@ const submitStream = async () => {
     <div className="w-full overflow-x-auto">
       <div className="min-w-[1000px] space-y-6">
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-fluid-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold">Trading Bot Configuration</h1>
               <p className="text-dark-400">Manage and configure your automated trading streams</p>
@@ -858,7 +858,7 @@ const submitStream = async () => {
 
           {/* Global message */}
           {message && (
-            <div className={`flex items-center gap-3 p-4 rounded-lg ${message.type === 'success'
+            <div className={`flex items-center gap-fluid-3 p-fluid-4 rounded-lg ${message.type === 'success'
                 ? 'bg-success-500/10 border border-success-500/20'
                 : 'bg-danger-500/10 border border-danger-500/20'
               }`}>
@@ -867,28 +867,28 @@ const submitStream = async () => {
               ) : (
                 <AlertTriangle className="h-5 w-5 text-danger-500 flex-shrink-0" />
               )}
-              <p className={`text-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
+              <p className={`text-fluid-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
                 {message.text}
               </p>
             </div>
           )}
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-fluid-4 sm:grid-cols-4 lg:grid-cols-4">
             {/* Total */}
             <div
-              className={`card p-4 cursor-pointer transition ${selectedStatus === 'all' ? 'ring-2 ring-primary-500' : ''
+              className={`card p-fluid-4 cursor-pointer transition ${selectedStatus === 'all' ? 'ring-2 ring-primary-500' : ''
                 }`}
               onClick={() => handleStatusCardClick('all')}
             >
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
+                  <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-primary-500/10">
                     <Bot className="h-4 w-4 text-primary-500" />
                   </div>
                 </div>
                 <div className="ml-3 min-w-0">
-                  <p className="text-sm font-medium text-dark-400">Total Streams</p>
+                  <p className="text-fluid-sm font-medium text-dark-400">Total Streams</p>
                   <p className="text-lg font-semibold">{streams.length}</p>
                 </div>
               </div>
@@ -896,18 +896,18 @@ const submitStream = async () => {
 
             {/* Active */}
             <div
-              className={`card p-4 cursor-pointer transition ${selectedStatus === 1 ? 'ring-2 ring-success-500' : ''
+              className={`card p-fluid-4 cursor-pointer transition ${selectedStatus === 1 ? 'ring-2 ring-success-500' : ''
                 }`}
               onClick={() => handleStatusCardClick(1)}
             >
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
+                  <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-success-500/10">
                     <Play className="h-4 w-4 text-success-500" />
                   </div>
                 </div>
                 <div className="ml-3 min-w-0">
-                  <p className="text-sm font-medium text-dark-400">Active</p>
+                  <p className="text-fluid-sm font-medium text-dark-400">Active</p>
                   <p className="text-lg font-semibold">{streams.filter(s => s.Status === 1).length}</p>
                 </div>
               </div>
@@ -915,18 +915,18 @@ const submitStream = async () => {
 
             {/* Inactive */}
             <div
-              className={`card p-4 cursor-pointer transition ${selectedStatus === 0 ? 'ring-2 ring-dark-500' : ''
+              className={`card p-fluid-4 cursor-pointer transition ${selectedStatus === 0 ? 'ring-2 ring-dark-500' : ''
                 }`}
               onClick={() => handleStatusCardClick(0)}
             >
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-dark-600">
+                  <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-dark-600">
                     <XCircle className="h-4 w-4 text-dark-300" />
                   </div>
                 </div>
                 <div className="ml-3 min-w-0">
-                  <p className="text-sm font-medium text-dark-400">Inactive</p>
+                  <p className="text-fluid-sm font-medium text-dark-400">Inactive</p>
                   <p className="text-lg font-semibold">{streams.filter(s => s.Status === 0).length}</p>
                 </div>
               </div>
@@ -935,18 +935,18 @@ const submitStream = async () => {
             {/* Deleted */}
             {['admin', 'superadmin'].includes(user?.role) && (
               <div
-                className={`card p-4 cursor-pointer transition ${selectedStatus === -1 ? 'ring-2 ring-danger-500' : ''
+                className={`card p-fluid-4 cursor-pointer transition ${selectedStatus === -1 ? 'ring-2 ring-danger-500' : ''
                   }`}
                 onClick={() => handleStatusCardClick(-1)}
               >
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
+                    <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-danger-500/10">
                       <Trash2 className="h-4 w-4 text-danger-500" />
                     </div>
                   </div>
                   <div className="ml-3 min-w-0">
-                    <p className="text-sm font-medium text-dark-400">Deleted By User</p>
+                    <p className="text-fluid-sm font-medium text-dark-400">Deleted By User</p>
                     <p className="text-lg font-semibold">{streams.filter(s => s.Status === -1).length}</p>
                   </div>
                 </div>
@@ -975,7 +975,7 @@ const submitStream = async () => {
             </div>
 
             {/* Filters row - responsive grid */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:flex lg:gap-4">
+            <div className="grid grid-cols-1 gap-fluid-3 sm:grid-cols-3 lg:flex lg:gap-fluid-4">
               <div className="lg:min-w-[140px]">
                 <select
                   className="form-select w-full"
@@ -1021,37 +1021,37 @@ const submitStream = async () => {
           {/* Trading streams table */}
           <div className="card overflow-hidden">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-fluid-12">
+                <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
               <div className=" overflow-x-auto">
-                <table className=" min-w-[1200px] table-auto text-sm text-left text-gray-200">
+                <table className=" min-w-[1200px] table-auto text-fluid-sm text-left text-gray-200">
                   <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Stream</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Symbol</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Lavarage</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">StopLost %</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 min-w-[80px]">Take Profit %</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Name</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 ">Stream</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 ">Symbol</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 ">Lavarage</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 ">StopLost %</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 min-w-[80px]">Take Profit %</th>
 
                       {SHOW_TYPE && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 min-w-[100px]">Type</th>
+                        <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 min-w-[100px]">Type</th>
                       )}
-                      <th className="px-6 py-3 text-center text-xs font-medium text-dark-400 min-w-[100px]">Status</th>
+                      <th className="px-6 py-fluid-3 text-center text-xs font-medium text-dark-400 min-w-[100px]">Status</th>
                       {SHOW_TYPE && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 min-w-[150px]">Stream Status</th>
+                        <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 min-w-[150px]">Stream Status</th>
                       )}
                       {SHOW_TYPE && (
-                        <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 min-w-[120px]">Order Price</th>
+                        <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 min-w-[120px]">Order Price</th>
                       )}
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">Capital %</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 ">Capital %</th>
                       {SHOW_TYPE && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-dark-400 ">Trend</th>)}
+                        <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400 ">Trend</th>)}
                       {SHOW_TYPE && (
-                        <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">Last Updated</th>)}
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400 ">Actions</th>
+                        <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 ">Last Updated</th>)}
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400 ">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-700 text-xs font-small">
@@ -1061,22 +1061,22 @@ const submitStream = async () => {
 
 
                       <tr key={stream.id} className="hover:bg-dark-700/40">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-white font-semibold">
+                            <div className="flex items-center gap-fluid-2 text-white font-semibold">
                               <User className="h-4 w-4 text-primary-500" />
                               {accountUsernameMap[Number(stream.InternalAccountId)] || 'Unknown'}
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-dark-400">
+                            <div className="flex items-center gap-fluid-2 text-fluid-sm text-dark-400">
                               <Link2 className="h-4 w-4 text-warning-300" />
                               {getBinanceAccountName(stream.BinanceAccountId)}
                             </div>
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
+                            <div className="h-fluid-input w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
                               <Bot className="h-5 w-5 text-primary-500" />
                             </div>
                             <div className="ml-4 min-w-0">
@@ -1094,57 +1094,57 @@ const submitStream = async () => {
                                 );
                               })()}
                               {user?.role === 'admin' || user?.role === 'superadmin' ? (
-                                <div className="text-sm text-dark-400">
+                                <div className="text-fluid-sm text-dark-400">
                                   ID: {stream.id} | Indicator: {stream.indicatorId}
                                 </div>) : null}
                             </div>
                           </div>
                         </td>
 
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="font-mono text-sm">{stream.Symbol}</span>
+                        <td className="px-6 py-fluid-4 whitespace-nowrap">
+                          <span className="font-mono text-fluid-sm">{stream.Symbol}</span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-center">
                           x{stream.Leverage ?? '1'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                           {stream.StopLost && stream.StopLost > 0 ? stream.StopLost.toFixed(2) : '--'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                           {stream.TakeProfit && stream.TakeProfit > 0 ? stream.TakeProfit.toFixed(2) : '--'}
                         </td>
 
 
 
                         {SHOW_TYPE && (
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-fluid-4 whitespace-nowrap">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getTypeColor(stream.Type)}`}>
                               {getTypeLabel(stream.Type)}
                             </span>
                           </td>
                         )}
 
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-center">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(stream.Status)}`}>
                             {getStatusIcon(stream.Status)}
                             <span className="ml-1">{getStatusLabel(stream.Status)}</span>
                           </span>
                         </td>
                         {SHOW_TYPE && (
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-dark-300">{stream.StreamStatus}</span>
+                          <td className="px-6 py-fluid-4 whitespace-nowrap">
+                            <span className="text-fluid-sm text-dark-300">{stream.StreamStatus}</span>
                           </td>
                         )}
                         {SHOW_TYPE && (
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                          <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
                             {stream.OrderPrice ? `$${parseFloat(stream.OrderPrice).toFixed(4)}` : '-'}
                           </td>
                         )}
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
                           {stream.CapitalUsageRatio}%
                         </td>
                         {SHOW_TYPE && (
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-fluid-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className={`w-2 h-2 rounded-full mr-2 ${stream.TrendType === 'UPTREND' ? 'bg-success-500' :
                                   stream.TrendType === 'DOWNTREND' ? 'bg-danger-500' : 'bg-warning-300'
@@ -1155,7 +1155,7 @@ const submitStream = async () => {
                             </div>
                           </td>)}
                         {SHOW_TYPE && (
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                          <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                             <div>
                               <FormattedDate
                                 value={stream.update_time}
@@ -1172,8 +1172,8 @@ const submitStream = async () => {
                               />
                             </div>
                           </td>)}
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <div className="flex justify-end space-x-2">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
+                          <div className="flex justify-end gap-fluid-2">
                             {stream.Status === 1 ? (
                               <button
                                 onClick={() => confirmResumeOrPause(stream)}
@@ -1221,10 +1221,10 @@ const submitStream = async () => {
           {/* Pagination */}
           {!isLoading && filteredStreams.length > 0 && (
             <div className="flex justify-between items-center mt-4">
-              <div className="text-sm text-dark-400">
+              <div className="text-fluid-sm text-dark-400">
                 Showing page {page} of {totalPages}
               </div>
-              <div className="flex space-x-2">
+              <div className="flex gap-fluid-2">
                 <button
                   onClick={() => handlePageChange(page - 1)}
                   disabled={page === 1}
@@ -1233,7 +1233,7 @@ const submitStream = async () => {
                   Previous
                 </button>
 
-                <div className="flex space-x-1">
+                <div className="flex gap-fluid-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                     const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + i;
                     if (pageNum > totalPages) return null;
@@ -1242,7 +1242,7 @@ const submitStream = async () => {
                       <button
                         key={pageNum}
                         onClick={() => handlePageChange(pageNum)}
-                        className={`px-3 py-2 text-sm rounded-md ${pageNum === page
+                        className={`px-fluid-3 py-2 text-fluid-sm rounded-fluid-md ${pageNum === page
                             ? 'bg-primary-500 text-white'
                             : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
                           }`}
@@ -1267,7 +1267,7 @@ const submitStream = async () => {
 
           {/* Form Modal */}
           {isFormOpen && (
-            <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
               <div className="card w-full max-w-6xl max-h-[90vh] overflow-y-auto">
                 <div className="card-header flex justify-between items-center">
                   <h2 className="text-lg font-medium">
@@ -1287,7 +1287,7 @@ const submitStream = async () => {
                 <form onSubmit={handleSubmit} className="p-6 space-y-6">
                   {/* Basic Information */}
                   {validationErrors.length > 0 && (
-                    <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-3 rounded mt-4 space-y-1 text-sm">
+                    <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-fluid-3 rounded mt-4 space-y-1 text-fluid-sm">
                       {validationErrors.map((error, index) => (
                         <div key={index}>• {error}</div>
                       ))}
@@ -1295,8 +1295,8 @@ const submitStream = async () => {
                   )}
 
                   <div>
-                    <h3 className="text-base font-medium mb-4">Basic Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <h3 className="text-fluid-base font-medium mb-4">Basic Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-fluid-4">
                       <div>
                         <label htmlFor="description" className="form-label">Description *</label>
                         <input
@@ -1398,8 +1398,8 @@ const submitStream = async () => {
 
                   {/* Status and Type */}
                   <div>
-                    <h3 className="text-base font-medium mb-4">Status & Type Configuration</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <h3 className="text-fluid-base font-medium mb-4">Status & Type Configuration</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-fluid-4">
                       {/*<div>
                     <label htmlFor="status" className="form-label">Status</label>
                     <select
@@ -1454,8 +1454,8 @@ const submitStream = async () => {
                           placeholder="10"
                         />
                       </div>
-                      <div className="lg:col-span-2 space-y-2">
-                        <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+                      <div className="lg:col-span-2 gap-fluid-2">
+                        <div className="lg:col-span-2 grid grid-cols-2 gap-fluid-4">
 
                           <div>
                             <label htmlFor="marginType" className="form-label">Margin Type</label>
@@ -1490,7 +1490,7 @@ const submitStream = async () => {
                           </div>
                         </div>
                         {showLeveragePopup && (
-                          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-fluid-4">
                             <div className="bg-dark-900 rounded-lg shadow-lg w-full max-w-md">
                               <div className="p-6 space-y-4">
                                 <div className="flex justify-between items-center">
@@ -1520,7 +1520,7 @@ const submitStream = async () => {
                                   ))}
                                 </div>
 
-                                <div className="text-sm text-dark-300 space-y-1 mt-2">
+                                <div className="text-fluid-sm text-dark-300 space-y-1 mt-2">
                                   <p>* Vị thế tối đa 200,000,000 USDT</p>
                                   <p>
                                     Xin lưu ý rằng việc thay đổi đòn bẩy sẽ áp dụng cho các vị thế mở
@@ -1551,8 +1551,8 @@ const submitStream = async () => {
                   {/* Trading Configuration */}
 
                   <div>
-                    <h3 className="text-base font-medium mb-4">Trading Configuration</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <h3 className="text-fluid-base font-medium mb-4">Trading Configuration</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-fluid-4">
                       {SHOW_ORDER_PRICE && (
                         <div>
                           <label htmlFor="orderPrice" className="form-label">Order Price</label>
@@ -1608,8 +1608,8 @@ const submitStream = async () => {
 
                   {/* Trailing Stop Configuration */}
                   {/*<div>
-                <h3 className="text-base font-medium mb-4">Trailing Stop Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <h3 className="text-fluid-base font-medium mb-4">Trailing Stop Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-fluid-4">
                   <div>
                     <label htmlFor="trailingStop" className="form-label">Trailing Stop</label>
                     <select
@@ -1666,8 +1666,8 @@ const submitStream = async () => {
 
                   {/* ATR Configuration */}
                   {/* <div>
-                <h3 className="text-base font-medium mb-4">ATR Configuration</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <h3 className="text-fluid-base font-medium mb-4">ATR Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-fluid-4">
                   <div>
                     <label htmlFor="atr" className="form-label">ATR</label>
                     <select
@@ -1711,8 +1711,8 @@ const submitStream = async () => {
 
                   {/* Trend Configuration */}
                   <div>
-                    {/* <h3 className="text-base font-medium mb-4">Trend Configuration</h3>*/}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* <h3 className="text-fluid-base font-medium mb-4">Trend Configuration</h3>*/}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-fluid-4">
                       {/*  <div>
                     <label htmlFor="trendStatus" className="form-label">Trend Status</label>
                     <select
@@ -1742,7 +1742,7 @@ const submitStream = async () => {
                     </div>
                   </div>
 
-                  <div className="flex justify-end space-x-2 pt-4 border-t border-dark-700">
+                  <div className="flex justify-end gap-fluid-2 pt-4 border-t border-dark-700">
                     <button
                       type="button"
                       className="btn btn-outline"
@@ -1774,10 +1774,10 @@ const submitStream = async () => {
 
          {/* Pause/Resume Confirmation Modal */}
 {togglingStream !== null && (
-  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
     <div className="card w-full max-w-md bg-dark-800 text-white rounded-lg shadow-lg border border-dark-600">
       <div className="p-6">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+        <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-warning-500/10 mx-auto mb-4">
           <AlertTriangle className="h-6 w-6 text-warning-500" />
         </div>
 
@@ -1819,10 +1819,10 @@ const submitStream = async () => {
 
           {/* Delete Confirmation Modal */}
           {deletingStream && (
-            <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+            <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
               <div className="card w-full max-w-md">
                 <div className="p-6">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
+                  <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-danger-500/10 mx-auto mb-4">
                     <AlertTriangle className="h-6 w-6 text-danger-500" />
                   </div>
 
@@ -1851,10 +1851,10 @@ const submitStream = async () => {
             </div>
           )}
           {showUpdateConfirm && (
-  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+  <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
     <div className="card w-full max-w-md">
       <div className="p-6">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+        <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-warning-500/10 mx-auto mb-4">
           <AlertTriangle className="h-6 w-6 text-warning-500" />
         </div>
         <h3 className="text-lg font-medium text-center text-danger-600 mb-2">Xác nhận cập nhật Stream</h3>

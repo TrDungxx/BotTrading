@@ -95,11 +95,11 @@ React.useEffect(() => {
   };
 
   return (
-    <div className="rounded-md border border-dark-600 p-2 bg-dark-800 text-xs">
+    <div className="rounded-fluid-md border border-dark-600 p-fluid-2 bg-dark-800 text-xs">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="font-medium">TP/SL</div>
-        <label className="inline-flex items-center gap-1">
+        <label className="inline-flex items-center gap-fluid-1">
           <input
             type="checkbox"
             checked={enabled}
@@ -111,8 +111,8 @@ React.useEffect(() => {
 
       {/* ENTRY */}
       <div className="mt-2">
-        <div className="text-[11px] text-gray-400 mb-1">Entry</div>
-        <div className="flex gap-1">
+        <div className="text-fluid-xs text-gray-400 mb-1">Entry</div>
+        <div className="flex gap-fluid-1">
           <input
             className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
               !enabled || !canEditEntry ? "opacity-60 cursor-not-allowed" : ""
@@ -136,15 +136,15 @@ React.useEffect(() => {
             Hit
           </button>
         </div>
-        <div className="mt-1 text-[11px] text-gray-500">
+        <div className="mt-1 text-fluid-xs text-gray-500">
           Side: <b>{positionSide}</b> • Last: {lastPrice ?? "—"}
         </div>
       </div>
 
       {/* QTY */}
 <div className="mt-2">
-  <div className="text-[11px] text-gray-400 mb-1">Số lượng</div>
-  <div className="flex gap-1">
+  <div className="text-fluid-xs text-gray-400 mb-1">Số lượng</div>
+  <div className="flex gap-fluid-1">
     <input
       className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
         !enabled ? "opacity-60 cursor-not-allowed" : ""
@@ -173,8 +173,8 @@ React.useEffect(() => {
 
 
       {/* SHOW TOGGLES */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <label className="inline-flex items-center gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-fluid-2">
+        <label className="inline-flex items-center gap-fluid-2">
           <input
             type="checkbox"
             checked={showTP}
@@ -183,7 +183,7 @@ React.useEffect(() => {
           />
           <span>Show TP</span>
         </label>
-        <label className="inline-flex items-center gap-2">
+        <label className="inline-flex items-center gap-fluid-2">
           <input
             type="checkbox"
             checked={showSL}
@@ -195,11 +195,11 @@ React.useEffect(() => {
       </div>
 
       {/* TP / SL */}
-      <div className="mt-2 grid grid-cols-2 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-fluid-2">
         {/* TP */}
         <div>
-          <div className="text-[11px] text-gray-400 mb-1">Take Profit</div>
-          <div className="flex gap-1">
+          <div className="text-fluid-xs text-gray-400 mb-1">Take Profit</div>
+          <div className="flex gap-fluid-1">
             <input
               className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
                 !enabled || !showTP ? "opacity-60 cursor-not-allowed" : ""
@@ -227,8 +227,8 @@ React.useEffect(() => {
 
         {/* SL */}
         <div>
-          <div className="text-[11px] text-gray-400 mb-1">Stop Loss</div>
-          <div className="flex gap-1">
+          <div className="text-fluid-xs text-gray-400 mb-1">Stop Loss</div>
+          <div className="flex gap-fluid-1">
             <input
               className={`w-full h-7 bg-dark-700 border border-dark-600 rounded px-2 text-xs ${
                 !enabled || !showSL ? "opacity-60 cursor-not-allowed" : ""
@@ -256,9 +256,9 @@ React.useEffect(() => {
       </div>
 
       {/* ACTIONS */}
-<div className="mt-3 flex justify-end gap-2">
+<div className="mt-3 flex justify-end gap-fluid-2">
   <button
-    className="h-7 px-3 rounded border border-dark-600 text-gray-300 hover:bg-dark-700/60"
+    className="h-7 px-fluid-3 rounded border border-dark-600 text-gray-300 hover:bg-dark-700/60"
     disabled={!enabled}
     onClick={() => {
       setTpInput("");
@@ -272,7 +272,7 @@ React.useEffect(() => {
 
   {canPlace && (
   <button
-    className="h-7 px-3 rounded bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
+    className="h-7 px-fluid-3 rounded bg-primary/80 hover:bg-primary text-white disabled:opacity-50"
     disabled={!enabled || entry == null}
     onClick={onPlace}
     title="Xác nhận đặt lệnh"

@@ -350,8 +350,8 @@ const ToolMini: React.FC<Props> = ({
   return (
     <div className={`absolute left-2 ${topOffsetClass} z-20 inline-block`}>
       {/* HEADER */}
-      <div className="bg-dark-800/90 rounded-md px-2 py-0.5 text-[11px]">
-        <div className="flex items-center gap-2">
+      <div className="bg-dark-800/90 rounded-fluid-md px-2 py-0.5 text-fluid-xs">
+        <div className="flex items-center gap-fluid-2">
           <div
             onClick={() =>
               setFolded((prev) => {
@@ -368,13 +368,13 @@ const ToolMini: React.FC<Props> = ({
           {!folded && (
             <>
               <button
-                className="px-2 py-0.5 rounded bg-dark-700 border border-dark-600 text-gray-200 hover:bg-dark-700/70 text-[11px]"
+                className="px-2 py-0.5 rounded bg-dark-700 border border-dark-600 text-gray-200 hover:bg-dark-700/70 text-fluid-xs"
                 onClick={() => setOpenPanel((s) => !s)}
               >
                 Tool
               </button>
 
-              <label className="ml-1 inline-flex items-center gap-1 text-gray-300 text-[11px]">
+              <label className="ml-1 inline-flex items-center gap-fluid-1 text-gray-300 text-fluid-xs">
                 <input
                   type="checkbox"
                   checked={isEnabled}
@@ -384,7 +384,7 @@ const ToolMini: React.FC<Props> = ({
               </label>
 
               {/* Chỉnh Entry */}
-              <label className="ml-2 inline-flex items-center gap-1 text-gray-300 text-[11px]">
+              <label className="ml-2 inline-flex items-center gap-fluid-1 text-gray-300 text-fluid-xs">
                 <input
                   type="checkbox"
                   checked={entryEditable}
@@ -396,7 +396,7 @@ const ToolMini: React.FC<Props> = ({
               {/* Chọn side LONG/SHORT */}
               <div className="ml-2 inline-flex rounded overflow-hidden border border-dark-600">
                 <button
-                  className={`px-2 py-0.5 text-[11px] ${
+                  className={`px-2 py-0.5 text-fluid-xs ${
                     orderSide === "LONG" ? "bg-emerald-600/70 text-white" : "bg-dark-700 text-gray-300"
                   }`}
                   onClick={() => setOrderSide("LONG")}
@@ -404,7 +404,7 @@ const ToolMini: React.FC<Props> = ({
                   LONG
                 </button>
                 <button
-                  className={`px-2 py-0.5 text-[11px] ${
+                  className={`px-2 py-0.5 text-fluid-xs ${
                     orderSide === "SHORT" ? "bg-rose-600/70 text-white" : "bg-dark-700 text-gray-300"
                   }`}
                   onClick={() => setOrderSide("SHORT")}
@@ -445,7 +445,7 @@ const ToolMini: React.FC<Props> = ({
 
       {/* PANEL */}
       {openPanel && !folded && (
-        <div className="mt-1 bg-dark-800/90 rounded-md px-2 py-2 text-xs border border-dark-600 relative w-[340px] sm:w-[380px]">
+        <div className="mt-1 bg-dark-800/90 rounded-fluid-md px-2 py-2 text-xs border border-dark-600 relative w-[340px] sm:w-[380px]">
           <ToolTpSl
             lastPrice={lastPrice}
             positionSide={orderSide}

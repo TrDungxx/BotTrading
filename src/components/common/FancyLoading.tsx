@@ -14,7 +14,7 @@ const FancyLoading = ({ message = 'TW Loading...' }) => {
         style={{ height: 160, width: 160 }}
       />
       <div className="text-xl font-bold animate-pulse">{message}</div>
-      <div className="text-sm text-gray-400 animate-pulse">
+      <div className="text-fluid-sm text-gray-400 animate-pulse">
         Vui lòng chờ trong giây lát...
       </div>
     </div>

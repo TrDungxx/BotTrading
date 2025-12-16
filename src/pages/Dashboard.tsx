@@ -40,12 +40,12 @@ export default function Dashboard() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-primary-500/10">
                   <Briefcase className="h-6 w-6 text-primary-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="portfolio.value" />
                 </h2>
                 <p className="text-2xl font-semibold">
@@ -87,12 +87,12 @@ export default function Dashboard() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-success-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-success-500/10">
                   <Bot className="h-6 w-6 text-success-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="trading.bots" />
                 </h2>
                 <p className="text-2xl font-semibold">{activeBots} <span className="text-lg text-dark-400">/ {totalBots}</span></p>
@@ -108,12 +108,12 @@ export default function Dashboard() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-warning-300/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-warning-300/10">
                   <TrendingUp className="h-6 w-6 text-warning-300" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="trading.winRate" />
                 </h2>
                 <p className="text-2xl font-semibold">
@@ -139,12 +139,12 @@ export default function Dashboard() {
           <div className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary-500/10">
+                <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-primary-500/10">
                   <DollarSign className="h-6 w-6 text-primary-500" />
                 </div>
               </div>
               <div className="ml-4">
-                <h2 className="text-sm font-medium text-dark-400">
+                <h2 className="text-fluid-sm font-medium text-dark-400">
                   <FormattedMessage id="trading.totalProfit" />
                 </h2>
                 <p className="text-2xl font-semibold text-success-500">+$1,247.89</p>
@@ -161,12 +161,12 @@ export default function Dashboard() {
       <div className="card">
         <div className="card-header">
           <h2 className="text-lg font-medium">Portfolio Performance</h2>
-          <div className="flex space-x-2">
+          <div className="flex gap-fluid-2">
             {(['1d', '7d', '30d', '90d'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => setTimeRange(range)}
-                className={`px-3 py-1 text-xs font-medium rounded-md ${
+                className={`px-fluid-3 py-fluid-1 text-xs font-medium rounded-fluid-md ${
                   timeRange === range
                     ? 'bg-primary-500 text-white'
                     : 'text-dark-400 hover:text-dark-300 hover:bg-dark-700'
@@ -189,7 +189,7 @@ export default function Dashboard() {
             <h2 className="text-lg font-medium">
               <FormattedMessage id="trading.bots" />
             </h2>
-            <a href="/bots" className="text-sm text-primary-500 hover:text-primary-400">
+            <a href="/bots" className="text-fluid-sm text-primary-500 hover:text-primary-400">
               <FormattedMessage id="common.viewAll" />
             </a>
           </div>
@@ -202,7 +202,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header">
             <h2 className="text-lg font-medium"><FormattedMessage id="trading.recent"/></h2>
-            <a href="/terminal" className="text-sm text-primary-500 hover:text-primary-400">
+            <a href="/terminal" className="text-fluid-sm text-primary-500 hover:text-primary-400">
               <FormattedMessage id="common.viewAll" />
             </a>
           </div>
@@ -216,7 +216,7 @@ export default function Dashboard() {
       <div className="card">
         <div className="card-header">
           <h2 className="text-lg font-medium"><FormattedMessage id="trading.market"/></h2>
-          <a href="/market" className="text-sm text-primary-500 hover:text-primary-400">
+          <a href="/market" className="text-fluid-sm text-primary-500 hover:text-primary-400">
             <FormattedMessage id="common.viewAll" />
           </a>
         </div>

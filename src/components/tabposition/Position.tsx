@@ -9,7 +9,7 @@ import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
 import { createPortal } from 'react-dom';
 import CloseAllPositionsModal from "../popupposition/CloseAllPositionsModal";
 import SymbolFilterDropdown, {PositionFilter} from "./dropdownfilter/SymbolFilterDropdown";
-import { StandardSortHeader, RoiSortHeader,SortConfig } from "./dropdownfilter/ColumnSortHeader";
+import { StandardSortHeader, SortConfig } from "./dropdownfilter/ColumnSortHeader";
 // ===== Helper đọc TP/SL settings từ localStorage =====
 interface TpSlSettings {
   trigger: "MARK_PRICE" | "LAST";
@@ -110,6 +110,8 @@ const Position: React.FC<PositionProps> = ({
   const latestVersionRef = React.useRef<number>(0);
   const refreshingRef = React.useRef<boolean>(false);
   const deltaQueueRef = React.useRef<PositionCalc[]>([]);
+  // ✅ STATE cho hide other symbols
+const [hideOtherSymbols, setHideOtherSymbols] = useState(false);
 const [showCloseAllModal, setShowCloseAllModal] = useState(false);
   const [positionsView, setPositionsView] = useState<PositionCalc[]>([]);
 // ✅ STATE cho filter Long/Short/All
@@ -980,7 +982,7 @@ const renderTpSlCell = (pos: PositionCalc) => {
   
   if (!validTp && !validSl) {
     return (
-      <div className="flex items-center gap-1 text-fluid-xs">
+      <div className="flex items-center gap-fluid-1 text-xs">
         <span className="text-gray-500">--</span>
         <span className="text-gray-600">|</span>
         <span className="text-gray-500">--</span>
@@ -1019,7 +1021,7 @@ const renderTpSlCell = (pos: PositionCalc) => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-1 text-[15px]">
+      <div className="flex items-center gap-fluid-1 text-fluid-base">
         <span className={validTp ? "text-[#0ecb81]" : "text-gray-500"}>
           {tpRoi ? `${tpRoi}%` : "--"}
         </span>
@@ -1028,7 +1030,7 @@ const renderTpSlCell = (pos: PositionCalc) => {
           {slRoi ? `${slRoi}%` : "--"}
         </span>
       </div>
-      <div className="text-[10px] text-gray-500">(ROI%)</div>
+      <div className="text-fluid-2xs text-gray-500">(ROI%)</div>
     </div>
   );
 };
@@ -1053,13 +1055,15 @@ const calculateRoi = (pos: PositionCalc): number => {
 const sortedPositions = React.useMemo(() => {
   let result = positionsView;
   
-  // Bước 1: Filter theo Long/Short/All/Current
+  // Filter theo Long/Short
   if (positionFilter === 'long') {
     result = result.filter((pos) => parseFloat(pos.positionAmt || "0") > 0);
   } else if (positionFilter === 'short') {
     result = result.filter((pos) => parseFloat(pos.positionAmt || "0") < 0);
-  } else if (positionFilter === 'current') {
-    // ✅ MỚI: Chỉ hiện symbol đang chọn trên chart
+  }
+
+  // ✅ Filter theo current symbol nếu checkbox được check
+  if (hideOtherSymbols) {
     const currentSymbol = localStorage.getItem('selectedSymbol') || '';
     if (currentSymbol) {
       result = result.filter((pos) => pos.symbol === currentSymbol);
@@ -1068,7 +1072,7 @@ const sortedPositions = React.useMemo(() => {
 
   // Bước 2: Sort nếu có sortConfig
   if (sortConfig && sortConfig.direction) {
-    const { column, direction, roiType } = sortConfig;
+    const { column, direction } = sortConfig;
     const multiplier = direction === 'asc' ? 1 : -1;
 
     result = [...result].sort((a, b) => {
@@ -1098,21 +1102,8 @@ const sortedPositions = React.useMemo(() => {
           valB = calculatePnl(b) || 0;
           break;
         case 'roi':
-          const roiA = calculateRoi(a);
-          const roiB = calculateRoi(b);
-          
-          if (roiType === 'positive') {
-            if (roiA > 0 && roiB <= 0) return -1;
-            if (roiA <= 0 && roiB > 0) return 1;
-            if (roiA <= 0 && roiB <= 0) return 0;
-          } else if (roiType === 'negative') {
-            if (roiA < 0 && roiB >= 0) return -1;
-            if (roiA >= 0 && roiB < 0) return 1;
-            if (roiA >= 0 && roiB >= 0) return 0;
-          }
-          
-          valA = roiA;
-          valB = roiB;
+          valA = calculateRoi(a);
+          valB = calculateRoi(b);
           break;
         default:
           return 0;
@@ -1122,420 +1113,553 @@ const sortedPositions = React.useMemo(() => {
   }
 
   return result;  // ✅ QUAN TRỌNG: return result
-}, [positionsView, positionFilter, sortConfig]);  // ✅ QUAN TRỌNG: đóng useMemo
+}, [positionsView, positionFilter, hideOtherSymbols, sortConfig]);  // ✅ QUAN TRỌNG: đóng useMemo
 
 
   return (
   <div className="w-full max-w-full overflow-hidden">
-    {/* ✅ THÊM WRAPPER CHO TABLE */}
+    {/* ✅ WRAPPER CHO TABLE */}
     <div className="trading-positions-table-container w-full max-w-full">
-      <table className="position-table w-full min-w-[1000px] text-fluid-xs">
+      {/* ✅ CHANGED: min-w-[1000px] → style với CSS variable */}
+      <table 
+        className="position-table w-full"
+        style={{ minWidth: 'clamp(800px, 52.083vw, 1200px)' }}
+      >
         <thead>
-  <tr className="border-b border-dark-700 text-left text-fluid-xs uppercase tracking-wider text-dark-300">
-    {/* Symbol với Filter dropdown */}
-    <th className="px-fluid-sm py-1.5">
-      <SymbolFilterDropdown
-        value={positionFilter}
-        onChange={setPositionFilter}
-      />
-    </th>
-    
-    {/* Size với Sort */}
-    <th className="px-2 py-1.5">
-      <StandardSortHeader
-        label="Size"
-        column="size"
-        currentSort={sortConfig}
-        onSort={setSortConfig}
-      />
-    </th>
-    
-    {/* Entry với Sort */}
-    <th className="px-3 py-1.5">
-      <StandardSortHeader
-        label="Entry"
-        column="entry"
-        currentSort={sortConfig}
-        onSort={setSortConfig}
-      />
-    </th>
-    
-    {/* Mark Price với Sort */}
-    <th className="px-3 py-1.5">
-      <StandardSortHeader
-        label="Mark Price"
-        column="markPrice"
-        currentSort={sortConfig}
-        onSort={setSortConfig}
-      />
-    </th>
-    
-    {/* Margin với Sort */}
-    <th className="px-3 py-1.5">
-      <StandardSortHeader
-        label="Margin"
-        column="margin"
-        currentSort={sortConfig}
-        onSort={setSortConfig}
-      />
-    </th>
-    
-    {/* PNL(ROI%) với Sort đặc biệt - dropdown 3 loại */}
-    <th className="px-3 py-1.5">
-      <RoiSortHeader
-        currentSort={sortConfig}
-        onSort={setSortConfig}
-      />
-    </th>
-    
-    {/* TP | SL */}
-    <th className="px-3 py-1.5">TP | SL</th>
-    
-    {/* Close Position header - giữ nguyên */}
-    <th className="closePosition px-2">
-      <div className="flex items-center justify-start space-x-2 min-w-[200px]">
-        <button
-          onClick={() => setShowCloseAllModal(true)}
-          className="text-[#fcd535] text-[10px] sm:text-fluid-xs hover:underline whitespace-nowrap"
-          title="Đóng tất cả Market Order"
-        >
-          Close All
-        </button>
-        <div className="w-[1px] h-[16px] bg-gray-600"></div>
-        <button
-          onClick={() => setShowPopup(true)}
-          className="text-[#fcd535] text-[10px] sm:text-fluid-xs hover:underline whitespace-nowrap"
-          title="Đóng tất cả theo PnL"
-        >
-          Close by PnL
-        </button>
-      </div>
-    </th>
-  </tr>
-</thead>
+          <tr className="border-b border-dark-700 text-left uppercase tracking-wider text-dark-300"
+              style={{ fontSize: 'var(--stats-font-xs)' }}>
+            
+            {/* Symbol với Filter dropdown */}
+            <th className="px-3 py-1.5">
+  <SymbolFilterDropdown
+    value={positionFilter}
+    onChange={setPositionFilter}
+    hideOtherSymbols={hideOtherSymbols}
+    onHideOtherSymbolsChange={setHideOtherSymbols}
+  />
+</th>
+            
+            {/* Size với Sort */}
+            <th className="trading-px-sm trading-py-sm">
+              <StandardSortHeader
+                label="Size"
+                column="size"
+                currentSort={sortConfig}
+                onSort={setSortConfig}
+              />
+            </th>
+            
+            {/* Entry với Sort */}
+            <th className="trading-px-xs trading-py-sm">
+              <StandardSortHeader
+                label="Entry"
+                column="entry"
+                currentSort={sortConfig}
+                onSort={setSortConfig}
+              />
+            </th>
+            
+            {/* Mark Price với Sort */}
+            <th className="trading-px-xs trading-py-sm">
+              <StandardSortHeader
+                label="Mark Price"
+                column="markPrice"
+                currentSort={sortConfig}
+                onSort={setSortConfig}
+              />
+            </th>
+            
+            {/* Margin với Sort */}
+            <th className="trading-px-xs trading-py-sm">
+              <StandardSortHeader
+                label="Margin"
+                column="margin"
+                currentSort={sortConfig}
+                onSort={setSortConfig}
+              />
+            </th>
+            
+            {/* PNL(ROI%) với Sort đơn giản */}
+            <th className="trading-px-xs trading-py-sm">
+              <StandardSortHeader
+                label="PNL(ROI%)"
+                column="roi"
+                currentSort={sortConfig}
+                onSort={setSortConfig}
+              />
+            </th>
+            
+            {/* TP | SL */}
+            <th className="trading-px-xs trading-py-sm">TP | SL</th>
+            
+            {/* Close Position header */}
+            <th className="closePosition trading-px-sm">
+              {/* ✅ CHANGED: min-w-[200px] → fluid */}
+              <div 
+                className="flex items-center justify-start"
+                style={{ 
+                  gap: 'var(--trading-gap-sm)',
+                  minWidth: 'clamp(160px, 10.417vw, 240px)' 
+                }}
+              >
+                <button
+                  onClick={() => setShowCloseAllModal(true)}
+                  className="text-[#fcd535] hover:underline whitespace-nowrap"
+                  style={{ fontSize: 'var(--stats-font-lg)' }}
+                  title="Đóng tất cả Market Order"
+                >
+                  Close All
+                </button>
+                {/* ✅ CHANGED: h-[16px] → fluid */}
+                <div 
+                  className="bg-gray-600"
+                  style={{ 
+                    width: '1px', 
+                    height: 'clamp(12px, 0.833vw, 20px)' 
+                  }}
+                />
+                <button
+                  onClick={() => setShowPopup(true)}
+                  className="text-[#fcd535] hover:underline whitespace-nowrap"
+                  style={{ fontSize: 'var(--stats-font-lg)' }}
+                  title="Đóng tất cả theo PnL"
+                >
+                  Close by PnL
+                </button>
+              </div>
+            </th>
+          </tr>
+        </thead>
 
         <tbody>
-  {sortedPositions.length === 0 ? (
-    <tr>
-      {/* ✅ UPDATE COLSPAN từ 7 lên 8 */}
-      <td colSpan={8} className="text-center py-6 text-dark-400 text-sm">
-  {positionFilter === 'all' 
-    ? 'Bạn không có vị thế nào.'
-    : positionFilter === 'long'
-    ? 'Không có lệnh Long nào.'
-    : 'Không có lệnh Short nào.'}
-</td>
-    </tr>
-  ) : (
-    sortedPositions.map((pos) => {
-      const size = parseFloat(pos.positionAmt || "0");
-      const pnl = calculatePnl(pos);
-      const key = rowKey(pos);
-      const step = getStepSize(pos.symbol);
-      const tick = getPriceTick(pos.symbol);
-      const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
-      const mark = Number(pos.markPrice || NaN);
-      
-      // ✅ TÍNH MARGIN
-      const margin = getInitialMargin(pos);
-      const marginType = pos.marginType || "cross";
+          {sortedPositions.length === 0 ? (
+            <tr>
+              <td 
+                colSpan={8} 
+                className="text-center text-dark-400"
+                style={{ 
+                  padding: 'var(--trading-gap-xl) 0',
+                  fontSize: 'var(--stats-font-md)' 
+                }}
+              >
+                {positionFilter === 'all' 
+                  ? 'Bạn không có vị thế nào.'
+                  : positionFilter === 'long'
+                  ? 'Không có lệnh Long nào.'
+                  : 'Không có lệnh Short nào.'}
+              </td>
+            </tr>
+          ) : (
+            sortedPositions.map((pos) => {
+              const size = parseFloat(pos.positionAmt || "0");
+              const pnl = calculatePnl(pos);
+              const key = rowKey(pos);
+              const step = getStepSize(pos.symbol);
+              const tick = getPriceTick(pos.symbol);
+              const absSize = Math.abs(parseFloat(pos.positionAmt || "0"));
+              const mark = Number(pos.markPrice || NaN);
+              
+              const margin = getInitialMargin(pos);
+              const marginType = pos.marginType || "cross";
 
-      const pnlClass =
-        pnl == null
-          ? "text-white"
-          : pnl > 0
-          ? "text-[#0ecb81]"
-          : pnl < 0
-          ? "text-[#f6465d]"
-          : "text-white";
+              const pnlClass =
+                pnl == null
+                  ? "text-white"
+                  : pnl > 0
+                  ? "text-[#0ecb81]"
+                  : pnl < 0
+                  ? "text-[#f6465d]"
+                  : "text-white";
 
-      const sizeClass =
-        size > 0
-          ? "text-[#0ecb81]"
-          : size < 0
-          ? "text-[#f6465d]"
-          : "text-white";
+              const sizeClass =
+                size > 0
+                  ? "text-[#0ecb81]"
+                  : size < 0
+                  ? "text-[#f6465d]"
+                  : "text-white";
 
-      return (
-  <tr
-    key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
-    className="border-b border-dark-700 hover:bg-dark-800/50 transition-colors"
-  >
-    {/* SYMBOL */}
-    <td 
-      className="px-fluid-sm py-fluid-xs font-medium text-white cursor-pointer hover:text-[#fcd535] transition-colors text-fluid-sm"
-      onClick={() => {
-        window.dispatchEvent(
-          new CustomEvent("chart-symbol-change-request", {
-            detail: { symbol: pos.symbol },
-          })
-        );
-        try {
-          localStorage.setItem("selectedSymbol", pos.symbol);
-        } catch {}
-      }}
-      title={`Click để chuyển chart sang ${pos.symbol}`}
-    >
-      {pos.symbol}
-    </td>
+              return (
+                <tr
+                  key={`${pos.symbol}:${pos.positionSide || "BOTH"}`}
+                  className="border-b border-dark-700 position-row"
+                >
+                  {/* Symbol - clickable với thanh màu Long/Short */}
+                  <td 
+                    className="font-medium text-white cursor-pointer hover:text-[#fcd535] transition-colors"
+                    style={{ 
+                      padding: 'var(--trading-gap-xs)',
+                      paddingLeft: 0,
+                      fontSize: 'var(--stats-font-base)' 
+                    }}
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent("chart-symbol-change-request", {
+                          detail: { symbol: pos.symbol },
+                        })
+                      );
+                      try {
+                        localStorage.setItem("selectedSymbol", pos.symbol);
+                      } catch {}
+                    }}
+                    title={`Click để chuyển chart sang ${pos.symbol}`}
+                  >
+                    <div className="flex items-center" style={{ gap: 'var(--trading-gap-sm)' }}>
+                      {/* Thanh màu: Xanh = Long, Đỏ = Short */}
+                      <div 
+                        style={{
+                          width: '3px',
+                          height: '40px',
+                          borderRadius: '2px',
+                          backgroundColor: size > 0 ? '#0ecb81' : '#f6465d',
+                          flexShrink: 0
+                        }}
+                      />
+                      <div>
+                        <div>{pos.symbol}</div>
+                        <div 
+                          className="text-dark-400"
+                          style={{ fontSize: 'var(--stats-font-xs)' }}
+                        >
+                          Perp {pos.leverage || '--'}x
+                        </div>
+                      </div>
+                    </div>
+                  </td>
 
-    {/* SIZE */}
-    <td className={`px-fluid-sm py-fluid-xs font-medium text-fluid-sm tabular-nums ${sizeClass}`}>
-      {size > 0 ? "" : "-"} {Math.abs(size)}
-    </td>
+                  {/* Size */}
+                  <td 
+                    className={`font-medium ${sizeClass}`}
+                    style={{ 
+                      padding: 'var(--trading-gap-xs)',
+                       paddingLeft: '2px',
+                      fontSize: 'var(--font-mono-sm)',
+                      fontFamily: "'IBM Plex Mono', monospace"
+                    }}
+                  >
+                    {size > 0 ? "" : "-"} {Math.abs(size)}
+                  </td>
 
-    {/* ENTRY PRICE */}
-    <td className="px-fluid-sm py-fluid-xs text-white text-fluid-sm tabular-nums">
-      {pos.entryPrice}
-    </td>
+                  {/* Entry Price */}
+                  <td 
+                    className="text-white"
+                    style={{ 
+                      padding: 'var(--trading-gap-xs)',
+                       paddingLeft: '2px',
+                      fontSize: 'var(--font-mono-sm)',
+                      fontFamily: "'IBM Plex Mono', monospace"
+                    }}
+                  >
+                    {pos.entryPrice}
+                  </td>
 
-    {/* MARK PRICE */}
-    <td className="px-fluid-sm py-fluid-xs text-white text-fluid-sm tabular-nums">
-      {fmt(getMark(pos))}
-    </td>
+                  {/* Mark Price */}
+                  <td 
+                    className="text-white"
+                    style={{ 
+                      padding: 'var(--trading-gap-x)',
+                      fontSize: 'var(--font-mono-sm)',
+                      fontFamily: "'IBM Plex Mono', monospace"
+                    }}
+                  >
+                    {fmt(getMark(pos))}
+                  </td>
 
-    {/* MARGIN */}
-    <td className="px-fluid-sm py-fluid-xs text-white">
-      <div>
-        <div className="text-fluid-sm tabular-nums">
-          {margin > 0 ? `${fmtShort(margin)} USDT` : "--"}
-        </div>
-        <div className="text-fluid-2xs text-gray-400">
-          ({marginType === "isolated" ? "Isolated" : "Cross"})
-        </div>
-      </div>
-    </td>
+                  {/* Margin */}
+                  <td 
+                    className="text-white"
+                    style={{ 
+                      padding: 'var(--trading-gap-xs)',
+                      fontSize: 'var(--font-mono-sm)',
+                      fontFamily: "'IBM Plex Mono', monospace"
+                    }}
+                  >
+                    <div>
+                      <div>{margin > 0 ? `${fmtShort(margin)} USDT` : "--"}</div>
+                      <div 
+                        className="text-gray-400"
+                        style={{ fontSize: 'var(--stats-font-xl)' }}
+                      >
+                        ({marginType === "isolated" ? "Isolated" : "Cross"})
+                      </div>
+                    </div>
+                  </td>
 
-    {/* PNL */}
-    <td className={`px-fluid-sm py-fluid-xs font-medium text-fluid-sm tabular-nums ${pnlClass}`}>
-      {pnl == null
-        ? "--"
-        : nearZero(pnl)
-        ? "0.00"
-        : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
-      <br />
-      <span className="text-fluid-3xs opacity-80">
-        {(() => {
-          const pnlPct = (() => {
-            const im = getInitialMargin(pos);
-            if (!im) return undefined;
-            return (pnl! / im) * 100;
-          })();
-          return pnlPct == null
-            ? "--"
-            : nearZero(pnlPct)
-            ? "0.00%"
-            : `(${pnlPct > 0 ? "+" : "-"}${fmt(Math.abs(pnlPct), 2)}%)`;
-        })()}
-      </span>
-    </td>
+                  {/* PNL */}
+                  <td 
+                    className={`font-medium ${pnlClass}`}
+                    style={{ 
+                      padding: 'var(--trading-gap-xs)',
+                      fontSize: 'var(--font-mono-sm)',
+                      fontFamily: "'IBM Plex Mono', monospace"
+                    }}
+                  >
+                    {pnl == null
+                      ? "--"
+                      : nearZero(pnl)
+                      ? "0.00"
+                      : `${pnl > 0 ? "+" : "-"}${fmtShort(Math.abs(pnl))} USDT`}
+                    <br />
+                    <span 
+                      className="opacity-80"
+                      style={{ fontSize: 'var(--stats-font-xl)' }}
+                    >
+                      {(() => {
+                        const pnlPct = (() => {
+                          const im = getInitialMargin(pos);
+                          if (!im) return undefined;
+                          return (pnl! / im) * 100;
+                        })();
+                        return pnlPct == null
+                          ? "--"
+                          : nearZero(pnlPct)
+                          ? "0.00%"
+                          : `(${pnlPct > 0 ? "+" : "-"}${fmt(
+                              Math.abs(pnlPct),
+                              2
+                            )}%)`;
+                      })()}
+                    </span>
+                  </td>
 
-    {/* TP | SL */}
-    <td className="px-fluid-sm py-fluid-xs text-fluid-sm">
-      {renderTpSlCell(pos)}
-    </td>
+                  {/* TP | SL */}
+                  <td style={{ padding: 'var(--trading-gap-xs)' }}>
+                    {renderTpSlCell(pos)}
+                  </td>
 
-    {/* ORDER TYPE SELECTOR */}
-    <td className="px-fluid-sm py-fluid-xs">
-      <div className="flex items-center gap-fluid-xs mt-fluid-xs">
-        <div className="text-fluid-xs font-normal text-white flex items-center gap-fluid-2xs">
-          <span
-            className={`cursor-pointer transition-colors ${
-              orderType === "market" ? "text-[#fcd535]" : "text-white hover:text-gray-300"
-            }`}
-            onClick={() => {
-              setOrderType("market");
-              setCloseModal({ open: true, mode: "market", pos });
-              setRowQty(key, absSize ? String(absSize) : "");
-            }}
-          >
-            Thị trường
-          </span>
-          <span className="text-gray-600">|</span>
-          <span
-            className={`cursor-pointer transition-colors ${
-              orderType === "limit" ? "text-[#fcd535]" : "text-white hover:text-gray-300"
-            }`}
-            onClick={() => {
-              setOrderType("limit");
-              setCloseModal({ open: true, mode: "limit", pos });
-              if (Number.isFinite(mark)) setRowPrice(key, String(mark));
-              setRowQty(key, absSize ? String(absSize) : "");
-            }}
-          >
-            Giới hạn
-          </span>
-        </div>
-      </div>
-    </td>
+                  {/* Close Options */}
+                  <td>
+                    <div 
+                      className="flex items-center mt-2"
+                      style={{ gap: 'var(--trading-gap-sm)' }}
+                    >
+                      <div 
+                        className="font-normal text-white flex items-center"
+                        style={{ 
+                          fontSize: 'var(--stats-font-lg)',
+                          gap: 'var(--trading-gap-xs)'
+                        }}
+                      >
+                        <span
+                          className={`cursor-pointer ${
+                            orderType === "market"
+                              ? "text-[#fcd535]"
+                              : "text-white"
+                          }`}
+                          onClick={() => {
+                            setOrderType("market");
+                            setCloseModal({ open: true, mode: "market", pos });
+                            setRowQty(key, absSize ? String(absSize) : "");
+                          }}
+                        >
+                          Thị trường
+                        </span>
+                        <span className="text-gray-600">|</span>
+                        <span
+                          className={`cursor-pointer ${
+                            orderType === "limit"
+                              ? "text-[#fcd535]"
+                              : "text-white"
+                          }`}
+                          onClick={() => {
+                            setOrderType("limit");
+                            setCloseModal({ open: true, mode: "limit", pos });
+                            if (Number.isFinite(mark))
+                              setRowPrice(key, String(mark));
+                            setRowQty(key, absSize ? String(absSize) : "");
+                          }}
+                        >
+                          Giới hạn
+                        </span>
+                      </div>
+                    </div>
+                  </td>
 
-    {/* ACTION BUTTONS */}
-    <td className="pr-fluid-md">
-      <div className="flex items-center justify-end gap-fluid-xs">
-        {/* TP/SL Button */}
-        <button
-          onClick={() => {
-            setActivePos(pos);
-            setShowTpSl(true);
-          }}
-          className="inline-flex items-center gap-fluid-2xs text-fluid-2xs px-fluid-xs py-fluid-2xs rounded border border-dark-500 text-gray-200 hover:bg-dark-700 transition-colors"
-          title="TP/SL cho vị thế (modal)"
-        >
-          <Edit3 size={14} className="flex-shrink-0" /> 
-          <span>TP/SL</span>
-        </button>
+                  {/* Actions */}
+                  <td style={{ paddingRight: 'var(--trading-gap-lg)' }}>
+                    <div 
+                      className="flex items-center justify-end"
+                      style={{ gap: 'var(--trading-gap-sm)' }}
+                    >
+                      <button
+                        onClick={() => {
+                          setActivePos(pos);
+                          setShowTpSl(true);
+                        }}
+                        className="inline-flex items-center rounded border border-dark-500 text-gray-200 hover:bg-dark-700"
+                        style={{ 
+                          gap: 'var(--trading-gap-xs)',
+                          fontSize: 'var(--stats-font-xs)',
+                          padding: 'var(--trading-gap-xs) var(--trading-gap-sm)'
+                        }}
+                        title="TP/SL cho vị thế (modal)"
+                      >
+                        <Edit3 style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} /> TP/SL
+                      </button>
 
-        {/* Advanced Button */}
-        <button
-          onClick={() => {
-            const size = parseFloat(pos.positionAmt || "0");
-            if (!size) return;
-            const side = (size > 0 ? "LONG" : "SHORT") as "LONG" | "SHORT";
-            const payload = {
-              positionId: `${pos.symbol}:${pos.positionSide ?? side}`,
-              symbol: pos.symbol,
-              side,
-              entry: parseFloat(pos.entryPrice || "0"),
-            };
-            try {
-              localStorage.setItem("activeTool", JSON.stringify(payload));
-            } catch {}
-            window.dispatchEvent(
-              new CustomEvent("chart-symbol-change-request", {
-                detail: { symbol: pos.symbol },
-              })
-            );
-            setTimeout(() => {
-              window.dispatchEvent(
-                new CustomEvent("active-tool-changed", { detail: payload })
+                      <button
+                        onClick={() => {
+                          const size = parseFloat(pos.positionAmt || "0");
+                          if (!size) return;
+                          const side = (size > 0 ? "LONG" : "SHORT") as
+                            | "LONG"
+                            | "SHORT";
+                          const payload = {
+                            positionId: `${pos.symbol}:${
+                              pos.positionSide ?? side
+                            }`,
+                            symbol: pos.symbol,
+                            side,
+                            entry: parseFloat(pos.entryPrice || "0"),
+                          };
+                          try {
+                            localStorage.setItem(
+                              "activeTool",
+                              JSON.stringify(payload)
+                            );
+                          } catch {}
+                          window.dispatchEvent(
+                            new CustomEvent("chart-symbol-change-request", {
+                              detail: { symbol: pos.symbol },
+                            })
+                          );
+                          setTimeout(() => {
+                            window.dispatchEvent(
+                              new CustomEvent("active-tool-changed", {
+                                detail: payload,
+                              })
+                            );
+                          }, 300);
+                        }}
+                        className="inline-flex items-center rounded border border-primary/60 text-primary hover:bg-dark-700"
+                        style={{ 
+                          gap: 'var(--trading-gap-xs)',
+                          fontSize: 'var(--stats-font-sm)',
+                          padding: 'var(--trading-gap-xs) var(--trading-gap-sm)'
+                        }}
+                        title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
+                      >
+                        Nâng cao
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               );
-            }, 300);
+            })
+          )}
+        </tbody>
+      </table>
+
+      {/* Modals giữ nguyên */}
+      {showPopup && createPortal(
+        <PopupPosition
+          isOpen={showPopup}
+          onClose={() => setShowPopup(false)}
+          pnlNow={currentPnl}
+          takeProfit={targetTP}
+          stopLoss={targetSL}
+          onSubmit={(tp, sl) => {
+            setTargetTP(tp);
+            setTargetSL(sl);
+            setShowPopup(false);
           }}
-          className="inline-flex items-center gap-fluid-2xs text-fluid-xs px-fluid-xs py-fluid-2xs rounded border border-primary/60 text-primary hover:bg-dark-700 transition-colors"
-          title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
-        >
-          Nâng cao
-        </button>
-      </div>
-    </td>
-  </tr>
-      );
-    })
-  )}
-</tbody>
-        </table>
+        />,
+        document.body
+      )}
 
-        {showPopup && createPortal(
-  <PopupPosition
-    isOpen={showPopup}
-    onClose={() => setShowPopup(false)}
-    pnlNow={currentPnl}
-    takeProfit={targetTP}
-    stopLoss={targetSL}
-    onSubmit={(tp, sl) => {
-      setTargetTP(tp);
-      setTargetSL(sl);
-      setShowPopup(false);
-    }}
-  />,
-  document.body
-)}
+      {activePos && showTpSl && createPortal(
+        <PositionTpSlModal
+          isOpen={showTpSl}
+          onClose={() => {
+            setShowTpSl(false);
+            setTpslVersion(v => v + 1);
+          }}
+          symbol={activePos.symbol}
+          entryPrice={parseFloat(activePos.entryPrice || "0")}
+          markPrice={getMark(activePos as any) ?? 0}
+          positionAmt={parseFloat(activePos.positionAmt || "0")}
+          getPriceTick={getPriceTick}
+          market={market}
+          leverage={
+            Number((activePos as any)?.leverage) ||
+            loadLeverageLS(
+              (activePos as any)?.internalAccountId ??
+                (activePos as any)?.accountId ??
+                null,
+              market,
+              activePos.symbol
+            ) ||
+            10
+          }
+          existingTpSlOrders={(() => {
+            const openOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
+            const positionSide = parseFloat(activePos.positionAmt || "0") > 0 ? "LONG" : "SHORT";
+            const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
+            
+            const tpOrder = openOrders.find((o: any) => 
+              o.symbol === activePos.symbol && 
+              (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+              o.side === expectedSide &&
+              o.status === 'NEW'
+            );
+            const slOrder = openOrders.find((o: any) => 
+              o.symbol === activePos.symbol && 
+              (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+              o.side === expectedSide &&
+              o.status === 'NEW'
+            );
+            
+            return { tpOrder, slOrder };
+          })()}
+          onSubmit={() => {
+            setTpslVersion(v => v + 1);
+          }}
+        />,
+        document.body
+      )}
 
-        {activePos && showTpSl && createPortal(
-  <PositionTpSlModal
-    isOpen={showTpSl}
-    onClose={() => {
-      setShowTpSl(false);
-      setTpslVersion(v => v + 1);
-    }}
-    symbol={activePos.symbol}
-    entryPrice={parseFloat(activePos.entryPrice || "0")}
-    markPrice={getMark(activePos as any) ?? 0}
-    positionAmt={parseFloat(activePos.positionAmt || "0")}
-    getPriceTick={getPriceTick}
-    market={market}
-    leverage={
-      Number((activePos as any)?.leverage) ||
-      loadLeverageLS(
-        (activePos as any)?.internalAccountId ??
-          (activePos as any)?.accountId ??
-          null,
-        market,
-        activePos.symbol
-      ) ||
-      10
-    }
-    // ✅ THÊM PROPS ĐỂ TRUYỀN TP/SL HIỆN TẠI
-    existingTpSlOrders={(() => {
-      const openOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
-      const positionSide = parseFloat(activePos.positionAmt || "0") > 0 ? "LONG" : "SHORT";
-      const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
-      
-      const tpOrder = openOrders.find((o: any) => 
-        o.symbol === activePos.symbol && 
-        (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
-        o.side === expectedSide &&
-        o.status === 'NEW'
-      );
-      const slOrder = openOrders.find((o: any) => 
-        o.symbol === activePos.symbol && 
-        (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
-        o.side === expectedSide &&
-        o.status === 'NEW'
-      );
-      
-      return { tpOrder, slOrder };
-    })()}
-    onSubmit={() => {
-      setTpslVersion(v => v + 1);
-    }}
-  />,
-  document.body
-)}
+      {closeModal.open && closeModal.pos && createPortal(
+        <ClosePositionModal
+          isOpen={closeModal.open}
+          onClose={() => setCloseModal({ open: false, mode: "market" })}
+          mode={closeModal.mode}
+          symbol={closeModal.pos.symbol}
+          side={Number(closeModal.pos.positionAmt || 0) > 0 ? "SELL" : "BUY"}
+          positionSide={
+            Number(closeModal.pos.positionAmt || 0) > 0 ? "LONG" : "SHORT"
+          }
+          markPrice={Number(closeModal.pos.markPrice || NaN)}
+          entryPrice={Number(closeModal.pos.entryPrice || NaN)}
+          maxQty={Math.abs(Number(closeModal.pos.positionAmt || 0))}
+          stepSize={getStepSize(closeModal.pos.symbol)}
+          tickSize={getPriceTick(closeModal.pos.symbol)}
+          price={closeBy[rowKey(closeModal.pos)]?.price}
+          qty={closeBy[rowKey(closeModal.pos)]?.qty}
+          onInputsChange={(next) =>
+            setCloseBy((prev) => ({
+              ...prev,
+              [rowKey(closeModal.pos!)]: {
+                ...(prev[rowKey(closeModal.pos!)] || {}),
+                ...next,
+              },
+            }))
+          }
+          onConfirm={handleConfirmClose}
+        />,
+        document.body
+      )}
 
-       {closeModal.open && closeModal.pos && createPortal(
-  <ClosePositionModal
-    isOpen={closeModal.open}
-    onClose={() => setCloseModal({ open: false, mode: "market" })}
-    mode={closeModal.mode}
-    symbol={closeModal.pos.symbol}
-    side={Number(closeModal.pos.positionAmt || 0) > 0 ? "SELL" : "BUY"}
-    positionSide={
-      Number(closeModal.pos.positionAmt || 0) > 0 ? "LONG" : "SHORT"
-    }
-    markPrice={Number(closeModal.pos.markPrice || NaN)}
-    entryPrice={Number(closeModal.pos.entryPrice || NaN)}
-    maxQty={Math.abs(Number(closeModal.pos.positionAmt || 0))}
-    stepSize={getStepSize(closeModal.pos.symbol)}
-    tickSize={getPriceTick(closeModal.pos.symbol)}
-    price={closeBy[rowKey(closeModal.pos)]?.price}
-    qty={closeBy[rowKey(closeModal.pos)]?.qty}
-    onInputsChange={(next) =>
-      setCloseBy((prev) => ({
-        ...prev,
-        [rowKey(closeModal.pos!)]: {
-          ...(prev[rowKey(closeModal.pos!)] || {}),
-          ...next,
-        },
-      }))
-    }
-    onConfirm={handleConfirmClose}
-  />,
-  document.body
-)}
-
-{showCloseAllModal && createPortal(
-  <CloseAllPositionsModal
-    isOpen={showCloseAllModal}
-    onClose={() => setShowCloseAllModal(false)}
-    onConfirm={handleCloseAllMarket}
-    positionCount={positionsView.length}
-  />,
-  document.body
-)}
-      </div>
+      {showCloseAllModal && createPortal(
+        <CloseAllPositionsModal
+          isOpen={showCloseAllModal}
+          onClose={() => setShowCloseAllModal(false)}
+          onConfirm={handleCloseAllMarket}
+          positionCount={positionsView.length}
+        />,
+        document.body
+      )}
     </div>
-  );
+  </div>
+);
 };
 
 export default Position;

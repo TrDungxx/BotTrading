@@ -92,7 +92,7 @@ const SettingControl: React.FC<Props> = ({ settings, onToggle, onClose, triggerR
   const content = (
     <div 
       ref={panelRef}
-      className="fixed bg-dark-800 border border-dark-600 rounded-md shadow-lg p-2 w-64 text-sm z-[9999]"
+      className="fixed bg-dark-800 border border-dark-600 rounded-fluid-md shadow-lg p-fluid-2 w-64 text-fluid-sm z-[9999]"
       style={{
         top: position.top,
         left: position.left,
@@ -104,7 +104,7 @@ const SettingControl: React.FC<Props> = ({ settings, onToggle, onClose, triggerR
         return (
           <div
             key={it.key}
-            className={`flex items-center justify-between px-3 py-2 rounded transition-colors
+            className={`flex items-center justify-between px-fluid-3 py-2 rounded transition-colors
               ${it.disabled 
                 ? 'opacity-50 cursor-not-allowed' 
                 : 'cursor-pointer hover:bg-dark-700'
@@ -150,7 +150,7 @@ const SettingControl: React.FC<Props> = ({ settings, onToggle, onClose, triggerR
 
       <div className="flex justify-end pt-1 mt-2 border-t border-dark-600">
         <button
-          className="text-xs px-3 py-1.5 rounded bg-dark-700 hover:bg-dark-600 transition-colors"
+          className="text-xs px-fluid-3 py-fluid-1.5 rounded bg-dark-700 hover:bg-dark-600 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             onClose?.();

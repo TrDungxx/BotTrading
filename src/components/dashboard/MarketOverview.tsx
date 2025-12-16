@@ -60,12 +60,12 @@ export default function MarketOverview() {
       <table className="min-w-full divide-y divide-dark-700">
         <thead>
           <tr>
-            <th className="py-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-0">Name</th>
-            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">Price</th>
-            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">24h Change</th>
-            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400 hidden md:table-cell">24h Volume</th>
-            <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400 hidden lg:table-cell">Market Cap</th>
-            <th className="relative py-3.5 pl-3 pr-4 sm:pr-0">
+            <th className="py-fluid-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-0">Name</th>
+            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">Price</th>
+            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">24h Change</th>
+            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400 hidden md:table-cell">24h Volume</th>
+            <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400 hidden lg:table-cell">Market Cap</th>
+            <th className="relative py-fluid-3.5 pl-3 pr-4 sm:pr-0">
               <span className="sr-only">Favorite</span>
             </th>
           </tr>
@@ -73,9 +73,9 @@ export default function MarketOverview() {
         <tbody className="divide-y divide-dark-700">
           {marketData.map((coin) => (
             <tr key={coin.id} className="hover:bg-dark-700/40 cursor-pointer">
-              <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-0">
+              <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm sm:pl-0">
                 <div className="flex items-center">
-                  <div className="h-8 w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
+                  <div className="h-fluid-input-sm w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
                     <span className="text-xs font-medium">{coin.symbol.substring(0, 1)}</span>
                   </div>
                   <div className="ml-3">
@@ -84,10 +84,10 @@ export default function MarketOverview() {
                   </div>
                 </div>
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-right font-medium">
+              <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right font-medium">
                 ${coin.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+              <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                 <span
                   className={`inline-flex items-center ${
                     coin.change24h >= 0 ? 'text-success-500' : 'text-danger-500'
@@ -101,13 +101,13 @@ export default function MarketOverview() {
                   {Math.abs(coin.change24h).toFixed(2)}%
                 </span>
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-right hidden md:table-cell">
+              <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right hidden md:table-cell">
                 ${(coin.volume24h / 1000000).toFixed(2)}M
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-right hidden lg:table-cell">
+              <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right hidden lg:table-cell">
                 ${(coin.marketCap / 1000000000).toFixed(2)}B
               </td>
-              <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-0">
+              <td className="relative whitespace-nowrap py-fluid-4 pl-3 pr-4 text-right text-fluid-sm sm:pr-0">
                 <button
                   className={`text-dark-400 hover:text-warning-300 ${
                     coin.favorite ? 'text-warning-300' : ''

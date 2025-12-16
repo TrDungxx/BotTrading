@@ -26,7 +26,7 @@ const PopupPosition: React.FC<Props> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-dark-800 p-6 w-[400px] rounded relative text-white">
         <button
-          className="absolute top-3 right-3 text-white hover:text-red-400"
+          className="absolute top-fluid-3 right-3 text-white hover:text-red-400"
           onClick={onClose}
         >
           ✕
@@ -34,7 +34,7 @@ const PopupPosition: React.FC<Props> = ({
 
         <h2 className="text-lg font-bold mb-4">Đóng tất cả dựa trên PnL</h2>
 
-        <div className="text-sm text-dark-400 mb-1">PnL hiện tại</div>
+        <div className="text-fluid-sm text-dark-400 mb-1">PnL hiện tại</div>
         <div className="text-lg text-red-500 mb-4">{pnlNow.toFixed(2)} USD</div>
 
         <div className="space-y-3">

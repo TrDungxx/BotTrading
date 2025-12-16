@@ -72,7 +72,7 @@ const totalPortfolioValue = portfolioAssets.reduce((sum, asset) => sum + asset.v
 export default function Portfolio() {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">
             <FormattedMessage id="nav.portfolio" />
@@ -81,7 +81,7 @@ export default function Portfolio() {
             <FormattedMessage id="portfolio.subtitle" />
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-fluid-2">
           <button className="btn btn-outline inline-flex items-center">
             <Download className="mr-2 h-4 w-4" />
             <FormattedMessage id="portfolio.export" />
@@ -100,7 +100,7 @@ export default function Portfolio() {
       <div className="card p-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <div>
-            <h2 className="text-sm font-medium text-dark-400">
+            <h2 className="text-fluid-sm font-medium text-dark-400">
               <FormattedMessage id="portfolio.totalValue" />
             </h2>
             <p className="mt-1 text-3xl font-semibold">
@@ -111,7 +111,7 @@ export default function Portfolio() {
               />
             </p>
             <div className="mt-1 flex items-center">
-              <span className="flex items-center text-sm font-medium text-success-500">
+              <span className="flex items-center text-fluid-sm font-medium text-success-500">
                 <ArrowUp className="mr-1 h-3 w-3" />
                 <FormattedNumber
                   value={0.0428}
@@ -126,7 +126,7 @@ export default function Portfolio() {
           </div>
           
           <div>
-            <h2 className="text-sm font-medium text-dark-400">
+            <h2 className="text-fluid-sm font-medium text-dark-400">
               <FormattedMessage id="portfolio.totalPnL" />
             </h2>
             <p className="mt-1 text-3xl font-semibold text-success-500">
@@ -138,7 +138,7 @@ export default function Portfolio() {
               />
             </p>
             <div className="mt-1 flex items-center">
-              <span className="flex items-center text-sm font-medium text-success-500">
+              <span className="flex items-center text-fluid-sm font-medium text-success-500">
                 <ArrowUp className="mr-1 h-3 w-3" />
                 <FormattedNumber
                   value={0.114}
@@ -153,7 +153,7 @@ export default function Portfolio() {
           </div>
           
           <div>
-            <h2 className="text-sm font-medium text-dark-400">
+            <h2 className="text-fluid-sm font-medium text-dark-400">
               <FormattedMessage id="portfolio.age" />
             </h2>
             <div className="mt-1 flex items-center">
@@ -183,7 +183,7 @@ export default function Portfolio() {
       </div>
       
       {/* Filters and search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-fluid-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-4 w-4 text-dark-400" />
@@ -208,23 +208,23 @@ export default function Portfolio() {
           <table className="min-w-full divide-y divide-dark-700">
             <thead>
               <tr>
-                <th className="py-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-6">
+                <th className="py-fluid-3.5 pl-4 pr-3 text-left text-xs font-medium text-dark-400 sm:pl-6">
                   <FormattedMessage id="portfolio.asset" />
                 </th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                   <FormattedMessage id="common.price" />
                 </th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">24h</th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">24h</th>
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                   <FormattedMessage id="portfolio.holdings" />
                 </th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                   <FormattedMessage id="portfolio.value" />
                 </th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                   <FormattedMessage id="portfolio.allocation" />
                 </th>
-                <th className="px-3 py-3.5 text-right text-xs font-medium text-dark-400">
+                <th className="px-fluid-3 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                   <FormattedMessage id="portfolio.profitLoss" />
                 </th>
               </tr>
@@ -232,9 +232,9 @@ export default function Portfolio() {
             <tbody className="divide-y divide-dark-700">
               {portfolioAssets.map((asset) => (
                 <tr key={asset.id} className="hover:bg-dark-700/40 cursor-pointer">
-                  <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                  <td className="whitespace-nowrap py-fluid-4 pl-4 pr-3 text-fluid-sm sm:pl-6">
                     <div className="flex items-center">
-                      <div className="h-8 w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
+                      <div className="h-fluid-input-sm w-8 flex-shrink-0 rounded-full bg-dark-700 flex items-center justify-center">
                         <span className="text-xs font-medium">{asset.symbol.substring(0, 1)}</span>
                       </div>
                       <div className="ml-3">
@@ -243,7 +243,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                     <FormattedNumber
                       value={asset.price}
                       style="currency"
@@ -252,7 +252,7 @@ export default function Portfolio() {
                       maximumFractionDigits={asset.price < 1 ? 4 : 2}
                     />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                     <span
                       className={`inline-flex items-center ${
                         asset.change24h >= 0 ? 'text-success-500' : 'text-danger-500'
@@ -270,14 +270,14 @@ export default function Portfolio() {
                       />
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                     <FormattedNumber
                       value={asset.amount}
                       minimumFractionDigits={asset.amount < 1 ? 4 : 0}
                       maximumFractionDigits={asset.amount < 1 ? 4 : 4}
                     /> {asset.symbol}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm font-medium text-right">
                     <FormattedNumber
                       value={asset.value}
                       style="currency"
@@ -285,7 +285,7 @@ export default function Portfolio() {
                       minimumFractionDigits={2}
                     />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                     <div className="flex items-center justify-end">
                       <span className="mr-2">
                         <FormattedNumber
@@ -304,7 +304,7 @@ export default function Portfolio() {
                       </div>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-4 text-sm text-right">
+                  <td className="whitespace-nowrap px-fluid-3 py-fluid-4 text-fluid-sm text-right">
                     <span
                       className={asset.pnl >= 0 ? 'text-success-500' : 'text-danger-500'}
                     >

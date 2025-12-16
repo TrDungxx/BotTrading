@@ -21,14 +21,14 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   return (
     <div className="bg-dark-800 border border-dark-700 rounded-2xl overflow-hidden">
       {/* Hàng header: button toggle + vùng right tách riêng */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-fluid-4 py-fluid-3">
         {/* NÚT TOGGLE: chỉ chứa tiêu đề + caret, không chứa nút khác */}
         <button
           type="button"
           onClick={() => setOpen(v => !v)}
-          className="flex items-center justify-between gap-3 flex-1 text-left hover:bg-dark-700/40 px-2 py-1.5 rounded-xl"
+          className="flex items-center justify-between gap-fluid-3 flex-1 text-left hover:bg-dark-700/40 px-2 py-fluid-1.5 rounded-xl"
         >
-          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-fluid-sm font-semibold">{title}</span>
           <span className={`transition-transform ${open ? "" : "rotate-180"}`}>▾</span>
         </button>
 
@@ -38,7 +38,7 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
         </div>
       </div>
 
-      {open && <div className="p-4">{children}</div>}
+      {open && <div className="p-fluid-4">{children}</div>}
     </div>
   );
 };
@@ -48,9 +48,9 @@ const DCABot: React.FC = () => {
   return (
     <div className="h-[calc(100svh-4rem)] md:h-[calc(100dvh-4rem)] bg-dark-900 text-dark-50 flex flex-col min-h-0">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-dark-700 bg-dark-800/95 backdrop-blur px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-20 border-b border-dark-700 bg-dark-800/95 backdrop-blur px-fluid-4 py-fluid-3 flex items-center justify-between">
         <h1 className="text-lg font-semibold">Create DCA Bot</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-fluid-2">
           <button className="btn btn-sm">Guide</button>
           <button className="btn btn-sm">Strategy presets</button>
           <button className="btn btn-icon btn-sm" aria-label="settings">
@@ -62,20 +62,20 @@ const DCABot: React.FC = () => {
       </header>
 
       {/* Main */}
-      <main className="flex-1 min-h-0 overflow-auto p-4 grid grid-cols-12 gap-4 auto-rows-fr">
+      <main className="flex-1 min-h-0 overflow-auto p-fluid-4 grid grid-cols-12 gap-fluid-4 auto-rows-fr">
         {/* Trái: Chart + Orders + Waiting */}
-        <section className="col-span-12 xl:col-span-7 order-2 xl:order-1 h-full min-h-0 flex flex-col gap-4">
+        <section className="col-span-12 xl:col-span-7 order-2 xl:order-1 h-full min-h-0 flex flex-col gap-fluid-4">
           <div className="card flex-1 flex flex-col min-h-0">
             <div className="card-header flex items-center justify-between">
-              <p className="text-sm font-medium">Orders</p>
-              <div className="flex items-center gap-3 text-xs text-dark-200">
-                <span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-success inline-block" />Chart</span>
-                <span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Orders</span>
-                <span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-dark-400 inline-block" />AO Usage</span>
+              <p className="text-fluid-sm font-medium">Orders</p>
+              <div className="flex items-center gap-fluid-3 text-xs text-dark-200">
+                <span className="inline-flex items-center gap-fluid-2"><span className="w-2 h-2 rounded-full bg-success inline-block" />Chart</span>
+                <span className="inline-flex items-center gap-fluid-2"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Orders</span>
+                <span className="inline-flex items-center gap-fluid-2"><span className="w-2 h-2 rounded-full bg-dark-400 inline-block" />AO Usage</span>
               </div>
             </div>
 
-            <div className="card-body grid grid-cols-1 lg:grid-cols-2 gap-4 auto-rows-fr flex-1 min-h-0">
+            <div className="card-body grid grid-cols-1 lg:grid-cols-2 gap-fluid-4 auto-rows-fr flex-1 min-h-0">
               {/* Chart */}
               <div className="rounded-xl overflow-hidden border border-dark-700 bg-dark-800 h-full min-h-[240px] min-h-0">
                 <div className="w-full h-full grid place-content-center text-dark-300 text-xs">Trading chart</div>
@@ -86,34 +86,34 @@ const DCABot: React.FC = () => {
                   <table className="w-full text-xs whitespace-nowrap">
                     <thead className="bg-dark-700/40">
                       <tr className="text-left text-dark-200">
-                        <th className="px-3 py-2 w-10"></th>
-                        <th className="px-3 py-2">Entry Order</th>
-                        <th className="px-3 py-2">Avg. O 1</th>
-                        <th className="px-3 py-2">Avg. O 2</th>
-                        <th className="px-3 py-2">Avg. O 3</th>
+                        <th className="px-fluid-3 py-2 w-10"></th>
+                        <th className="px-fluid-3 py-2">Entry Order</th>
+                        <th className="px-fluid-3 py-2">Avg. O 1</th>
+                        <th className="px-fluid-3 py-2">Avg. O 2</th>
+                        <th className="px-fluid-3 py-2">Avg. O 3</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr className="border-t border-dark-700/60">
-                        <td className="px-3 py-2 text-dark-300">Min. deviation, %</td>
-                        <td className="px-3 py-2">0</td>
-                        <td className="px-3 py-2">-1</td>
-                        <td className="px-3 py-2">-5</td>
-                        <td className="px-3 py-2">-21</td>
+                        <td className="px-fluid-3 py-2 text-dark-300">Min. deviation, %</td>
+                        <td className="px-fluid-3 py-2">0</td>
+                        <td className="px-fluid-3 py-2">-1</td>
+                        <td className="px-fluid-3 py-2">-5</td>
+                        <td className="px-fluid-3 py-2">-21</td>
                       </tr>
                       <tr className="border-t border-dark-700/60">
-                        <td className="px-3 py-2 text-dark-300">Min. order size, ETH</td>
-                        <td className="px-3 py-2">0.00492592</td>
-                        <td className="px-3 py-2">0.00373177</td>
-                        <td className="px-3 py-2">0.00661111</td>
-                        <td className="px-3 py-2">0.01351515</td>
+                        <td className="px-fluid-3 py-2 text-dark-300">Min. order size, ETH</td>
+                        <td className="px-fluid-3 py-2">0.00492592</td>
+                        <td className="px-fluid-3 py-2">0.00373177</td>
+                        <td className="px-fluid-3 py-2">0.00661111</td>
+                        <td className="px-fluid-3 py-2">0.01351515</td>
                       </tr>
                       <tr className="border-t border-dark-700/60">
-                        <td className="px-3 py-2 text-dark-300">Order volume, USDT</td>
-                        <td className="px-3 py-2">20</td>
-                        <td className="px-3 py-2">15</td>
-                        <td className="px-3 py-2">25.5</td>
-                        <td className="px-3 py-2">43.35</td>
+                        <td className="px-fluid-3 py-2 text-dark-300">Order volume, USDT</td>
+                        <td className="px-fluid-3 py-2">20</td>
+                        <td className="px-fluid-3 py-2">15</td>
+                        <td className="px-fluid-3 py-2">25.5</td>
+                        <td className="px-fluid-3 py-2">43.35</td>
                       </tr>
                     </tbody>
                   </table>
@@ -123,7 +123,7 @@ const DCABot: React.FC = () => {
 
             {/* Waiting box chiếm phần còn lại */}
             <div className="rounded-xl border border-dashed border-dark-700 bg-dark-900/30 flex-1 grid place-items-center min-h-0">
-              <p className="text-dark-300 text-sm">Waiting for setup…</p>
+              <p className="text-dark-300 text-fluid-sm">Waiting for setup…</p>
             </div>
           </div>
         </section>
@@ -133,7 +133,7 @@ const DCABot: React.FC = () => {
   {/* Khung ngoài giống cột trái */}
   <div className="card h-full flex flex-col min-h-0">
     <div className="card-header flex items-center justify-between">
-      <p className="text-sm font-medium">Configuration</p>
+      <p className="text-fluid-sm font-medium">Configuration</p>
       {/* tuỳ: <button className="btn btn-xs">Video tutorial</button> */}
     </div>
 

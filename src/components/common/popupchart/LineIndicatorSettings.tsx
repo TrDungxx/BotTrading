@@ -1,154 +1,125 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { Plus, Trash2, X, ChevronRight } from 'lucide-react';
+import {
+  DynamicIndicatorConfig,
+  IndicatorLine,
+  BollConfig,
+  VolumeMALine,
+  DEFAULT_COLORS,
+  createIndicatorLine,
+  createBollConfig,
+  createVolumeMALine,
+} from '../hooks/indicatorTypes';
 
-export interface MainIndicatorConfig {
-  ma7: boolean;
-  ma25: boolean;
-  ma99: boolean;
-  ema12: boolean;
-  ema26: boolean;
-  boll: boolean;
+// ============================================
+// CUSTOM CHECKBOX COMPONENT
+// ============================================
+
+interface CustomCheckboxProps {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
-export interface VolumeIndicatorConfig {
-  mavol1: boolean;
-  mavol2: boolean;
-}
+const CustomCheckbox: React.FC<CustomCheckboxProps> = ({
+  checked,
+  onChange,
+  disabled = false,
+  size = 'md',
+  className = '',
+}) => {
+  const sizeClasses = {
+    sm: 'w-3.5 h-3.5',
+    md: 'w-4 h-4',
+    lg: 'w-5 h-5',
+  };
 
-export interface SubIndicatorConfig {
-  vol: boolean;
-  macd: boolean;
-  rsi: boolean;
-  mfi: boolean;
-  kdj: boolean;
-  obv: boolean;
-  cci: boolean;
-  stochRsi: boolean;
-  wr: boolean;
-}
+  const iconSizes = {
+    sm: { width: 8, height: 6 },
+    md: { width: 10, height: 8 },
+    lg: { width: 12, height: 10 },
+  };
 
-export interface IndicatorPeriods {
-  ma7?: number;
-  ma25?: number;
-  ma99?: number;
-  ema12?: number;
-  ema26?: number;
-  mavol1?: number;
-  mavol2?: number;
-  boll?: { period: number; stdDev: number };
-  macd?: { fast: number; slow: number; signal: number };
-  rsi?: number;
-  mfi?: number;
-  kdj?: { k: number; d: number };
-  cci?: number;
-  stochRsi?: { period: number; k: number; d: number };
-  wr?: number;
-}
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        !disabled && onChange(!checked);
+      }}
+      className={`
+        ${sizeClasses[size]}
+        flex items-center justify-center
+        rounded
+        border
+        transition-all duration-150
+        shrink-0
+        ${checked 
+          ? 'bg-[#256ec2ff] border-[#256ec2ff]' 
+          : 'bg-transparent border-[#474d57] hover:border-[#848e9c]'
+        }
+        ${disabled 
+          ? 'opacity-50 cursor-not-allowed' 
+          : 'cursor-pointer'
+        }
+        ${className}
+      `}
+    >
+      {checked && (
+        <svg 
+          width={iconSizes[size].width} 
+          height={iconSizes[size].height} 
+          viewBox="0 0 10 8" 
+          fill="none"
+          className="text-[#1e2329]"
+        >
+          <path 
+            d="M1 4L3.5 6.5L9 1" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+    </button>
+  );
+};
 
-export interface IndicatorColors {
-  ma7?: string;
-  ma25?: string;
-  ma99?: string;
-  ema12?: string;
-  ema26?: string;
-  mavol1?: string;
-  mavol2?: string;
-  boll?: { upper: string; middle: string; lower: string; fill: string };
-  macd?: { macd: string; signal: string; histogram: string };
-  rsi?: string;
-  mfi?: string;
-  kdj?: { k: string; d: string; j: string };
-  obv?: string;
-  cci?: string;
-  stochRsi?: { k: string; d: string };
-  wr?: string;
-}
+// ============================================
+// TYPES
+// ============================================
 
 interface LineIndicatorSettingsProps {
   type: 'main' | 'volume';
-  defaultTab?: number; // Tab mặc định: 1 = Chỉ báo chính, 2 = Chỉ báo phụ
-  mainVisible?: MainIndicatorConfig;
-  volumeVisible?: VolumeIndicatorConfig;
-  subVisible?: SubIndicatorConfig;
-  periods?: IndicatorPeriods;
-  colors?: IndicatorColors;
-  bollFillVisible?: boolean; // ✅ ADD: Pass bollFillVisible from parent
-  onChange?: (
-    mainVis?: MainIndicatorConfig,
-    volumeVis?: VolumeIndicatorConfig,
-    subVis?: SubIndicatorConfig,
-    per?: IndicatorPeriods,
-    col?: IndicatorColors,
-    bollFillVisible?: boolean
-  ) => void;
+  defaultTab?: number;
+  config: DynamicIndicatorConfig;
+  onChange: (config: DynamicIndicatorConfig) => void;
   onClose: () => void;
 }
 
+// ============================================
+// COMPONENT
+// ============================================
 
 const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
   type,
-  defaultTab = 1, // Mặc định mở tab 1
-  // ✅ FIX: Change default values to false
-  mainVisible = { ma7: false, ma25: false, ma99: false, ema12: false, ema26: false, boll: false },
-  volumeVisible = { mavol1: false, mavol2: false },
-  subVisible = {
-    vol: true,
-    macd: false,
-    rsi: false,
-    mfi: false,
-    kdj: false,
-    obv: false,
-    cci: false,
-    stochRsi: false,
-    wr: false,
-  },
-  periods = {
-    ma7: 7,
-    ma25: 25,
-    ma99: 99,
-    ema12: 12,
-    ema26: 26,
-    mavol1: 7,
-    mavol2: 14,
-    boll: { period: 20, stdDev: 2 },
-    rsi: 14,
-    mfi: 14,
-    kdj: { k: 9, d: 3 },
-    cci: 20,
-    stochRsi: { period: 14, k: 3, d: 3 },
-    wr: 14,
-    macd: { fast: 12, slow: 26, signal: 9 },
-  },
-  colors = {
-    ma7: '#F0B90B',
-    ma25: '#EB40B5',
-    ma99: '#B385F8',
-    ema12: '#2962FF',
-    ema26: '#FF6D00',
-    mavol1: '#0ECB81',
-    mavol2: '#EB40B5',
-    boll: { upper: '#B385F8', middle: '#EB40B5', lower: '#B385F8', fill: 'rgba(179, 133, 248, 0.1)' },
-    rsi: '#7E57C2',
-    mfi: '#26A69A',
-    kdj: { k: '#2962FF', d: '#FF6D00', j: '#9C27B0' },
-    obv: '#00BCD4',
-    cci: '#FF9800',
-    stochRsi: { k: '#2962FF', d: '#FF6D00' },
-    wr: '#E91E63',
-    macd: { macd: '#2962FF', signal: '#FF6D00', histogram: '#26A69A' },
-  },
-  bollFillVisible = false, // ✅ ADD: Receive bollFillVisible from parent
+  defaultTab = 1,
+  config,
   onChange,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState(defaultTab); // Sử dụng defaultTab thay vì hardcode 1
-  const [localMainVis, setLocalMainVis] = useState({ ...mainVisible, boll: mainVisible.boll ?? false });
-  const [localVolVis, setLocalVolVis] = useState(volumeVisible);
-  const [localSubVis, setLocalSubVis] = useState(subVisible);
-  const [localPeriods, setLocalPeriods] = useState(periods);
-  const [localColors, setLocalColors] = useState(colors);
-  const [selectedMainIndicator, setSelectedMainIndicator] = useState('ma'); // For main indicators sidebar
-  const [selectedSubIndicator, setSelectedSubIndicator] = useState('vol'); // For sub indicators sidebar
-  const [localBollFillVisible, setLocalBollFillVisible] = useState(bollFillVisible); // ✅ Use bollFillVisible from props
+  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [selectedMainIndicator, setSelectedMainIndicator] = useState<'ma' | 'ema' | 'wma' | 'boll'>('ma');
+  const [selectedSubIndicator, setSelectedSubIndicator] = useState('vol');
+  
+  // Local state for editing
+  const [localConfig, setLocalConfig] = useState<DynamicIndicatorConfig>({ ...config });
 
   const tabs = [
     { id: 1, label: 'Chỉ báo chính' },
@@ -158,620 +129,633 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
     { id: 5, label: 'Kiểm định' },
   ];
 
+  const mainIndicatorsList = [
+    { key: 'ma' as const, label: 'MA', desc: 'Moving Average' },
+    { key: 'ema' as const, label: 'EMA', desc: 'Exponential Moving Average' },
+    { key: 'wma' as const, label: 'WMA', desc: 'Weighted Moving Average' },
+    { key: 'boll' as const, label: 'BOLL', desc: 'Bollinger Bands' },
+  ];
+
+  // ============================================
+  // HANDLERS
+  // ============================================
+
   const handleSave = () => {
-    onChange?.(localMainVis, localVolVis, localSubVis, localPeriods, localColors, localBollFillVisible); // ✅ Pass localBollFillVisible
+    onChange(localConfig);
     onClose();
   };
 
-  // ✅ FIX: Reset về false thay vì true
   const handleReset = () => {
-    // Reset Main indicators
-    setLocalMainVis({ ma7: false, ma25: false, ma99: false, ema12: false, ema26: false, boll: false });
-    
-    // Reset Volume indicators
-    setLocalVolVis({ mavol1: false, mavol2: false });
-    
-    // Reset all periods
-    setLocalPeriods({
-      ma7: 7,
-      ma25: 25,
-      ma99: 99,
-      ema12: 12,
-      ema26: 26,
-      mavol1: 7,
-      mavol2: 14,
-      boll: { period: 20, stdDev: 2 },
-    });
-    
-    // Reset all colors
-    setLocalColors({
-      ma7: '#F0B90B',
-      ma25: '#EB40B5',
-      ma99: '#B385F8',
-      ema12: '#2962FF',
-      ema26: '#FF6D00',
-      mavol1: '#0ECB81',
-      mavol2: '#EB40B5',
-      boll: { upper: '#B385F8', middle: '#EB40B5', lower: '#B385F8', fill: 'rgba(179, 133, 248, 0.1)' },
+    setLocalConfig({
+      ...localConfig,
+      lines: localConfig.lines.map(l => ({ ...l, visible: false })),
+      bollingerBands: localConfig.bollingerBands.map(b => ({ ...b, visible: false })),
+      volumeMA: localConfig.volumeMA.map(v => ({ ...v, visible: false })),
     });
   };
 
-  // Render Main Indicators Tab (with sidebar like Binance)
-  const renderMainIndicators = () => {
-    const mainIndicatorsList = [
-      { key: 'ma', label: 'MA', desc: 'Moving Average' },
-      { key: 'ema', label: 'EMA', desc: 'Exponential Moving Average' },
-      { key: 'wma', label: 'WMA', desc: 'Weighted Moving Average' },
-      { key: 'boll', label: 'BOLL', desc: 'Bollinger Bands' },
-      { key: 'vwap', label: 'VWAP', desc: 'Volume Weighted Average Price' },
-      { key: 'avl', label: 'AVL', desc: 'Average Line' },
-      { key: 'trix', label: 'TRIX', desc: 'Triple Exponential Average' },
-      { key: 'sar', label: 'SAR', desc: 'Parabolic SAR' },
-    ];
+  // Line handlers
+  const handleAddLine = (lineType: 'MA' | 'EMA' | 'WMA') => {
+    const newLine = createIndicatorLine(lineType, localConfig.lines);
+    setLocalConfig(prev => ({
+      ...prev,
+      lines: [...prev.lines, newLine],
+    }));
+  };
 
-    // Render settings for selected main indicator
-    const renderMainIndicatorSettings = () => {
-      if (selectedMainIndicator === 'ma') {
-        // MA Settings - support up to 10 MA lines
-        const maLines = [
-          { 
-            key: 'ma7', 
-            label: 'MA1', 
-            period: localPeriods.ma7 ?? 7, 
-            color: localColors.ma7 ?? '#F0B90B', 
-            visible: localMainVis.ma7 
-          },
-          { 
-            key: 'ma25', 
-            label: 'MA2', 
-            period: localPeriods.ma25 ?? 25, 
-            color: localColors.ma25 ?? '#EB40B5', 
-            visible: localMainVis.ma25 
-          },
-          { 
-            key: 'ma99', 
-            label: 'MA3', 
-            period: localPeriods.ma99 ?? 99, 
-            color: localColors.ma99 ?? '#B385F8', 
-            visible: localMainVis.ma99 
-          },
-        ];
+  const handleRemoveLine = (id: string) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      lines: prev.lines.filter(l => l.id !== id),
+    }));
+  };
 
-        return (
-          <div className="space-y-4 flex-1 px-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-sm font-medium text-dark-200">MA</h3>
-              <span className="text-dark-500">&gt;</span>
-              <span className="text-xs text-dark-400">Đường trung bình động</span>
-            </div>
+  const handleUpdateLine = (id: string, updates: Partial<IndicatorLine>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      lines: prev.lines.map(l => (l.id === id ? { ...l, ...updates } : l)),
+    }));
+  };
 
-            <div className="space-y-3">
-              {maLines.map((ma, index) => (
-                <div key={ma.key} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-[80px]">
-                    <input
-                      type="checkbox"
-                      checked={ma.visible}
-                      onChange={(e) => {
-                        if (ma.key === 'ma7') setLocalMainVis({ ...localMainVis, ma7: e.target.checked });
-                        else if (ma.key === 'ma25') setLocalMainVis({ ...localMainVis, ma25: e.target.checked });
-                        else if (ma.key === 'ma99') setLocalMainVis({ ...localMainVis, ma99: e.target.checked });
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-dark-200">{ma.label}</span>
-                  </div>
+  // BOLL handlers
+  const handleAddBoll = () => {
+    const newBoll = createBollConfig(localConfig.bollingerBands);
+    setLocalConfig(prev => ({
+      ...prev,
+      bollingerBands: [...prev.bollingerBands, newBoll],
+    }));
+  };
 
-                  <input
-                    type="number"
-                    value={ma.period}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (ma.key === 'ma7') setLocalPeriods({ ...localPeriods, ma7: val });
-                      else if (ma.key === 'ma25') setLocalPeriods({ ...localPeriods, ma25: val });
-                      else if (ma.key === 'ma99') setLocalPeriods({ ...localPeriods, ma99: val });
-                    }}
-                    className="w-20 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
-                    min="1"
-                  />
+  const handleRemoveBoll = (id: string) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      bollingerBands: prev.bollingerBands.filter(b => b.id !== id),
+    }));
+  };
 
-                  <select className="px-3 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                    <option>Đóng</option>
-                    <option>Mở</option>
-                    <option>Cao</option>
-                    <option>Thấp</option>
-                  </select>
+  const handleUpdateBoll = (id: string, updates: Partial<BollConfig>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      bollingerBands: prev.bollingerBands.map(b =>
+        b.id === id
+          ? { ...b, ...updates, colors: { ...b.colors, ...(updates.colors || {}) } }
+          : b
+      ),
+    }));
+  };
 
-                  <select className="w-24 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200 flex items-center gap-1">
-                    <option>━━━</option>
-                  </select>
+  // Volume MA handlers
+  const handleAddVolumeMA = () => {
+    const newLine = createVolumeMALine(localConfig.volumeMA);
+    setLocalConfig(prev => ({
+      ...prev,
+      volumeMA: [...prev.volumeMA, newLine],
+    }));
+  };
 
-                  <input
-                    type="color"
-                    value={ma.color}
-                    onChange={(e) => {
-                      if (ma.key === 'ma7') setLocalColors({ ...localColors, ma7: e.target.value });
-                      else if (ma.key === 'ma25') setLocalColors({ ...localColors, ma25: e.target.value });
-                      else if (ma.key === 'ma99') setLocalColors({ ...localColors, ma99: e.target.value });
-                    }}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                </div>
-              ))}
-            </div>
+  const handleRemoveVolumeMA = (id: string) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      volumeMA: prev.volumeMA.filter(v => v.id !== id),
+    }));
+  };
+
+  const handleUpdateVolumeMA = (id: string, updates: Partial<VolumeMALine>) => {
+    setLocalConfig(prev => ({
+      ...prev,
+      volumeMA: prev.volumeMA.map(v => (v.id === id ? { ...v, ...updates } : v)),
+    }));
+  };
+
+  // ============================================
+  // RENDER MA/EMA/WMA SETTINGS
+  // ============================================
+
+  const renderLineSettings = (lineType: 'MA' | 'EMA' | 'WMA') => {
+    const lines = localConfig.lines.filter(l => l.type === lineType);
+    const maxLines = 10;
+
+    return (
+      <div className="space-y-4 flex-1 px-6 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-fluid-2">
+            <h3 className="text-fluid-sm font-medium text-dark-200">{lineType}</h3>
+            <span className="text-dark-500">›</span>
+            <span className="text-xs text-dark-400">
+              {lineType === 'MA'
+                ? 'Đường trung bình động'
+                : lineType === 'EMA'
+                ? 'Đường trung bình động hàm mũ'
+                : 'Đường trung bình động có trọng số'}
+            </span>
           </div>
-        );
-      } else if (selectedMainIndicator === 'ema') {
-        // EMA Settings
-        const emaLines = [
-          { 
-            key: 'ema12', 
-            label: 'EMA1', 
-            period: localPeriods.ema12 ?? 12, 
-            color: localColors.ema12 ?? '#2962FF', 
-            visible: localMainVis.ema12 
-          },
-          { 
-            key: 'ema26', 
-            label: 'EMA2', 
-            period: localPeriods.ema26 ?? 26, 
-            color: localColors.ema26 ?? '#FF6D00', 
-            visible: localMainVis.ema26 
-          },
-        ];
+          {lines.length < maxLines && (
+            <button
+              onClick={() => handleAddLine(lineType)}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-dark-700 rounded transition-colors"
+            >
+              <Plus size={14} />
+              Thêm {lineType}
+            </button>
+          )}
+        </div>
 
-        return (
-          <div className="space-y-4 flex-1 px-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-sm font-medium text-dark-200">EMA</h3>
-              <span className="text-dark-500">&gt;</span>
-              <span className="text-xs text-dark-400">Đường trung bình động hàm mũ</span>
-            </div>
-
-            <div className="space-y-3">
-              {emaLines.map((ema) => (
-                <div key={ema.key} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-[80px]">
-                    <input
-                      type="checkbox"
-                      checked={ema.visible}
-                      onChange={(e) => {
-                        if (ema.key === 'ema12') setLocalMainVis({ ...localMainVis, ema12: e.target.checked });
-                        else if (ema.key === 'ema26') setLocalMainVis({ ...localMainVis, ema26: e.target.checked });
-                      }}
-                      className="w-4 h-4"
-                    />
-                    <span className="text-sm text-dark-200">{ema.label}</span>
-                  </div>
-
-                  <input
-                    type="number"
-                    value={ema.period}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      if (ema.key === 'ema12') setLocalPeriods({ ...localPeriods, ema12: val });
-                      else if (ema.key === 'ema26') setLocalPeriods({ ...localPeriods, ema26: val });
-                    }}
-                    className="w-20 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
-                    min="1"
-                  />
-
-                  <select className="px-3 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                    <option>Đóng</option>
-                    <option>Mở</option>
-                    <option>Cao</option>
-                    <option>Thấp</option>
-                  </select>
-
-                  <select className="w-24 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                    <option>━━━</option>
-                  </select>
-
-                  <input
-                    type="color"
-                    value={ema.color}
-                    onChange={(e) => {
-                      if (ema.key === 'ema12') setLocalColors({ ...localColors, ema12: e.target.value });
-                      else if (ema.key === 'ema26') setLocalColors({ ...localColors, ema26: e.target.value });
-                    }}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                </div>
-              ))}
-            </div>
+        {lines.length === 0 ? (
+          <div className="text-center py-8 text-dark-400">
+            <p className="text-sm mb-2">Chưa có đường {lineType} nào</p>
+            <button
+              onClick={() => handleAddLine(lineType)}
+              className="text-primary hover:underline text-sm"
+            >
+              + Thêm đường {lineType} đầu tiên
+            </button>
           </div>
-        );
-      } else if (selectedMainIndicator === 'boll') {
-        // BOLL (Bollinger Bands) Settings
-        const bollPeriod = localPeriods.boll?.period ?? 20;
-        const bollStdDev = localPeriods.boll?.stdDev ?? 2;
-        const bollColors = localColors.boll ?? { upper: '#B385F8', middle: '#EB40B5', lower: '#B385F8' };
-
-        return (
-          <div className="space-y-4 flex-1 px-6">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="text-sm font-medium text-dark-200">BOLL</h3>
-              <span className="text-dark-500">-</span>
-              <span className="text-xs text-dark-400">Dải Bollinger</span>
+        ) : (
+          <div className="space-y-3">
+            {/* Header */}
+            <div className="grid grid-cols-[40px_1fr_80px_100px_80px_40px] gap-2 text-xs text-dark-400 px-1">
+              <span></span>
+              <span>Tên</span>
+              <span>Chu kỳ</span>
+              <span>Nguồn</span>
+              <span>Màu</span>
+              <span></span>
             </div>
 
-            <div className="space-y-4">
-              {/* Thời gian (Period) */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-dark-300">Thời gian</span>
+            {/* Lines */}
+            {lines.map((line, index) => (
+              <div
+                key={line.id}
+                className="grid grid-cols-[40px_1fr_80px_100px_80px_40px] gap-2 items-center bg-dark-750 rounded-lg px-2 py-2"
+              >
+                {/* Checkbox */}
+                <CustomCheckbox
+                  checked={line.visible}
+                  onChange={(checked) => handleUpdateLine(line.id, { visible: checked })}
+                />
+
+                {/* Name */}
+                <span className="text-fluid-sm text-dark-200">
+                  {lineType}{index + 1}
+                </span>
+
+                {/* Period */}
                 <input
                   type="number"
-                  value={bollPeriod}
-                  onChange={(e) => setLocalPeriods({ 
-                    ...localPeriods, 
-                    boll: { period: Number(e.target.value), stdDev: bollStdDev } 
-                  })}
-                  className="w-24 px-3 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
+                  value={line.period}
+                  onChange={(e) => handleUpdateLine(line.id, { period: Number(e.target.value) || 1 })}
+                  className="w-full px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
                   min="1"
+                  max="999"
                 />
-              </div>
 
-              {/* Hệ số nhân (Standard Deviation) */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-dark-300">Hệ số nhân</span>
+                {/* Source */}
+                <select
+                  value={line.source}
+                  onChange={(e) => handleUpdateLine(line.id, { source: e.target.value as any })}
+                  className="w-full px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
+                >
+                  <option value="close">Đóng</option>
+                  <option value="open">Mở</option>
+                  <option value="high">Cao</option>
+                  <option value="low">Thấp</option>
+                </select>
+
+                {/* Color */}
                 <input
-                  type="number"
-                  value={bollStdDev}
-                  onChange={(e) => setLocalPeriods({ 
-                    ...localPeriods, 
-                    boll: { period: bollPeriod, stdDev: Number(e.target.value) } 
-                  })}
-                  className="w-24 px-3 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
-                  min="0.1"
-                  step="0.1"
+                  type="color"
+                  value={line.color}
+                  onChange={(e) => handleUpdateLine(line.id, { color: e.target.value })}
+                  className="w-8 h-8 rounded cursor-pointer border-0"
                 />
-              </div>
 
-              {/* Phông nền checkbox với color picker */}
-              <div className="flex items-center justify-between">
+                {/* Delete */}
+                <button
+                  onClick={() => handleRemoveLine(line.id)}
+                  className="p-1.5 hover:bg-dark-600 rounded transition-colors text-dark-400 hover:text-red-400"
+                  title="Xóa"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {lines.length >= maxLines && (
+          <p className="text-xs text-dark-500 mt-2">Đã đạt giới hạn {maxLines} đường {lineType}</p>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================
+  // RENDER BOLL SETTINGS
+  // ============================================
+
+  const renderBollSettings = () => {
+    const bolls = localConfig.bollingerBands;
+    const maxBolls = 3;
+
+    return (
+      <div className="space-y-4 flex-1 px-6 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-fluid-2">
+            <h3 className="text-fluid-sm font-medium text-dark-200">BOLL</h3>
+            <span className="text-dark-500">›</span>
+            <span className="text-xs text-dark-400">Dải Bollinger</span>
+          </div>
+          {bolls.length < maxBolls && (
+            <button
+              onClick={handleAddBoll}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-dark-700 rounded transition-colors"
+            >
+              <Plus size={14} />
+              Thêm BOLL
+            </button>
+          )}
+        </div>
+
+        {bolls.length === 0 ? (
+          <div className="text-center py-8 text-dark-400">
+            <p className="text-sm mb-2">Chưa có Bollinger Bands nào</p>
+            <button onClick={handleAddBoll} className="text-primary hover:underline text-sm">
+              + Thêm BOLL đầu tiên
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {bolls.map((boll, index) => (
+              <div key={boll.id} className="bg-dark-750 rounded-lg p-4 space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CustomCheckbox
+                      checked={boll.visible}
+                      onChange={(checked) => handleUpdateBoll(boll.id, { visible: checked })}
+                    />
+                    <span className="text-fluid-sm font-medium text-dark-200">BOLL {index + 1}</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveBoll(boll.id)}
+                    className="p-1.5 hover:bg-dark-600 rounded transition-colors text-dark-400 hover:text-red-400"
+                    title="Xóa"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                {/* Settings grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Period */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-dark-400">Chu kỳ</span>
+                    <input
+                      type="number"
+                      value={boll.period}
+                      onChange={(e) => handleUpdateBoll(boll.id, { period: Number(e.target.value) || 20 })}
+                      className="w-20 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
+                      min="1"
+                    />
+                  </div>
+
+                  {/* StdDev */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-dark-400">Hệ số nhân</span>
+                    <input
+                      type="number"
+                      value={boll.stdDev}
+                      onChange={(e) => handleUpdateBoll(boll.id, { stdDev: Number(e.target.value) || 2 })}
+                      className="w-20 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
+                      min="0.1"
+                      step="0.1"
+                    />
+                  </div>
+                </div>
+
+                {/* Fill toggle */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CustomCheckbox
+                      checked={boll.fillVisible}
+                      onChange={(checked) => handleUpdateBoll(boll.id, { fillVisible: checked })}
+                    />
+                    <span className="text-xs text-dark-400">Phông nền</span>
+                  </div>
+                  <input
+                    type="color"
+                    value={boll.colors.fill.includes('rgba') 
+                      ? '#' + boll.colors.fill.match(/\d+/g)?.slice(0, 3).map(x => parseInt(x).toString(16).padStart(2, '0')).join('') || 'B385F8'
+                      : boll.colors.fill
+                    }
+                    onChange={(e) => {
+                      const hex = e.target.value;
+                      const rgba = `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, 0.1)`;
+                      handleUpdateBoll(boll.id, { colors: { ...boll.colors, fill: rgba } });
+                    }}
+                    className="w-8 h-6 rounded cursor-pointer border-0"
+                  />
+                </div>
+
+                {/* Band colors */}
+                <div className="space-y-2">
+                  {/* Upper */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-dark-400">Upper</span>
+                    <input
+                      type="color"
+                      value={boll.colors.upper}
+                      onChange={(e) => handleUpdateBoll(boll.id, { colors: { ...boll.colors, upper: e.target.value } })}
+                      className="w-8 h-6 rounded cursor-pointer border-0"
+                    />
+                  </div>
+                  {/* Middle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-dark-400">Middle</span>
+                    <input
+                      type="color"
+                      value={boll.colors.middle}
+                      onChange={(e) => handleUpdateBoll(boll.id, { colors: { ...boll.colors, middle: e.target.value } })}
+                      className="w-8 h-6 rounded cursor-pointer border-0"
+                    />
+                  </div>
+                  {/* Lower */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-dark-400">Lower</span>
+                    <input
+                      type="color"
+                      value={boll.colors.lower}
+                      onChange={(e) => handleUpdateBoll(boll.id, { colors: { ...boll.colors, lower: e.target.value } })}
+                      className="w-8 h-6 rounded cursor-pointer border-0"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================
+  // RENDER VOLUME MA SETTINGS
+  // ============================================
+
+  const renderVolumeSettings = () => {
+    const volumeMAs = localConfig.volumeMA;
+    const maxLines = 5;
+
+    return (
+      <div className="space-y-4 flex-1 px-6 py-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-fluid-2">
+            <h3 className="text-fluid-sm font-medium text-dark-200">VOL</h3>
+            <span className="text-dark-500">›</span>
+            <span className="text-xs text-dark-400">Khối lượng giao dịch</span>
+          </div>
+          {volumeMAs.length < maxLines && (
+            <button
+              onClick={handleAddVolumeMA}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-dark-700 rounded transition-colors"
+            >
+              <Plus size={14} />
+              Thêm MAVOL
+            </button>
+          )}
+        </div>
+
+        <p className="text-xs text-dark-500 mb-4">
+          MAVOL là đường trung bình động của khối lượng giao dịch, giúp xác định xu hướng khối lượng.
+        </p>
+
+        {volumeMAs.length === 0 ? (
+          <div className="text-center py-8 text-dark-400">
+            <p className="text-sm mb-2">Chưa có đường MAVOL nào</p>
+            <button onClick={handleAddVolumeMA} className="text-primary hover:underline text-sm">
+              + Thêm MAVOL đầu tiên
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {volumeMAs.map((vol, index) => (
+              <div
+                key={vol.id}
+                className="flex items-center justify-between bg-dark-750 rounded-lg px-3 py-2"
+              >
+                <div className="flex items-center gap-3">
+                  <CustomCheckbox
+                    checked={vol.visible}
+                    onChange={(checked) => handleUpdateVolumeMA(vol.id, { visible: checked })}
+                  />
+                  <span className="text-fluid-sm text-dark-200">MAVOL{index + 1}</span>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <input
-                    type="checkbox"
-                    checked={localBollFillVisible}
-                    onChange={(e) => setLocalBollFillVisible(e.target.checked)}
-                    className="w-4 h-4"
+                    type="number"
+                    value={vol.period}
+                    onChange={(e) => handleUpdateVolumeMA(vol.id, { period: Number(e.target.value) || 7 })}
+                    className="w-16 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
+                    min="1"
                   />
-                  <span className="text-sm text-dark-300">Phông nền</span>
-                </div>
-                <input
-                  type="color"
-                  value={bollColors.fill ? bollColors.fill.replace(/rgba?\((\d+),\s*(\d+),\s*(\d+).*\)/, (_, r, g, b) => 
-                    '#' + [r, g, b].map(x => parseInt(x).toString(16).padStart(2, '0')).join('')
-                  ) : '#B385F8'}
-                  onChange={(e) => {
-                    const hex = e.target.value;
-                    const rgba = `rgba(${parseInt(hex.slice(1, 3), 16)}, ${parseInt(hex.slice(3, 5), 16)}, ${parseInt(hex.slice(5, 7), 16)}, 0.1)`;
-                    setLocalColors({ 
-                      ...localColors, 
-                      boll: { ...bollColors, fill: rgba } 
-                    });
-                  }}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-              </div>
-
-              {/* UP - Upper Band */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-[80px]">
                   <input
-                    type="checkbox"
-                    checked={localMainVis.boll}
-                    onChange={(e) => setLocalMainVis({ ...localMainVis, boll: e.target.checked })}
-                    className="w-4 h-4"
+                    type="color"
+                    value={vol.color}
+                    onChange={(e) => handleUpdateVolumeMA(vol.id, { color: e.target.value })}
+                    className="w-8 h-6 rounded cursor-pointer border-0"
                   />
-                  <span className="text-sm text-dark-200">UP</span>
+                  <button
+                    onClick={() => handleRemoveVolumeMA(vol.id)}
+                    className="p-1.5 hover:bg-dark-600 rounded transition-colors text-dark-400 hover:text-red-400"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-
-                <select className="w-32 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                  <option>━━━</option>
-                </select>
-
-                <input
-                  type="color"
-                  value={bollColors.upper}
-                  onChange={(e) => setLocalColors({ 
-                    ...localColors, 
-                    boll: { ...bollColors, upper: e.target.value } 
-                  })}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
               </div>
-
-              {/* MB - Middle Band */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-[80px]">
-                  <input
-                    type="checkbox"
-                    checked={localMainVis.boll}
-                    onChange={(e) => setLocalMainVis({ ...localMainVis, boll: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-dark-200">MB</span>
-                </div>
-
-                <select className="w-32 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                  <option>━━━</option>
-                </select>
-
-                <input
-                  type="color"
-                  value={bollColors.middle}
-                  onChange={(e) => setLocalColors({ 
-                    ...localColors, 
-                    boll: { ...bollColors, middle: e.target.value } 
-                  })}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-              </div>
-
-              {/* DN - Lower Band */}
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-[80px]">
-                  <input
-                    type="checkbox"
-                    checked={localMainVis.boll}
-                    onChange={(e) => setLocalMainVis({ ...localMainVis, boll: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-dark-200">DN</span>
-                </div>
-
-                <select className="w-32 px-2 py-1.5 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                  <option>━━━</option>
-                </select>
-
-                <input
-                  type="color"
-                  value={bollColors.lower}
-                  onChange={(e) => setLocalColors({ 
-                    ...localColors, 
-                    boll: { ...bollColors, lower: e.target.value } 
-                  })}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-              </div>
-            </div>
+            ))}
           </div>
-        );
-      }
+        )}
+      </div>
+    );
+  };
 
-      // Placeholder for other indicators
-      return (
-        <div className="flex-1 px-6 flex items-center justify-center">
-          <p className="text-sm text-dark-400">
-            Cài đặt cho {mainIndicatorsList.find(i => i.key === selectedMainIndicator)?.label} đang được phát triển...
-          </p>
-        </div>
-      );
+  // ============================================
+  // RENDER MAIN INDICATORS TAB
+  // ============================================
+
+  const renderMainIndicators = () => {
+    // Count visible indicators for sidebar
+    const getIndicatorCount = (key: string): number => {
+      if (key === 'ma') return localConfig.lines.filter(l => l.type === 'MA' && l.visible).length;
+      if (key === 'ema') return localConfig.lines.filter(l => l.type === 'EMA' && l.visible).length;
+      if (key === 'wma') return localConfig.lines.filter(l => l.type === 'WMA' && l.visible).length;
+      if (key === 'boll') return localConfig.bollingerBands.filter(b => b.visible).length;
+      return 0;
     };
 
     return (
       <div className="flex h-full">
         {/* Sidebar */}
-        <div className="w-40 border-r border-dark-600 overflow-y-auto">
+        <div className="w-44 border-r border-dark-600 overflow-y-auto">
           <div className="py-2">
-            <div className="px-3 py-2 text-xs font-medium text-dark-400">Main</div>
+            <div className="px-3 py-2 text-xs font-medium text-dark-500 uppercase">Main</div>
             {mainIndicatorsList.map((ind) => {
-              // Calculate if any line in this indicator is enabled
-              let isChecked = false;
-              if (ind.key === 'ma') isChecked = localMainVis.ma7 || localMainVis.ma25 || localMainVis.ma99;
-              else if (ind.key === 'ema') isChecked = localMainVis.ema12 || localMainVis.ema26;
-              else if (ind.key === 'boll') isChecked = localMainVis.boll;
+              const count = getIndicatorCount(ind.key);
+              // Check if any indicator of this type is visible
+              const isTypeVisible = ind.key === 'boll'
+                ? localConfig.bollingerBands.some(b => b.visible)
+                : localConfig.lines.filter(l => l.type === ind.key.toUpperCase()).some(l => l.visible);
+              
+              // Toggle all indicators of this type
+              const handleToggleType = (checked: boolean) => {
+                if (ind.key === 'boll') {
+                  setLocalConfig(prev => ({
+                    ...prev,
+                    bollingerBands: prev.bollingerBands.map(b => ({ ...b, visible: checked })),
+                  }));
+                } else {
+                  const typeUpper = ind.key.toUpperCase();
+                  setLocalConfig(prev => ({
+                    ...prev,
+                    lines: prev.lines.map(l => 
+                      l.type === typeUpper ? { ...l, visible: checked } : l
+                    ),
+                  }));
+                }
+              };
 
               return (
-                <button
+                <div
                   key={ind.key}
                   onClick={() => setSelectedMainIndicator(ind.key)}
-                  className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition-colors ${
+                  className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition-colors cursor-pointer ${
                     selectedMainIndicator === ind.key
                       ? 'bg-dark-700 text-dark-100'
                       : 'text-dark-300 hover:bg-dark-750'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        const newState = e.target.checked;
-                        if (ind.key === 'ma') {
-                          setLocalMainVis({ ...localMainVis, ma7: newState, ma25: newState, ma99: newState });
-                        } else if (ind.key === 'ema') {
-                          setLocalMainVis({ ...localMainVis, ema12: newState, ema26: newState });
-                        } else if (ind.key === 'boll') {
-                          setLocalMainVis({ ...localMainVis, boll: newState });
-                        }
-                      }}
-                      className="w-3.5 h-3.5"
+                    {/* Checkbox for toggle visibility */}
+                    <CustomCheckbox
+                      checked={isTypeVisible}
+                      onChange={handleToggleType}
+                      size="sm"
                     />
-                    <span className="text-sm">{ind.label}</span>
+                    <span className="text-fluid-sm">{ind.label}</span>
                   </div>
-                  <span className="i-lucide-chevron-right text-xs opacity-60" />
-                </button>
+                  <ChevronRight size={14} className="text-dark-500" />
+                </div>
               );
             })}
           </div>
         </div>
 
         {/* Settings Panel */}
-        {renderMainIndicatorSettings()}
+        <div className="flex-1 overflow-y-auto">
+          {selectedMainIndicator === 'ma' && renderLineSettings('MA')}
+          {selectedMainIndicator === 'ema' && renderLineSettings('EMA')}
+          {selectedMainIndicator === 'wma' && renderLineSettings('WMA')}
+          {selectedMainIndicator === 'boll' && renderBollSettings()}
+        </div>
       </div>
     );
   };
 
-  // Render Sub Indicators Tab (with sidebar like Binance)
+  // ============================================
+  // RENDER SUB INDICATORS TAB
+  // ============================================
+
   const renderSubIndicators = () => {
     const subIndicators = [
       { key: 'vol', label: 'VOL', desc: 'Volume' },
       { key: 'macd', label: 'MACD', desc: 'Moving Average Convergence Divergence' },
       { key: 'rsi', label: 'RSI', desc: 'Relative Strength Index' },
-      { key: 'mfi', label: 'MFI', desc: 'Money Flow Index' },
-      { key: 'kdj', label: 'KDJ', desc: 'Stochastic Oscillator' },
-      { key: 'obv', label: 'OBV', desc: 'On-Balance Volume' },
-      { key: 'cci', label: 'CCI', desc: 'Commodity Channel Index' },
-      { key: 'stochRsi', label: 'StochRSI', desc: 'Stochastic RSI' },
-      { key: 'wr', label: 'WR', desc: 'Williams %R' },
     ];
 
-    // Render settings for selected indicator
-    const renderIndicatorSettings = () => {
-      if (selectedSubIndicator === 'vol') {
-        return (
-          <div className="space-y-4 flex-1 px-6">
-            <h3 className="text-sm font-medium text-dark-200 mb-1">Vol - Khối lượng</h3>
-            <p className="text-xs text-dark-400 mb-4">
-              MAVOL có nghĩa là cộng khối lượng giao dịch trong một khoảng thời gian nhất định và là giá trị trung bình để tạo một đường cong mượt mà hơn trên biểu đồ khối lượng giao dịch, tức là đường khối lượng giao dịch trung bình.
-            </p>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-medium text-dark-300">Long</div>
-                <select className="px-3 py-1 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                  <option>Đường...</option>
-                </select>
-              </div>
-
-              {/* MAVOL1 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={localVolVis.mavol1}
-                    onChange={(e) => setLocalVolVis({ ...localVolVis, mavol1: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-dark-200">MAVOL1</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={localPeriods.mavol1}
-                    onChange={(e) => setLocalPeriods({ ...localPeriods, mavol1: Number(e.target.value) })}
-                    className="w-16 px-2 py-1 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
-                    min="1"
-                  />
-                  <input
-                    type="color"
-                    value={localColors.mavol1}
-                    onChange={(e) => setLocalColors({ ...localColors, mavol1: e.target.value })}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* MAVOL2 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={localVolVis.mavol2}
-                    onChange={(e) => setLocalVolVis({ ...localVolVis, mavol2: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span className="text-sm text-dark-200">MAVOL2</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={localPeriods.mavol2}
-                    onChange={(e) => setLocalPeriods({ ...localPeriods, mavol2: Number(e.target.value) })}
-                    className="w-16 px-2 py-1 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200"
-                    min="1"
-                  />
-                  <input
-                    type="color"
-                    value={localColors.mavol2}
-                    onChange={(e) => setLocalColors({ ...localColors, mavol2: e.target.value })}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mt-4 mb-2">
-                <div className="text-xs font-medium text-dark-300">Short</div>
-                <select className="px-3 py-1 bg-dark-700 border border-dark-600 rounded text-xs text-dark-200">
-                  <option>Đường...</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // Placeholder for other indicators
-      return (
-        <div className="flex-1 px-6 flex items-center justify-center">
-          <p className="text-sm text-dark-400">
-            Cài đặt cho {subIndicators.find(i => i.key === selectedSubIndicator)?.label} đang được phát triển...
-          </p>
-        </div>
-      );
-    };
+    const visibleVolCount = localConfig.volumeMA.filter(v => v.visible).length;
 
     return (
       <div className="flex h-full">
         {/* Sidebar */}
-        <div className="w-40 border-r border-dark-600 overflow-y-auto">
+        <div className="w-44 border-r border-dark-600 overflow-y-auto">
           <div className="py-2">
-            <div className="px-3 py-2 text-xs font-medium text-dark-400">Sub</div>
-            {subIndicators.map((ind) => (
-              <button
-                key={ind.key}
-                onClick={() => setSelectedSubIndicator(ind.key)}
-                className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition-colors ${
-                  selectedSubIndicator === ind.key
-                    ? 'bg-dark-700 text-dark-100'
-                    : 'text-dark-300 hover:bg-dark-750'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={ind.key === 'vol' ? (localVolVis.mavol1 || localVolVis.mavol2) : false}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      // TODO: Handle checkbox for other indicators
-                      if (ind.key === 'vol') {
-                        const newState = e.target.checked;
-                        setLocalVolVis({ mavol1: newState, mavol2: newState });
-                      }
-                    }}
-                    className="w-3.5 h-3.5"
-                  />
-                  <span className="text-sm">{ind.label}</span>
+            <div className="px-3 py-2 text-xs font-medium text-dark-500 uppercase">Sub</div>
+            {subIndicators.map((ind) => {
+              // Check visibility for VOL
+              const isTypeVisible = ind.key === 'vol'
+                ? localConfig.volumeMA.some(v => v.visible)
+                : false;
+              
+              // Toggle visibility
+              const handleToggleType = (checked: boolean) => {
+                if (ind.key === 'vol') {
+                  setLocalConfig(prev => ({
+                    ...prev,
+                    volumeMA: prev.volumeMA.map(v => ({ ...v, visible: checked })),
+                  }));
+                }
+              };
+
+              return (
+                <div
+                  key={ind.key}
+                  onClick={() => setSelectedSubIndicator(ind.key)}
+                  className={`w-full px-3 py-2.5 text-left flex items-center justify-between transition-colors cursor-pointer ${
+                    selectedSubIndicator === ind.key
+                      ? 'bg-dark-700 text-dark-100'
+                      : 'text-dark-300 hover:bg-dark-750'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Checkbox for toggle visibility */}
+                    {ind.key === 'vol' ? (
+                      <CustomCheckbox
+                        checked={isTypeVisible}
+                        onChange={handleToggleType}
+                        size="sm"
+                      />
+                    ) : (
+                      <div className="w-3.5 h-3.5" /> // Placeholder for alignment
+                    )}
+                    <span className="text-fluid-sm">{ind.label}</span>
+                    {ind.key === 'vol' && visibleVolCount > 0 && (
+                      <span className="px-1.5 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
+                        {visibleVolCount}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight size={14} className="text-dark-500" />
                 </div>
-                <span className="i-lucide-chevron-right text-xs opacity-60" />
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
         {/* Settings Panel */}
-        {renderIndicatorSettings()}
+        <div className="flex-1 overflow-y-auto">
+          {selectedSubIndicator === 'vol' && renderVolumeSettings()}
+          {selectedSubIndicator !== 'vol' && (
+            <div className="flex items-center justify-center h-48 text-dark-400">
+              <p className="text-sm">Đang phát triển...</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
-  // Render other tabs (placeholder)
-  const renderPlaceholderTab = (title: string) => (
-    <div className="flex items-center justify-center h-48">
-      <p className="text-sm text-dark-400">Tab "{title}" đang được phát triển...</p>
-    </div>
-  );
+  // ============================================
+  // RENDER
+  // ============================================
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col relative z-[10000]">
+      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
         {/* Header with Tabs */}
         <div className="border-b border-dark-600">
           <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-4 flex-1 overflow-x-auto">
+            <div className="flex items-center gap-2 flex-1 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -779,7 +763,7 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
                   className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
                     activeTab === tab.id
                       ? 'text-primary border-b-2 border-primary'
-                      : 'text-dark-300 hover:text-dark-200'
+                      : 'text-dark-400 hover:text-dark-200'
                   }`}
                 >
                   {tab.label}
@@ -788,41 +772,35 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-dark-700 rounded-lg transition-colors ml-4 shrink-0 group"
-              title="Đóng"
+              className="p-2 hover:bg-dark-700 rounded-lg transition-colors ml-4"
             >
-              <svg 
-                className="w-5 h-5 text-dark-300 group-hover:text-dark-100 transition-colors" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X size={20} className="text-dark-400" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className={`flex-1 overflow-y-auto ${activeTab === 1 || activeTab === 2 ? '' : 'p-6'}`}>
+        <div className="flex-1 overflow-hidden">
           {activeTab === 1 && renderMainIndicators()}
           {activeTab === 2 && renderSubIndicators()}
-          {activeTab === 3 && renderPlaceholderTab('Dữ liệu Giao dịch')}
-          {activeTab === 4 && renderPlaceholderTab('Tùy chỉnh')}
-          {activeTab === 5 && renderPlaceholderTab('Kiểm định')}
+          {activeTab > 2 && (
+            <div className="flex items-center justify-center h-48 text-dark-400">
+              <p className="text-sm">Tab đang được phát triển...</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="border-t border-dark-600 p-4 flex items-center justify-end gap-3">
           <button
             onClick={handleReset}
-            className="px-4 py-2 text-sm text-dark-300 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm text-dark-400 hover:text-dark-200 hover:bg-dark-700 rounded-lg transition-colors"
           >
             Đặt lại
           </button>
           <button
             onClick={handleSave}
-            className="btn btn-primary py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            className="px-6 py-2 bg-primary text-dark-900 font-medium rounded-lg hover:bg-primary/90 transition-colors"
           >
             Lưu lại
           </button>

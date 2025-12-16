@@ -185,7 +185,7 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
       <div className="bg-dark-800 w-full max-w-md rounded-lg shadow-lg p-6 relative">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-slate-400 hover:text-white"
+          className="absolute top-fluid-3 right-3 text-slate-400 hover:text-white"
         >
           <X className="w-5 h-5" />
         </button>
@@ -193,16 +193,16 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
         <h2 className="text-lg font-semibold mb-4">Chốt lời/Cắt lỗ</h2>
 
         {/* Header: side toggle */}
-        <div className="relative flex mb-4 rounded-md overflow-hidden border border-dark-600 w-fit">
+        <div className="relative flex mb-4 rounded-fluid-md overflow-hidden border border-dark-600 w-fit">
           <div
-            className={`absolute left-0 top-0 h-full w-1/2 rounded-md transition-all duration-300 pointer-events-none ${
+            className={`absolute left-0 top-0 h-full w-1/2 rounded-fluid-md transition-all duration-300 pointer-events-none ${
               tradeSide === 'buy' ? 'bg-success-500' : 'translate-x-full bg-danger-500'
             }`}
             style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0% 100%)' }}
           />
           <button
             onClick={() => setTradeSide('buy')}
-            className={`relative z-10 px-4 py-1 text-sm font-medium ${
+            className={`relative z-10 px-fluid-4 py-fluid-1 text-fluid-sm font-medium ${
               tradeSide === 'buy' ? 'text-white' : 'text-slate-400'
             }`}
           >
@@ -210,7 +210,7 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
           </button>
           <button
             onClick={() => setTradeSide('sell')}
-            className={`relative z-10 px-4 py-1 text-sm font-medium ${
+            className={`relative z-10 px-fluid-4 py-fluid-1 text-fluid-sm font-medium ${
               tradeSide === 'sell' ? 'text-white' : 'text-slate-400'
             }`}
           >
@@ -226,18 +226,18 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
         </div>
 
         {/* TP */}
-        <div className="space-y-2">
-          <label className="flex items-center space-x-2 mb-1">
+        <div className="gap-fluid-2">
+          <label className="flex items-center gap-fluid-2 mb-1">
             <input
               type="checkbox"
               checked={takeProfitEnabled}
               onChange={() => setTakeProfitEnabled(!takeProfitEnabled)}
             />
-            <span className="text-sm font-medium">Take Profit</span>
+            <span className="text-fluid-sm font-medium">Take Profit</span>
             <span className="ml-auto text-xs text-dark-400">Mark</span>
           </label>
 
-          <div className="flex gap-2">
+          <div className="flex gap-fluid-2">
             <input
               type="text"
               placeholder="Giá kích hoạt"
@@ -254,7 +254,7 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
               disabled={!tpMarketEditable}
             />
             <button
-              className="btn btn-outline text-sm px-3"
+              className="btn btn-outline text-fluid-sm px-fluid-3"
               onClick={() => setTpMarketEditable(!tpMarketEditable)}
             >
               Thị trường
@@ -271,18 +271,18 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
         </div>
 
         {/* SL */}
-        <div className="space-y-2 mt-6">
-          <label className="flex items-center space-x-2 mb-1">
+        <div className="gap-fluid-2 mt-6">
+          <label className="flex items-center gap-fluid-2 mb-1">
             <input
               type="checkbox"
               checked={stopLossEnabled}
               onChange={() => setStopLossEnabled(!stopLossEnabled)}
             />
-            <span className="text-sm font-medium">Stop Loss</span>
+            <span className="text-fluid-sm font-medium">Stop Loss</span>
             <span className="ml-auto text-xs text-dark-400">Mark</span>
           </label>
 
-          <div className="flex gap-2">
+          <div className="flex gap-fluid-2">
             <input
               type="text"
               placeholder="Giá kích hoạt"
@@ -299,7 +299,7 @@ const TpSlModal: React.FC<TpSlModalProps> = ({
               disabled={!slMarketEditable}
             />
             <button
-              className="btn btn-outline text-sm px-3"
+              className="btn btn-outline text-fluid-sm px-fluid-3"
               onClick={() => setSlMarketEditable(!slMarketEditable)}
             >
               Thị trường

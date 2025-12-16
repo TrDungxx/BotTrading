@@ -83,7 +83,7 @@ export default function Bots() {
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">
             <FormattedMessage id="bots.title" />
@@ -98,7 +98,7 @@ export default function Bots() {
         </button>
       </div>
       
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-fluid-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-4 w-4 text-dark-400" />
@@ -123,7 +123,7 @@ export default function Bots() {
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('all')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'all'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -133,7 +133,7 @@ export default function Bots() {
           </button>
           <button
             onClick={() => setActiveTab('running')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'running'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -143,7 +143,7 @@ export default function Bots() {
           </button>
           <button
             onClick={() => setActiveTab('stopped')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${
               activeTab === 'stopped'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
@@ -157,9 +157,9 @@ export default function Bots() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredBots.map((bot) => (
           <div key={bot.id} className="card overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-dark-700">
+            <div className="flex justify-between items-center p-fluid-4 border-b border-dark-700">
               <div className="flex items-center">
-                <div className={`h-10 w-10 rounded-md flex items-center justify-center ${
+                <div className={`h-fluid-input w-10 rounded-fluid-md flex items-center justify-center ${
                   bot.type === 'DCA Bot' ? 'bg-primary-500/10' :
                   bot.type === 'Grid Bot' ? 'bg-success-500/10' : 'bg-warning-300/10'
                 }`}>
@@ -169,7 +169,7 @@ export default function Bots() {
                   }`} />
                 </div>
                 <div className="ml-3">
-                  <h3 className="text-base font-medium">{bot.name}</h3>
+                  <h3 className="text-fluid-base font-medium">{bot.name}</h3>
                   <p className="text-xs text-dark-400">{bot.type}</p>
                 </div>
               </div>
@@ -180,27 +180,27 @@ export default function Bots() {
               </div>
             </div>
             
-            <div className="p-4">
+            <div className="p-fluid-4">
               <div className="text-xs text-dark-400 mb-2">{bot.description}</div>
               
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-fluid-4 mb-4">
                 <div>
                   <div className="text-xs text-dark-400">
                     <FormattedMessage id="common.price" />
                   </div>
-                  <div className="text-sm font-medium">{bot.pair}</div>
+                  <div className="text-fluid-sm font-medium">{bot.pair}</div>
                 </div>
                 <div>
                   <div className="text-xs text-dark-400">
                     <FormattedMessage id="bots.exchange" />
                   </div>
-                  <div className="text-sm font-medium">{bot.exchange}</div>
+                  <div className="text-fluid-sm font-medium">{bot.exchange}</div>
                 </div>
                 <div>
                   <div className="text-xs text-dark-400">
                     <FormattedMessage id="bots.profitTotal" />
                   </div>
-                  <div className={`text-sm font-medium ${bot.profitTotal >= 0 ? 'text-success-500' : 'text-danger-500'}`}>
+                  <div className={`text-fluid-sm font-medium ${bot.profitTotal >= 0 ? 'text-success-500' : 'text-danger-500'}`}>
                     <FormattedNumber
                       value={bot.profitTotal}
                       style="currency"
@@ -212,7 +212,7 @@ export default function Bots() {
                   <div className="text-xs text-dark-400">
                     <FormattedMessage id="bots.deals" />
                   </div>
-                  <div className="text-sm font-medium">{bot.deals}</div>
+                  <div className="text-fluid-sm font-medium">{bot.deals}</div>
                 </div>
               </div>
               
@@ -223,7 +223,7 @@ export default function Bots() {
                   <FormattedMessage id={`common.${bot.status}`} />
                 </span>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-fluid-2">
                   {bot.status === 'running' ? (
                     <button className="p-1 text-dark-400 hover:text-danger-500\" title={<FormattedMessage id="bots.stop" />}>
                       <PauseCircle className="h-5 w-5" />

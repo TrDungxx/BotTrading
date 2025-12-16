@@ -62,11 +62,11 @@ export default function CreateAdmin() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
         <div className="relative w-full max-w-md text-center">
           <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-success-500/10 rounded-full mb-6">
-              <Shield className="h-8 w-8 text-success-500" />
+              <Shield className="h-fluid-input-sm w-8 text-success-500" />
             </div>
             
             <h1 className="text-2xl font-bold mb-4 text-success-500">
@@ -79,7 +79,7 @@ export default function CreateAdmin() {
             
             <Link
               to="/login"
-              className="w-full btn btn-primary py-3 text-base font-medium inline-flex items-center justify-center"
+              className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium inline-flex items-center justify-center"
             >
               Go to Login
             </Link>
@@ -90,18 +90,18 @@ export default function CreateAdmin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-danger-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-fluid-40 -right-40 w-80 h-fluid-input-sm0 bg-danger-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-fluid-input-sm0 bg-primary-500/10 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-danger-600 to-danger-500 rounded-2xl mb-4">
-            <Shield className="h-8 w-8 text-white" />
+            <Shield className="h-fluid-input-sm w-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-dark-300 bg-clip-text text-transparent">
             Create Admin Account
@@ -115,9 +115,9 @@ export default function CreateAdmin() {
         <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-3 p-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
+              <div className="flex items-center gap-fluid-3 p-fluid-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
-                <p className="text-sm text-danger-500">{error}</p>
+                <p className="text-fluid-sm text-danger-500">{error}</p>
               </div>
             )}
 
@@ -233,7 +233,7 @@ export default function CreateAdmin() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn bg-danger-500 hover:bg-danger-600 text-white py-3 text-base font-medium relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full btn bg-danger-500 hover:bg-danger-600 text-white py-fluid-3 text-fluid-base font-medium relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="relative z-10 flex items-center justify-center">
                 {isLoading ? (
@@ -263,8 +263,8 @@ export default function CreateAdmin() {
         </div>
 
         {/* Development Info */}
-        <div className="mt-6 p-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
-          <h3 className="text-sm font-medium text-warning-300 mb-2">Development Mode</h3>
+        <div className="mt-6 p-fluid-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
+          <h3 className="text-fluid-sm font-medium text-warning-300 mb-2">Development Mode</h3>
           <p className="text-xs text-warning-300/80 mb-2">
             For testing purposes, use admin key: <code className="bg-dark-700 px-1 rounded">ADMIN_CREATE_KEY_2024</code>
           </p>

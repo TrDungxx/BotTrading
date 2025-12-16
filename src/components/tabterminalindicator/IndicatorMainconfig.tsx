@@ -158,7 +158,7 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
     }
   };
 
-  const baseBtn = "px-3 py-2 rounded-md text-sm font-medium border transition disabled:opacity-60";
+  const baseBtn = "px-fluid-3 py-2 rounded-fluid-md text-fluid-sm font-medium border transition disabled:opacity-60";
   const longBtn = `${baseBtn} bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/15`;
   const shortBtn = `${baseBtn} bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/15`;
   const exitBtn = `${baseBtn} bg-slate-500/10 text-slate-300 border-slate-500/30 hover:bg-slate-500/15`;
@@ -168,7 +168,7 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
   return (
     <div className="space-y-5">
       {/* Indicator dropdown */}
-      <div className="rounded-lg border border-dark-600 bg-dark-700 p-3 relative">
+      <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-3 relative">
         <div className="text-xs text-gray-400 mb-2">Indicator</div>
         <IndicatorDropdown
           indicators={indicators}
@@ -184,58 +184,58 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
             typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: frac }) : "—";
           const fmtRate = (r?: number) => (typeof r === "number" ? `${Math.round(r * 100)}%` : "—");
           return (
-            <div className="mt-3 rounded-lg border border-dark-600 bg-dark-800 p-3">
-              <div className="grid grid-cols-4 gap-2">
-                <div className="rounded border border-dark-600 bg-dark-700 p-2">
-                  <div className="text-[10px] text-gray-400">Orders</div>
-                  <div className="text-sm font-medium">{s ? fmtNum(s.totalOrders, 0) : "—"}</div>
+            <div className="mt-3 rounded-lg border border-dark-600 bg-dark-800 p-fluid-3">
+              <div className="grid grid-cols-4 gap-fluid-2">
+                <div className="rounded border border-dark-600 bg-dark-700 p-fluid-2">
+                  <div className="text-fluid-2xs text-gray-400">Orders</div>
+                  <div className="text-fluid-sm font-medium">{s ? fmtNum(s.totalOrders, 0) : "—"}</div>
                 </div>
-                <div className="rounded border border-dark-600 bg-dark-700 p-2">
-                  <div className="text-[10px] text-gray-400">Trades</div>
-                  <div className="text-sm font-medium">{s ? fmtNum(s.totalTrades, 0) : "—"}</div>
+                <div className="rounded border border-dark-600 bg-dark-700 p-fluid-2">
+                  <div className="text-fluid-2xs text-gray-400">Trades</div>
+                  <div className="text-fluid-sm font-medium">{s ? fmtNum(s.totalTrades, 0) : "—"}</div>
                 </div>
-                <div className="rounded border border-dark-600 bg-dark-700 p-2">
-                  <div className="text-[10px] text-gray-400">Net PnL</div>
-                  <div className={`text-sm font-medium ${(s?.netPnL ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {s ? fmtNum(s.netPnL) : "—"} <span className="text-[10px] text-gray-400">USDT</span>
+                <div className="rounded border border-dark-600 bg-dark-700 p-fluid-2">
+                  <div className="text-fluid-2xs text-gray-400">Net PnL</div>
+                  <div className={`text-fluid-sm font-medium ${(s?.netPnL ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {s ? fmtNum(s.netPnL) : "—"} <span className="text-fluid-2xs text-gray-400">USDT</span>
                   </div>
                 </div>
-                <div className="rounded border border-dark-600 bg-dark-700 p-2">
-                  <div className="text-[10px] text-gray-400">Winrate</div>
-                  <div className="text-sm font-medium">{fmtRate(s?.winRate)}</div>
+                <div className="rounded border border-dark-600 bg-dark-700 p-fluid-2">
+                  <div className="text-fluid-2xs text-gray-400">Winrate</div>
+                  <div className="text-fluid-sm font-medium">{fmtRate(s?.winRate)}</div>
                 </div>
               </div>
-              {s?.timeframe && <div className="mt-2 text-[11px] text-gray-500">Range: <b>{s.timeframe}</b></div>}
+              {s?.timeframe && <div className="mt-2 text-fluid-xs text-gray-500">Range: <b>{s.timeframe}</b></div>}
             </div>
           );
         })()}
       </div>
 
       {/* OPEN / HIGH / Current */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-dark-600 bg-dark-700 p-2">
-          <div className="text-[10px] text-gray-400">OPEN</div>
-          <div className="text-sm font-medium">{lastOhlc?.open ?? "-"}</div>
+      <div className="grid grid-cols-3 gap-fluid-3">
+        <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-2">
+          <div className="text-fluid-2xs text-gray-400">OPEN</div>
+          <div className="text-fluid-sm font-medium">{lastOhlc?.open ?? "-"}</div>
         </div>
-        <div className="rounded-lg border border-dark-600 bg-dark-700 p-2">
-          <div className="text-[10px] text-gray-400">HIGH</div>
-          <div className="text-sm font-medium">{lastOhlc?.high ?? "-"}</div>
+        <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-2">
+          <div className="text-fluid-2xs text-gray-400">HIGH</div>
+          <div className="text-fluid-sm font-medium">{lastOhlc?.high ?? "-"}</div>
         </div>
-        <div className="rounded-lg border border-dark-600 bg-dark-700 p-2">
-          <div className="text-[10px] text-gray-400">Current</div>
-          <div className="text-sm font-medium">{currentPrice ?? "-"}</div>
+        <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-2">
+          <div className="text-fluid-2xs text-gray-400">Current</div>
+          <div className="text-fluid-sm font-medium">{currentPrice ?? "-"}</div>
         </div>
       </div>
 
       {/* Capital chips */}
-      <div className="space-y-2">
+      <div className="gap-fluid-2">
         <div className="text-xs text-gray-400">Capital %</div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-fluid-2">
           {pctOptions.map((p) => (
             <button
               key={p}
               onClick={() => setCapitalPct(p)}
-              className={`px-2.5 py-1.5 rounded border text-xs ${
+              className={`px-2.5 py-fluid-1.5 rounded border text-xs ${
                 capitalPct === p ? "border-primary/60 text-primary bg-primary/10" : "border-dark-600 text-gray-300 bg-dark-700 hover:bg-dark-600"
               }`}
             >
@@ -246,21 +246,21 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
       </div>
 
       {/* Slider + Manual qty */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-dark-600 bg-dark-700 p-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-fluid-4">
+        <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-3">
           <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
             <span>Capital % (slider)</span>
             <span className="text-gray-300 font-medium">{capitalPct}%</span>
           </div>
           <input type="range" min={1} max={100} step={1} value={capitalPct} onChange={(e) => setCapitalPct(Number(e.target.value))} className="w-full accent-primary" />
-          <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+          <div className="flex justify-between text-fluid-2xs text-gray-500 mt-1">
             <span>1%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
           </div>
         </div>
 
-        <div className="rounded-lg border border-dark-600 bg-dark-700 p-3 space-y-2">
+        <div className="rounded-lg border border-dark-600 bg-dark-700 p-fluid-3 gap-fluid-2">
           <div className="text-xs text-gray-400">Manual Quantity (BASE)</div>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-fluid-2 min-w-0">
             <input
               type="number"
               min={0}
@@ -275,7 +275,7 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
                 const n = Number(val);
                 setManualQty(Number.isFinite(n) && n >= 0 ? n : null);
               }}
-              className="w-full min-w-0 bg-dark-800 border border-dark-600 rounded px-2 py-1.5 text-sm"
+              className="w-full min-w-0 bg-dark-800 border border-dark-600 rounded px-2 py-fluid-1.5 text-fluid-sm"
             />
             <span className="shrink-0 w-12 text-right text-xs text-gray-400">{selectedSymbol.replace(/USDT$/i, "")}</span>
           </div>
@@ -284,7 +284,7 @@ const IndicatorMainConfig: React.FC<IndicatorMainConfigProps> = (props) => {
       </div>
 
       {/* Nút gửi tín hiệu */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-fluid-2">
         <button className={longBtn} onClick={() => send("long")} disabled={!!sending || !selectedIndicatorId}>
           {sending === "long" ? "Sending..." : "Long Message"}
         </button>
@@ -336,38 +336,38 @@ const IndicatorDropdown: React.FC<{
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full bg-dark-800 border border-dark-600 rounded px-3 py-2 text-left hover:bg-dark-700"
+        className="w-full bg-dark-800 border border-dark-600 rounded px-fluid-3 py-2 text-left hover:bg-dark-700"
       >
         {selected ? (
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start justify-between gap-fluid-3">
             <div className="min-w-0">
-              <div className="text-sm text-gray-200 truncate">
+              <div className="text-fluid-sm text-gray-200 truncate">
                 {selected.name} — {selected.symbol}
               </div>
-              <div className="text-[11px] text-gray-400 truncate">Description: {selected.description || "—"}</div>
+              <div className="text-fluid-xs text-gray-400 truncate">Description: {selected.description || "—"}</div>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex items-center gap-fluid-2">
               {selected.leverage ? (
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-fluid-xs">
                   {selected.leverage}x
                 </span>
               ) : null}
               {selected.marginType ? (
-                <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-fluid-xs">
                   {selected.marginType}
                 </span>
               ) : null}
             </div>
           </div>
         ) : (
-          <span className="text-sm text-gray-400">Chọn indicator…</span>
+          <span className="text-fluid-sm text-gray-400">Chọn indicator…</span>
         )}
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full rounded-md border border-dark-600 bg-dark-800 shadow-lg overflow-hidden" role="listbox">
+        <div className="absolute z-20 mt-2 w-full rounded-fluid-md border border-dark-600 bg-dark-800 shadow-lg overflow-hidden" role="listbox">
           <div className="max-h-72 overflow-auto divide-y divide-dark-700">
-            {indicators.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">Không có indicator</div>}
+            {indicators.length === 0 && <div className="px-fluid-3 py-2 text-fluid-sm text-gray-400">Không có indicator</div>}
             {indicators.map((it) => (
               <button
                 key={it.id}
@@ -377,23 +377,23 @@ const IndicatorDropdown: React.FC<{
                   setSelectedSymbol?.(it.symbol); // ⬅️ set symbol ngay khi chọn
                   setOpen(false);
                 }}
-                className={`w-full text-left px-3 py-2 hover:bg-dark-700 ${String(selectedId) === String(it.id) ? "bg-dark-700" : ""}`}
+                className={`w-full text-left px-fluid-3 py-2 hover:bg-dark-700 ${String(selectedId) === String(it.id) ? "bg-dark-700" : ""}`}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-fluid-3">
                   <div className="min-w-0">
-                    <div className="text-sm text-gray-200 truncate">
+                    <div className="text-fluid-sm text-gray-200 truncate">
                       {it.name} — {it.symbol}
                     </div>
-                    <div className="text-[11px] text-gray-400 line-clamp-2">Descripsion: {it.description || "—"}</div>
+                    <div className="text-fluid-xs text-gray-400 line-clamp-fluid-2">Descripsion: {it.description || "—"}</div>
                   </div>
-                  <div className="shrink-0 flex items-center gap-2">
+                  <div className="shrink-0 flex items-center gap-fluid-2">
                     {it.leverage ? (
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-fluid-xs">
                         {it.leverage}x
                       </span>
                     ) : null}
                     {it.marginType ? (
-                      <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[11px]">
+                      <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-fluid-xs">
                         {it.marginType}
                       </span>
                     ) : null}

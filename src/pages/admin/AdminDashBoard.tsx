@@ -340,7 +340,7 @@ export default function AdminSystem() {
 
       {/* Global message */}
       {message && (
-        <div className={`flex items-center gap-3 p-4 rounded-lg ${message.type === 'success'
+        <div className={`flex items-center gap-fluid-3 p-fluid-4 rounded-lg ${message.type === 'success'
             ? 'bg-success-500/10 border border-success-500/20'
             : 'bg-danger-500/10 border border-danger-500/20'
           }`}>
@@ -349,7 +349,7 @@ export default function AdminSystem() {
           ) : (
             <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
           )}
-          <p className={`text-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
+          <p className={`text-fluid-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
             {message.text}
           </p>
         </div>
@@ -360,15 +360,15 @@ export default function AdminSystem() {
         <div className="card p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary-500/10">
+              <div className="flex h-fluid-input-lg w-12 items-center justify-center rounded-fluid-md bg-primary-500/10">
                 <Users className="h-6 w-6 text-primary-500" />
               </div>
             </div>
             <div className="ml-4">
-              <h2 className="text-sm font-medium text-dark-400">Total Users</h2>
+              <h2 className="text-fluid-sm font-medium text-dark-400">Total Users</h2>
               <div className="mt-1 flex items-baseline">
                 <p className="text-2xl font-semibold">{accounts.length}</p>
-<p className="ml-2 text-sm text-dark-400">
+<p className="ml-2 text-fluid-sm text-dark-400">
   ({accounts.filter(a => a.status === 1).length} active)
 </p>
               </div>
@@ -393,7 +393,7 @@ User: {accounts.filter(a => a.type === 0).length}
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('users')}
-            className={`border-b-2 px-1 py-4 text-sm font-medium ${activeTab === 'users'
+            className={`border-b-2 px-1 py-fluid-4 text-fluid-sm font-medium ${activeTab === 'users'
                 ? 'border-primary-500 text-primary-500'
                 : 'border-transparent text-dark-400 hover:text-dark-300 hover:border-dark-600'
               }`}
@@ -409,7 +409,7 @@ User: {accounts.filter(a => a.type === 0).length}
       {activeTab === 'users' && (
         <>
           {/* Filters and search */}
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-fluid-4">
             <div className="relative flex-1">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <Search className="h-4 w-4 text-dark-400" />
@@ -422,7 +422,7 @@ User: {accounts.filter(a => a.type === 0).length}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 lg:flex-shrink-0">
+            <div className="flex flex-col sm:flex-row gap-fluid-2 lg:flex-shrink-0">
               <select
                 className="form-select min-w-[140px]"
                 value={selectedType}
@@ -460,42 +460,42 @@ User: {accounts.filter(a => a.type === 0).length}
           {/* Users table */}
           <div className="card overflow-hidden">
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-fluid-12">
+                <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-[800px] w-full divide-y divide-dark-700">
                   <thead>
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">User</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Type</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-dark-400">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Created</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Last Login</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">User</th>
+                      <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Type</th>
+                      <th className="px-6 py-fluid-3 text-center text-xs font-medium text-dark-400">Status</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Created</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Last Login</th>
+                      <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-dark-700">
                     {filteredUsers.map((account) => (
                       <tr key={account.id} className="hover:bg-dark-700/40">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="h-10 w-10 flex-shrink-0 rounded-full bg-dark-600 flex items-center justify-center">
+                            <div className="h-fluid-input w-10 flex-shrink-0 rounded-full bg-dark-600 flex items-center justify-center">
                               <span className="text-lg font-medium">{account.username[0].toUpperCase()}</span>
                             </div>
                             <div className="ml-4">
                               <div className="font-medium">{account.username}</div>
-                              <div className="text-sm text-dark-400">{account.email}</div>
+                              <div className="text-fluid-sm text-dark-400">{account.email}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getUserTypeBadgeColor(account.type)}`}>
                             {getUserTypeLabel(account.type)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-center">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(account.status)}`}>
                             {account.status === 0 && <Clock className="mr-1 h-3 w-3" />}
                             {account.status === 1 && <CheckCircle className="mr-1 h-3 w-3" />}
@@ -503,7 +503,7 @@ User: {accounts.filter(a => a.type === 0).length}
                             {getStatusLabel(account.status)}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                           <FormattedDate
                             value={account.createdAt}
                             day="2-digit"
@@ -511,7 +511,7 @@ User: {accounts.filter(a => a.type === 0).length}
                             year="numeric"
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                           {account.lastLogin ? (
                             <FormattedDate
                               value={account.lastLogin}
@@ -525,8 +525,8 @@ User: {accounts.filter(a => a.type === 0).length}
                             'Never'
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                          <div className="flex justify-end space-x-2">
+                        <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
+                          <div className="flex justify-end gap-fluid-2">
                             <button
                               onClick={() => handleUserAction(account, 'edit')}
                               className="text-dark-400 hover:text-primary-500"
@@ -559,10 +559,10 @@ User: {accounts.filter(a => a.type === 0).length}
           </div>
           {!isLoading && accounts.length > 0 && (
             <div className="flex justify-between items-center mt-4 px-6">
-              <div className="text-sm text-dark-400">
+              <div className="text-fluid-sm text-dark-400">
                 Showing page {page} of {totalPages}
               </div>
-              <div className="flex space-x-2">
+              <div className="flex gap-fluid-2">
                 <button
                   onClick={() => setPage(page - 1)}
                   disabled={page === 1}
@@ -575,7 +575,7 @@ User: {accounts.filter(a => a.type === 0).length}
                   <button
                     key={i + 1}
                     onClick={() => setPage(i + 1)}
-                    className={`px-3 py-2 text-sm rounded-md ${i + 1 === page
+                    className={`px-fluid-3 py-2 text-fluid-sm rounded-fluid-md ${i + 1 === page
                         ? 'bg-primary-500 text-white'
                         : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
                       }`}
@@ -619,12 +619,12 @@ User: {accounts.filter(a => a.type === 0).length}
           </div>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            <div className="flex items-center justify-center py-fluid-12">
+              <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : pendingUsers.length === 0 ? (
             <div className="card p-8 text-center">
-              <UserCheck className="h-12 w-12 text-dark-600 mx-auto mb-4" />
+              <UserCheck className="h-fluid-input-lg w-12 text-dark-600 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-dark-300 mb-2">No Pending Approvals</h3>
               <p className="text-dark-400">All user registrations have been reviewed.</p>
             </div>
@@ -634,23 +634,23 @@ User: {accounts.filter(a => a.type === 0).length}
                 <div key={user.id} className="card overflow-hidden">
                   <div className="p-6">
                     <div className="flex items-center mb-4">
-                      <div className="h-12 w-12 rounded-full bg-dark-600 flex items-center justify-center">
+                      <div className="h-fluid-input-lg w-12 rounded-full bg-dark-600 flex items-center justify-center">
                         <span className="text-lg font-medium">{user.username[0].toUpperCase()}</span>
                       </div>
                       <div className="ml-4">
                         <h3 className="font-medium">{user.username}</h3>
-                        <p className="text-sm text-dark-400">{user.email}</p>
+                        <p className="text-fluid-sm text-dark-400">{user.email}</p>
                       </div>
                     </div>
 
-                    <div className="space-y-2 mb-6">
-                      <div className="flex justify-between text-sm">
+                    <div className="gap-fluid-2 mb-6">
+                      <div className="flex justify-between text-fluid-sm">
                         <span className="text-dark-400">Type:</span>
-                        <span className={`px-2 py-1 rounded text-xs ${getUserTypeBadgeColor(user.type)}`}>
+                        <span className={`px-2 py-fluid-1 rounded text-xs ${getUserTypeBadgeColor(user.type)}`}>
                           {getUserTypeLabel(user.type)}
                         </span>
                       </div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-fluid-sm">
                         <span className="text-dark-400">Registered:</span>
                         <div className="text-right">
                           <div>
@@ -670,7 +670,7 @@ User: {accounts.filter(a => a.type === 0).length}
                           </div>
                         </div>
                       </div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-fluid-sm">
                         <span className="text-dark-400">Waiting time:</span>
                         <span className="text-warning-300 text-xs">
                           {getTimeSinceRegistration(user.createdAt)}
@@ -681,14 +681,14 @@ User: {accounts.filter(a => a.type === 0).length}
                     <div className="flex space-x-3">
                       <button
                         onClick={() => handleApprovalAction(user.id, 'approve')}
-                        className="flex-1 btn bg-success-500 hover:bg-success-600 text-white py-2 text-sm"
+                        className="flex-1 btn bg-success-500 hover:bg-success-600 text-white py-2 text-fluid-sm"
                       >
                         <UserCheck className="mr-2 h-4 w-4" />
                         Approve
                       </button>
                       <button
                         onClick={() => handleApprovalAction(user.id, 'reject')}
-                        className="flex-1 btn bg-danger-500 hover:bg-danger-600 text-white py-2 text-sm"
+                        className="flex-1 btn bg-danger-500 hover:bg-danger-600 text-white py-2 text-fluid-sm"
                       >
                         <UserX className="mr-2 h-4 w-4" />
                         Reject
@@ -711,8 +711,8 @@ User: {accounts.filter(a => a.type === 0).length}
             <div className="p-6 space-y-6">
               <div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-dark-400">Memory Usage</span>
-                  <span className="text-sm">{systemStats.memoryUsage}%</span>
+                  <span className="text-fluid-sm text-dark-400">Memory Usage</span>
+                  <span className="text-fluid-sm">{systemStats.memoryUsage}%</span>
                 </div>
                 <div className="h-2 bg-dark-700 rounded-full">
                   <div
@@ -722,13 +722,13 @@ User: {accounts.filter(a => a.type === 0).length}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
-                  <div className="text-sm text-dark-400">Uptime</div>
+                  <div className="text-fluid-sm text-dark-400">Uptime</div>
                   <div className="text-lg font-medium">{systemStats.uptime}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-dark-400">Last Backup</div>
+                  <div className="text-fluid-sm text-dark-400">Last Backup</div>
                   <div className="text-lg font-medium">
                     <FormattedDate
                       value={systemStats.lastBackup}
@@ -749,7 +749,7 @@ User: {accounts.filter(a => a.type === 0).length}
               <h2 className="text-lg font-medium">Quick Actions</h2>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <button className="btn btn-primary">
                   <Shield className="mr-2 h-4 w-4" />
                   Security Audit
@@ -774,7 +774,7 @@ User: {accounts.filter(a => a.type === 0).length}
 
       {/* Create Account Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-md">
             <div className="card-header flex justify-between items-center">
               <h2 className="text-lg font-medium">Create New Account</h2>
@@ -822,7 +822,7 @@ User: {accounts.filter(a => a.type === 0).length}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="create-type" className="form-label">Type</label>
                   <select
@@ -853,7 +853,7 @@ User: {accounts.filter(a => a.type === 0).length}
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end gap-fluid-2 pt-4">
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -881,7 +881,7 @@ User: {accounts.filter(a => a.type === 0).length}
 
       {/* Edit Account Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-md">
             <div className="card-header flex justify-between items-center">
               <h2 className="text-lg font-medium">Edit Account</h2>
@@ -915,7 +915,7 @@ User: {accounts.filter(a => a.type === 0).length}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="edit-type" className="form-label">Type</label>
                   <select
@@ -946,7 +946,7 @@ User: {accounts.filter(a => a.type === 0).length}
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end gap-fluid-2 pt-4">
                 <button
                   type="button"
                   className="btn btn-outline"

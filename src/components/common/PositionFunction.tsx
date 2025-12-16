@@ -11,6 +11,7 @@ import {
   POSITIONS_LS_KEY,
   POSITIONS_EVENT,
 } from '../binancewebsocket/BinanceWebSocketService';
+import FullscreenPositionModal, { ExpandIcon } from '../common/tabpositionfunction/FullscreenPositionModal';
 
 function readPositionsLS(): any[] {
   try {
@@ -102,6 +103,9 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
   const [openOrderCount, setOpenOrderCount] = useState(0);
   const [positionCount, setPositionCount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // ✅ NEW: Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // ✅ Detect mobile
   useEffect(() => {
@@ -287,7 +291,7 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex-shrink-0 px-3 py-2 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  className={`flex-shrink-0 px-fluid-3 py-fluid-2 text-fluid-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                     activeTab === tab.key
                       ? 'border-primary-500 text-primary-400'
                       : 'border-transparent text-dark-400 hover:text-dark-200'
@@ -295,12 +299,12 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
                 >
                   {tab.label}
                   {tab.key === 'position' && positionCount > 0 && (
-                    <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300">
+                    <span className="ml-1.5 text-fluid-sm px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300">
                       {positionCount}
                     </span>
                   )}
                   {tab.key === 'openOrder' && openOrderCount > 0 && (
-                    <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300">
+                    <span className="ml-1.5 text-fluid-sm px-1.5 py-0.5 rounded-full bg-primary-500/20 text-primary-300">
                       {openOrderCount}
                     </span>
                   )}
@@ -316,39 +320,68 @@ const PositionFunction: React.FC<PositionFunctionProps> = ({
     );
   }
 
-  // ✅ Desktop: Original layout
+  // ✅ Desktop: Original layout with Fullscreen button
   return (
-    <div className="w-full max-w-full overflow-hidden p-1.5 sm:p-3">
-      <div className="flex space-x-1.5 sm:space-x-3  border-b border-dark-700 mb-2 sm:mb-4 overflow-x-auto scrollbar-hide">
-        {tabs.map((tab) => (
+    <>
+      <div className="w-full max-w-full overflow-hidden p-1.5 sm:p-fluid-3">
+        {/* ✅ Header row with tabs and fullscreen button */}
+        <div className="flex items-center justify-between border-b border-dark-700 mb-2 sm:mb-4">
+          {/* Tabs */}
+          <div className="flex space-x-1.5 sm:space-x-3 overflow-x-auto scrollbar-hide">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                className={`py-fluid-1.5 px-1.5 sm:px-2 md:px-fluid-3 text-fluid-2xs sm:text-fluid-base font-medium border-b-2 whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.key
+                    ? 'border-primary-500 text-primary-500'
+                    : 'border-transparent text-gray-400 hover:text-white'
+                }`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <span className="inline-flex items-center">
+                  {tab.label}
+                  {tab.key === 'position' && positionCount > 0 && (
+                    <span className="ml-0.5 inline-flex items-center justify-center text-fluid-xs leading-none px-1 py-[1px] rounded-full bg-primary-100/20 text-primary-300">
+                      {positionCount}
+                    </span>
+                  )}
+                  {tab.key === 'openOrder' && openOrderCount > 0 && (
+                    <span className="ml-0.5 inline-flex items-center justify-center text-fluid-xs leading-none px-1 py-[1px] rounded-full bg-primary-100/20 text-primary-300">
+                      {openOrderCount}
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* ✅ Fullscreen button */}
           <button
-            key={tab.key}
-            className={`py-1.5 px-1.5 sm:px-2 md:px-3 text-[10px] sm:text-xs font-medium border-b-2 whitespace-nowrap flex-shrink-0 ${
-              activeTab === tab.key
-                ? 'border-primary-500 text-primary-500'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-            onClick={() => setActiveTab(tab.key)}
+            className="expand-fullscreen-btn ml-2 flex-shrink-0"
+            onClick={() => setIsFullscreen(true)}
+            title="Mở rộng toàn màn hình"
           >
-            <span className="inline-flex items-center">
-              {tab.label}
-              {tab.key === 'position' && positionCount > 0 && (
-                <span className="ml-0.5 inline-flex items-center justify-center text-[8px] leading-none px-1 py-[1px] rounded-full bg-primary-500/20 text-primary-300">
-                  {positionCount}
-                </span>
-              )}
-              {tab.key === 'openOrder' && openOrderCount > 0 && (
-                <span className="ml-0.5 inline-flex items-center justify-center text-[8px] leading-none px-1 py-[1px] rounded-full bg-primary-500/20 text-primary-300">
-                  {openOrderCount}
-                </span>
-              )}
-            </span>
+            <ExpandIcon />
           </button>
-        ))}
+        </div>
+
+        {/* Content */}
+        <div>{renderContent()}</div>
       </div>
 
-      <div>{renderContent()}</div>
-    </div>
+      {/* ✅ Fullscreen Modal */}
+      <FullscreenPositionModal
+        isOpen={isFullscreen}
+        onClose={() => setIsFullscreen(false)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabs={tabs}
+        positionCount={positionCount}
+        openOrderCount={openOrderCount}
+      >
+        {renderContent()}
+      </FullscreenPositionModal>
+    </>
   );
 };
 

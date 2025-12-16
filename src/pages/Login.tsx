@@ -95,20 +95,20 @@ export default function Login() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-success-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-fluid-40 -right-40 w-80 h-fluid-input-sm0 bg-primary-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-fluid-input-sm0 bg-success-500/10 rounded-full blur-3xl"></div>
       </div>
 
       {/* Guest Mode button */}
       <button
         onClick={handleGuestMode}
-        className="absolute top-6 left-6 flex items-center gap-2 text-dark-400 hover:text-dark-200 transition-colors"
+        className="absolute top-6 left-6 flex items-center gap-fluid-2 text-dark-400 hover:text-dark-200 transition-colors"
       >
         <Home className="h-5 w-5" />
-        <span className="text-sm">
+        <span className="text-fluid-sm">
           <FormattedMessage id="auth.guestMode" />
         </span>
       </button>
@@ -116,30 +116,30 @@ export default function Login() {
       <div className="relative w-full max-w-md">
         {/* Development Helper - Only show in development mode */}
         {import.meta.env.DEV && (
-          <div className="mb-6 p-4 bg-info-500/10 border border-info-500/20 rounded-lg">
-            <div className="flex items-center gap-2 mb-3">
+          <div className="mb-6 p-fluid-4 bg-info-500/10 border border-info-500/20 rounded-lg">
+            <div className="flex items-center gap-fluid-2 mb-3">
               <Info className="h-4 w-4 text-info-500" />
-              <span className="text-sm font-medium text-info-500">Development Mode - Test Credentials</span>
+              <span className="text-fluid-sm font-medium text-info-500">Development Mode - Test Credentials</span>
             </div>
-            <div className="space-y-2 text-xs">
-              <div className="grid grid-cols-3 gap-2">
+            <div className="gap-fluid-2 text-xs">
+              <div className="grid grid-cols-3 gap-fluid-2">
                 <button
                   onClick={() => handleQuickLogin('admin123', 'password')}
-                  className="px-2 py-1 bg-primary-500/20 text-primary-400 rounded text-left hover:bg-primary-500/30 transition-colors"
+                  className="px-2 py-fluid-1 bg-primary-500/20 text-primary-400 rounded text-left hover:bg-primary-500/30 transition-colors"
                 >
                   <div className="font-medium">Admin</div>
                   <div className="opacity-75">admin123</div>
                 </button>
                 <button
                   onClick={() => handleQuickLogin('super', 'password')}
-                  className="px-2 py-1 bg-warning-500/20 text-warning-400 rounded text-left hover:bg-warning-500/30 transition-colors"
+                  className="px-2 py-fluid-1 bg-warning-500/20 text-warning-400 rounded text-left hover:bg-warning-500/30 transition-colors"
                 >
                   <div className="font-medium">Super</div>
                   <div className="opacity-75">super</div>
                 </button>
                 <button
                   onClick={() => handleQuickLogin('trdung0107', 'limlim0107')}
-                  className="px-2 py-1 bg-success-500/20 text-success-400 rounded text-left hover:bg-success-500/30 transition-colors"
+                  className="px-2 py-fluid-1 bg-success-500/20 text-success-400 rounded text-left hover:bg-success-500/30 transition-colors"
                 >
                   <div className="font-medium">User</div>
                   <div className="opacity-75">user</div>
@@ -152,14 +152,14 @@ export default function Login() {
 
         {/* API Connection Info - Show when there's a connection error */}
         {showApiInfo && (
-          <div className="mb-6 p-4 bg-warning-500/10 border border-warning-500/20 rounded-lg">
-            <div className="flex items-start gap-3">
+          <div className="mb-6 p-fluid-4 bg-warning-500/10 border border-warning-500/20 rounded-lg">
+            <div className="flex items-start gap-fluid-3">
               <AlertCircle className="h-5 w-5 text-warning-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-warning-500 mb-2">API Connection Issue</h3>
-                <div className="text-xs text-warning-400 space-y-2">
+                <h3 className="text-fluid-sm font-medium text-warning-500 mb-2">API Connection Issue</h3>
+                <div className="text-xs text-warning-400 gap-fluid-2">
                   <p><strong>Current API URL:</strong> {API_BASE_URL}</p>
-                  <div className="bg-dark-800/50 p-2 rounded text-xs">
+                  <div className="bg-dark-800/50 p-fluid-2 rounded text-xs">
                     <p className="mb-1"><strong>To fix this:</strong></p>
                     <ol className="list-decimal list-inside space-y-1 text-warning-300">
                       <li>Make sure your backend server is running</li>
@@ -167,10 +167,10 @@ export default function Login() {
                       <li>Restart the frontend server after updating .env</li>
                     </ol>
                   </div>
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex gap-fluid-2 mt-3">
                     <button
                       onClick={handleRetry}
-                      className="flex items-center gap-1 px-2 py-1 bg-warning-500/20 text-warning-400 rounded text-xs hover:bg-warning-500/30 transition-colors"
+                      className="flex items-center gap-fluid-1 px-2 py-fluid-1 bg-warning-500/20 text-warning-400 rounded text-xs hover:bg-warning-500/30 transition-colors"
                     >
                       <RefreshCw className="h-3 w-3" />
                       Retry
@@ -179,7 +179,7 @@ export default function Login() {
                       href={API_BASE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 px-2 py-1 bg-info-500/20 text-info-400 rounded text-xs hover:bg-info-500/30 transition-colors"
+                      className="flex items-center gap-fluid-1 px-2 py-fluid-1 bg-info-500/20 text-info-400 rounded text-xs hover:bg-info-500/30 transition-colors"
                     >
                       <ExternalLink className="h-3 w-3" />
                       Test API
@@ -209,10 +209,10 @@ export default function Login() {
           <form onSubmit={handleSubmit} autoComplete="on" className="space-y-6">
 
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
+              <div className="flex items-start gap-fluid-3 p-fluid-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="text-sm text-danger-500 whitespace-pre-line">{error}</p>
+                  <p className="text-fluid-sm text-danger-500 whitespace-pre-line">{error}</p>
                 </div>
               </div>
             )}
@@ -230,7 +230,7 @@ export default function Login() {
                   name="username"
                   type="text"
                   required
-                  className="form-input pl-12 h-12 text-white placeholder:text-dark-400"
+                  className="form-input pl-12 h-fluid-input-lg text-white placeholder:text-dark-400"
                   placeholder="Nhập tên đăng nhập"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -251,7 +251,7 @@ export default function Login() {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   required
-                  className="form-input pl-10 pr-10 h-12"
+                  className="form-input pl-10 pr-10 h-fluid-input-lg"
                   placeholder={intl.formatMessage({ id: 'auth.passwordPlaceholder' })}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -279,13 +279,13 @@ export default function Login() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <label htmlFor="remember-me" className="ml-2 text-sm text-dark-300">
+                <label htmlFor="remember-me" className="ml-2 text-fluid-sm text-dark-300">
                   <FormattedMessage id="auth.rememberMe" />
                 </label>
               </div>
               <Link
                 to="/forgot-password"
-                className="text-sm text-primary-500 hover:text-primary-400 transition-colors"
+                className="text-fluid-sm text-primary-500 hover:text-primary-400 transition-colors"
               >
                 <FormattedMessage id="auth.forgotPassword" />
               </Link>
@@ -294,7 +294,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn btn-primary py-3 text-base font-medium relative overflow-hidden group"
+              className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium relative overflow-hidden group"
             >
               <span className="relative z-10 flex items-center justify-center">
                 {isLoading ? (
@@ -324,7 +324,7 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-dark-500">
+        <div className="text-center mt-8 text-fluid-sm text-dark-500">
           <FormattedMessage id="auth.termsText" />{' '}
           <a href="#" className="text-primary-500 hover:text-primary-400">
             <FormattedMessage id="auth.terms" />

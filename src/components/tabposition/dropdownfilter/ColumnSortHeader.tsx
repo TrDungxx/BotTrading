@@ -49,7 +49,7 @@ export const StandardSortHeader: React.FC<StandardSortHeaderProps> = ({
   return (
     <div
       onClick={handleClick}
-      className="flex items-center gap-1 cursor-pointer select-none hover:text-[#fcd535] transition-colors"
+      className="flex items-center gap-fluid-1 cursor-pointer select-none hover:text-[#fcd535] transition-colors"
     >
       <span>{label}</span>
       <div className="flex flex-col">
@@ -168,7 +168,7 @@ export const RoiSortHeader: React.FC<RoiSortHeaderProps> = ({
       <div
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 cursor-pointer select-none hover:text-[#fcd535] transition-colors"
+        className="flex items-center gap-fluid-1 cursor-pointer select-none hover:text-[#fcd535] transition-colors"
       >
         <span>PNL(ROI%)</span>
         <div className="flex flex-col">
@@ -207,21 +207,21 @@ export const RoiSortHeader: React.FC<RoiSortHeaderProps> = ({
       {isOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[9999] bg-[#1e2329] border border-[#2b3139] rounded shadow-lg py-1 min-w-[160px]"
+          className="fixed z-[9999] bg-[#1e2329] border border-[#2b3139] rounded shadow-lg py-fluid-1 min-w-[160px]"
           style={{
             top: position.top,
             left: position.left,
           }}
         >
           {options.map((opt) => (
-            <div key={opt.type} className="px-2 py-1">
-              <div className={`text-[10px] ${opt.color} mb-1`}>{opt.label}</div>
-              <div className="flex gap-2">
+            <div key={opt.type} className="px-2 py-fluid-1">
+              <div className={`text-fluid-2xs ${opt.color} mb-1`}>{opt.label}</div>
+              <div className="flex gap-fluid-2">
                 {/* Tăng dần */}
                 <button
                   onClick={() => handleSortClick(opt.type, 'asc')}
                   className={`
-                    flex items-center gap-1 px-2 py-1 rounded text-[10px]
+                    flex items-center gap-fluid-1 px-2 py-fluid-1 rounded text-fluid-2xs
                     ${isActive && roiType === opt.type && direction === 'asc'
                       ? `bg-[#2b3139] ${opt.color}`
                       : 'text-gray-400 hover:bg-[#2b3139]'
@@ -237,7 +237,7 @@ export const RoiSortHeader: React.FC<RoiSortHeaderProps> = ({
                 <button
                   onClick={() => handleSortClick(opt.type, 'desc')}
                   className={`
-                    flex items-center gap-1 px-2 py-1 rounded text-[10px]
+                    flex items-center gap-fluid-1 px-2 py-fluid-1 rounded text-fluid-2xs
                     ${isActive && roiType === opt.type && direction === 'desc'
                       ? `bg-[#2b3139] ${opt.color}`
                       : 'text-gray-400 hover:bg-[#2b3139]'
@@ -261,7 +261,7 @@ export const RoiSortHeader: React.FC<RoiSortHeaderProps> = ({
                   onSort(null);
                   setIsOpen(false);
                 }}
-                className="w-full text-center text-[10px] text-gray-400 hover:text-white py-1"
+                className="w-full text-center text-fluid-2xs text-gray-400 hover:text-white py-fluid-1"
               >
                 Bỏ sắp xếp
               </button>

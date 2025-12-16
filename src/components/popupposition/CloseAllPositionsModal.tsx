@@ -41,13 +41,13 @@ const CloseAllPositionsModal: React.FC<Props> = ({
         {/* Warning Icon */}
         <div className="flex justify-center mb-4">
           <div className="w-14 h-14 rounded-full bg-warning-500/20 flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8 text-warning-500" />
+            <AlertTriangle className="w-8 h-fluid-input-sm text-warning-500" />
           </div>
         </div>
 
         {/* Content */}
         <div className="text-center">
-          <p className="text-white text-sm leading-relaxed">
+          <p className="text-white text-fluid-sm leading-relaxed">
             Bạn có chắc là muốn đóng tất cả các vị thế ở mức giá thị trường và huỷ bỏ tất cả lệnh?
           </p>
           
@@ -59,10 +59,10 @@ const CloseAllPositionsModal: React.FC<Props> = ({
         </div>
 
         {/* Buttons */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-fluid-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 px-4 rounded-lg bg-dark-700 text-white font-medium hover:bg-dark-600 transition-colors"
+            className="flex-1 py-2.5 px-fluid-4 rounded-lg bg-dark-700 text-white font-medium hover:bg-dark-600 transition-colors"
           >
             Huỷ bỏ
           </button>
@@ -71,7 +71,7 @@ const CloseAllPositionsModal: React.FC<Props> = ({
               onConfirm();
               onClose();
             }}
-            className="flex-1 py-2.5 px-4 rounded-lg bg-[#fcd535] text-black font-medium hover:brightness-95 transition-all"
+            className="flex-1 py-2.5 px-fluid-4 rounded-lg bg-[#fcd535] text-black font-medium hover:brightness-95 transition-all"
           >
             Xác nhận
           </button>

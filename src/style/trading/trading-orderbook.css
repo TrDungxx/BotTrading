@@ -1,5 +1,5 @@
 /* ============================================
-   ORDERBOOK PANEL - RESPONSIVE
+   ORDERBOOK PANEL - FLUID RESPONSIVE
    ============================================ */
 
 .orderbook-panel {
@@ -9,6 +9,7 @@
   border-right: 1px solid var(--border-panel);
   min-width: 0;
   overflow: hidden;
+  width: var(--orderbook-width);
 }
 
 /* ===== ORDERBOOK HEADER ===== */
@@ -16,32 +17,74 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: var(--trading-gap-md) var(--trading-gap-lg);
   border-bottom: 1px solid var(--border-panel);
   flex-shrink: 0;
-  min-height: 48px;
+  min-height: clamp(40px, 2.5vw, 64px);
 }
 
-.orderbook-header h3 {
-  font-size: 0.875rem;
+.orderbook-header h3,
+.orderbook-title {
+  font-size: var(--stats-font-lg);
   font-weight: 600;
+  color: rgba(226, 232, 240, 0.95);
 }
 
 .orderbook-controls {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--trading-gap-sm);
 }
 
 .orderbook-controls button {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
+  font-size: var(--stats-font-sm);
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
   color: rgba(148, 163, 184, 0.8);
   transition: color var(--transition-fast);
+  border-radius: var(--trading-radius-sm);
 }
 
 .orderbook-controls button:hover {
   color: rgba(226, 232, 240, 0.9);
+  background: rgba(71, 85, 105, 0.3);
+}
+
+.orderbook-controls button.active {
+  color: rgba(59, 130, 246, 0.95);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Precision selector */
+.precision-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-xs);
+}
+
+.precision-selector select {
+  font-size: var(--stats-font-xs);
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-panel);
+  border-radius: var(--trading-radius-sm);
+  color: rgba(226, 232, 240, 0.9);
+}
+
+/* ===== ORDERBOOK TABLE HEADER ===== */
+.orderbook-table-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border-panel);
+  flex-shrink: 0;
+}
+
+.orderbook-table-header span:last-child {
+  text-align: right;
 }
 
 /* ===== ORDERBOOK CONTENT ===== */
@@ -59,50 +102,38 @@
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  padding: 0.5rem;
+  padding: var(--trading-gap-sm);
 }
 
 /* ✅ HIDE SCROLLBAR - Keep scroll functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+.scrollbar-hide,
+.orderbook-asks,
+.orderbook-bids {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari, Opera */
-}
-
-/* Custom scrollbar for orderbook (LEGACY - now hidden) */
+.scrollbar-hide::-webkit-scrollbar,
 .orderbook-asks::-webkit-scrollbar,
 .orderbook-bids::-webkit-scrollbar {
-  display: none; /* ✅ CHANGED: Hide scrollbar */
+  display: none;
 }
 
-/* Firefox */
-.orderbook-asks,
-.orderbook-bids {
-  scrollbar-width: none; /* ✅ ADDED: Hide scrollbar in Firefox */
-}
-
-/* IE/Edge */
-.orderbook-asks,
-.orderbook-bids {
-  -ms-overflow-style: none; /* ✅ ADDED: Hide scrollbar in IE/Edge */
-}
-
-/* ===== ORDER ROWS ===== */
+/* ===== ORDER ROWS - FLUID ===== */
 .order-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  font-family: 'Courier New', monospace;
-  padding: 0.125rem 0.25rem;
+  font-size: var(--stats-font-sm);
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
   position: relative;
   cursor: pointer;
   transition: background-color var(--transition-fast);
-  border-radius: 2px;
+  border-radius: var(--trading-radius-sm);
   margin-bottom: 1px;
+  height: var(--orderbook-row-height);
+  min-height: var(--orderbook-row-height);
 }
 
 .order-row:hover {
@@ -123,12 +154,22 @@
   color: rgba(34, 197, 94, 0.95);
 }
 
-.order-row-quantity {
+.order-row-quantity,
+.order-row-size {
   position: relative;
   z-index: 2;
   color: rgba(203, 213, 225, 0.8);
+  text-align: center;
 }
 
+.order-row-total {
+  position: relative;
+  z-index: 2;
+  color: rgba(148, 163, 184, 0.7);
+  text-align: right;
+}
+
+/* Depth bar */
 .order-row-depth {
   position: absolute;
   right: 0;
@@ -137,6 +178,7 @@
   z-index: 1;
   opacity: 0.15;
   transition: opacity var(--transition-fast);
+  border-radius: var(--trading-radius-sm);
 }
 
 .order-row:hover .order-row-depth {
@@ -152,8 +194,9 @@
 }
 
 /* ===== CURRENT PRICE SEPARATOR ===== */
-.orderbook-current-price {
-  padding: 0.5rem 1rem;
+.orderbook-current-price,
+.orderbook-spread {
+  padding: var(--trading-gap-sm) var(--trading-gap-lg);
   border-top: 1px solid var(--border-panel);
   border-bottom: 1px solid var(--border-panel);
   text-align: center;
@@ -162,9 +205,9 @@
 }
 
 .orderbook-price-value {
-  font-size: 0.875rem;
+  font-size: var(--price-font-sm);
   font-weight: 700;
-  font-family: 'Courier New', monospace;
+  font-family: 'IBM Plex Mono', monospace;
 }
 
 .orderbook-price-value.positive {
@@ -176,9 +219,14 @@
 }
 
 .orderbook-price-usd {
-  font-size: 0.75rem;
+  font-size: var(--stats-font-sm);
   color: rgba(148, 163, 184, 0.8);
-  margin-top: 0.125rem;
+  margin-top: var(--trading-gap-xs);
+}
+
+.orderbook-spread-value {
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.7);
 }
 
 /* ===== EMPTY STATE ===== */
@@ -190,20 +238,51 @@
   height: 100%;
   color: rgba(148, 163, 184, 0.7);
   text-align: center;
-  padding: 2rem 1rem;
+  padding: var(--trading-gap-xl) var(--trading-gap-lg);
+}
+
+.orderbook-empty-icon {
+  width: clamp(32px, 2.083vw, 56px);
+  height: clamp(32px, 2.083vw, 56px);
+  margin-bottom: var(--trading-gap-md);
+  opacity: 0.5;
 }
 
 .orderbook-empty-title {
-  font-size: 0.875rem;
-  margin-bottom: 0.25rem;
+  font-size: var(--stats-font-lg);
+  margin-bottom: var(--trading-gap-xs);
 }
 
 .orderbook-empty-subtitle {
-  font-size: 0.75rem;
+  font-size: var(--stats-font-sm);
   opacity: 0.7;
 }
 
-/* ===== RESPONSIVE ADJUSTMENTS ===== */
+/* ===== LOADING STATE ===== */
+.orderbook-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: rgba(148, 163, 184, 0.7);
+}
+
+.orderbook-loading-spinner {
+  width: clamp(20px, 1.302vw, 36px);
+  height: clamp(20px, 1.302vw, 36px);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: rgba(59, 130, 246, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
 
 /* Mobile (< 768px) - HIDDEN */
 @media (max-width: 767px) {
@@ -219,51 +298,125 @@
   }
 }
 
-/* Desktop (1024px - 1279px) - Compact */
+/* Desktop Small (1024px - 1279px) - Compact */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .orderbook-panel {
-    width: var(--orderbook-md);
+    width: 220px;
   }
   
   .orderbook-header {
-    padding: 0.625rem 0.875rem;
+    padding: 8px 12px;
+    min-height: 40px;
   }
   
   .order-row {
-    font-size: 0.7rem;
-    padding: 0.125rem 0.125rem;
+    font-size: 10px;
+    padding: 2px 4px;
+    height: 18px;
+    min-height: 18px;
+  }
+  
+  .orderbook-price-value {
+    font-size: 12px;
   }
 }
 
-/* Large (1280px - 1535px) - Comfortable */
+/* Desktop Medium (1280px - 1535px) */
 @media (min-width: 1280px) and (max-width: 1535px) {
   .orderbook-panel {
-    width: var(--orderbook-lg);
-  }
-}
-
-/* Extra Large (>= 1536px) - Full */
-@media (min-width: 1536px) {
-  .orderbook-panel {
-    width: var(--orderbook-xl);
+    width: 260px;
   }
   
   .order-row {
-    font-size: 0.8125rem;
+    font-size: 11px;
+    height: 20px;
+    min-height: 20px;
+  }
+}
+
+/* Desktop Large (1536px - 2399px) */
+@media (min-width: 1536px) and (max-width: 2399px) {
+  .orderbook-panel {
+    width: 280px;
+  }
+  
+  .order-row {
+    font-size: 12px;
+    height: 22px;
+    min-height: 22px;
+  }
+}
+
+/* 2K (2400px - 3199px) */
+@media (min-width: 2400px) and (max-width: 3199px) {
+  .orderbook-panel {
+    width: 340px;
+  }
+  
+  .orderbook-header {
+    padding: 14px 18px;
+    min-height: 56px;
+  }
+  
+  .order-row {
+    font-size: 14px;
+    padding: 4px 8px;
+    height: 28px;
+    min-height: 28px;
+  }
+  
+  .orderbook-price-value {
+    font-size: 18px;
+  }
+}
+
+/* 4K (3200px+) */
+@media (min-width: 3200px) {
+  .orderbook-panel {
+    width: 400px;
+  }
+  
+  .orderbook-header {
+    padding: 18px 24px;
+    min-height: 72px;
+  }
+  
+  .orderbook-header h3 {
+    font-size: 18px;
+  }
+  
+  .order-row {
+    font-size: 16px;
+    padding: 6px 10px;
+    height: 32px;
+    min-height: 32px;
+  }
+  
+  .orderbook-price-value {
+    font-size: 22px;
+  }
+  
+  .orderbook-table-header {
+    font-size: 12px;
+    padding: 10px 16px;
   }
 }
 
 /* ===== FLOATING ORDERBOOK (Future feature) ===== */
 .orderbook-floating {
   position: fixed;
-  top: calc(var(--header-height) + 1rem);
-  right: 1rem;
+  top: calc(var(--header-height) + var(--trading-gap-lg));
+  right: var(--trading-gap-lg);
   width: var(--orderbook-sm);
-  max-height: calc(100vh - var(--header-height) - 2rem);
+  max-height: calc(100vh - var(--header-height) - var(--trading-gap-xl));
   background: var(--bg-panel);
   border: 1px solid var(--border-panel);
-  border-radius: 0.5rem;
+  border-radius: var(--trading-radius-lg);
   box-shadow: var(--shadow-floating);
   z-index: var(--z-orderbook-mobile);
   backdrop-filter: blur(12px);
+}
+
+.orderbook-floating .orderbook-header {
+  cursor: move;
 }

@@ -1451,7 +1451,7 @@ useEffect(() => {
     <div className="h-[calc(100dvh-4rem)] bg-dark-900 flex flex-col">
       {/* Thanh trên cùng: chọn symbol + trạng thái + tài khoản */}
       <div className="shrink-0 border-b border-dark-700 bg-dark-800">
-        <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center justify-between px-fluid-4 py-2">
           {/* Trái: chọn symbol + stats nhanh */}
           <div className="flex items-center space-x-6">
             <div className="flex items-center">
@@ -1459,7 +1459,7 @@ useEffect(() => {
                 {/* Nút chọn symbol */}
                 <div
   ref={symbolButtonRef}
-  className="flex items-center space-x-2 hover:bg-dark-700 px-3 py-2 rounded transition-colors cursor-default"
+  className="flex items-center gap-fluid-2 hover:bg-dark-700 px-fluid-3 py-2 rounded transition-colors cursor-default"
   onMouseEnter={handleSymbolButtonEnter}
   onMouseLeave={handleSymbolButtonLeave}
 >
@@ -1499,14 +1499,14 @@ useEffect(() => {
       </div>
 
             {/* Chọn market */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-fluid-2">
               <span className="text-xs text-dark-400">Market:</span>
               <select
                 value={selectedMarket}
                 onChange={(e) =>
                   handleMarketChange(e.target.value as "spot" | "futures")
                 }
-                className="bg-dark-700 border border-dark-600 rounded px-2 py-1 text-xs focus:border-primary-500 focus:outline-none"
+                className="bg-dark-700 border border-dark-600 rounded px-2 py-fluid-1 text-xs focus:border-primary-500 focus:outline-none"
               >
                 <option value="futures">FUTURES</option>
                 <option value="spot">SPOT</option>
@@ -1527,7 +1527,7 @@ useEffect(() => {
 
                 <div className="flex flex-col">
                   <span
-                    className={`text-sm font-medium ${
+                    className={`text-fluid-sm font-medium ${
                       parseFloat(tickerData.priceChange) >= 0
                         ? "text-success-500"
                         : "text-danger-500"
@@ -1553,7 +1553,7 @@ useEffect(() => {
 
           {/* Phải: trạng thái kết nối + chọn tài khoản + controls */}
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-fluid-2">
               {connectionStatus === "connected" ? (
                 <Wifi className="h-4 w-4 text-success-500" />
               ) : connectionStatus === "connecting" ? (
@@ -1567,7 +1567,7 @@ useEffect(() => {
             </div>
 
             {/* Tài khoản Binance đang chọn */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-fluid-2">
               <span className="text-xs text-dark-400">Tài khoản:</span>
               <BinanceAccountSelector
                 onSelect={(id) => {
@@ -1595,7 +1595,7 @@ useEffect(() => {
 
        {/* Dải stats 24h - ✅ LUÔN render với min-height cố định */}
 <div 
-  className="flex items-center space-x-8 px-4 py-2 text-xs border-t border-dark-700"
+  className="flex items-center space-x-8 px-fluid-4 py-2 text-xs border-t border-dark-700"
   style={{ minHeight: '52px' }} // ✅ Thêm dòng này
 >
   {tickerData ? (
@@ -1630,19 +1630,19 @@ useEffect(() => {
   ) : (
     // ✅ Skeleton placeholder khi đang load
     <>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-fluid-1">
         <span className="text-dark-400">24h High</span>
         <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-fluid-1">
         <span className="text-dark-400">24h Low</span>
         <div className="h-4 w-20 bg-dark-700 animate-pulse rounded" />
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-fluid-1">
         <span className="text-dark-400">24h Volume (BTC)</span>
         <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
       </div>
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-fluid-1">
         <span className="text-dark-400">24h Volume (USDT)</span>
         <div className="h-4 w-24 bg-dark-700 animate-pulse rounded" />
       </div>
@@ -1652,20 +1652,20 @@ useEffect(() => {
       </div>
 
       {/* Thân chính: Chart trái, Order book giữa, Form phải */}
-      <div className="flex gap-1 flex-1 min-h-0 overflow-hidden">
+      <div className="flex gap-fluid-1 flex-1 min-h-0 overflow-hidden">
         {/* Trái: Biểu đồ */}
         <div className="flex-1 min-w-0 bg-dark-800 border-r border-dark-700 overflow-hidden">
           <div className="h-full flex flex-col">
             {/* Controls chart */}
-<div className="flex items-center justify-between p-3 border-b border-dark-700">
+<div className="flex items-center justify-between p-fluid-3 border-b border-dark-700">
   <div className="flex items-center space-x-4">
     {/* 1. Timeframe selector */}
-    <div className="flex items-center space-x-2">
+    <div className="flex items-center gap-fluid-2">
   {pinnedTimeframes.map((interval) => (
     <button
       key={interval}
       onClick={() => handleIntervalChange(interval)}
-      className={`text-xs px-2 py-1 rounded hover:bg-dark-600 ${
+      className={`text-xs px-2 py-fluid-1 rounded hover:bg-dark-600 ${
         selectedInterval === interval ? "bg-dark-700" : ""
       }`}
     >
@@ -1681,7 +1681,7 @@ useEffect(() => {
       setShowTimeframeSelector(true);
     }, 0);
   }}
-  className="text-xs px-2 py-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
+  className="text-xs px-2 py-fluid-1 rounded hover:bg-dark-600 text-dark-400 border border-dark-600"
   title="Edit timeframes"
 >
   <ChevronDown className="h-3 w-3" />
@@ -1700,7 +1700,7 @@ useEffect(() => {
     {/* 3. Settings button */}
     <div className="flex items-center gap-2 relative" ref={panelRef}>
       <button
-        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-md"
+        className="btn-outline p-2 hover:ring-1 ring-primary-500 rounded-fluid-md"
         title="Cài đặt biểu đồ"
         onClick={() => setShowSettings((v) => !v)}
       >
@@ -1720,7 +1720,7 @@ useEffect(() => {
   </div>
 
   {/* Right side controls */}
-  <div className="flex items-center space-x-2">
+  <div className="flex items-center gap-fluid-2">
     <button className="p-1 hover:bg-dark-700 rounded">
       <TrendingUp className="h-4 w-4 text-dark-400" />
     </button>
@@ -1749,7 +1749,7 @@ useEffect(() => {
               </section>
 
               {/* Overlay OHLCV */}
-               {/*<div className="absolute top-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
+               {/*<div className="absolute top-fluid-4 left-4 bg-dark-800/80 rounded p-2 text-xs z-10">
                 {klineData && (
                   <div className="space-y-1">
                     <div>
@@ -1792,9 +1792,9 @@ useEffect(() => {
         {/* Giữa: Order Book */}
         <div className="min-h-0 w-56 md:w-64 bg-dark-800 border-r border-dark-700">
           <div className="h-full flex flex-col">
-            <div className="flex items-center justify-between p-3 border-b border-dark-700">
-              <h3 className="text-sm font-medium">Order Book</h3>
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center justify-between p-fluid-3 border-b border-dark-700">
+              <h3 className="text-fluid-sm font-medium">Order Book</h3>
+              <div className="flex items-center gap-fluid-2">
                 <button className="text-xs text-dark-400 hover:text-dark-200">
                   0.01
                 </button>
@@ -1840,10 +1840,10 @@ useEffect(() => {
                   </div>
 
                   {/* Giá hiện tại */}
-                  <div className="px-2 py-1 border-y border-dark-700">
+                  <div className="px-2 py-fluid-1 border-y border-dark-700">
                     <div className="text-center">
                       <div
-                        className={`text-sm font-bold ${
+                        className={`text-fluid-sm font-bold ${
                           tickerData && parseFloat(tickerData.priceChange) >= 0
                             ? "text-success-500"
                             : "text-danger-500"
@@ -1896,7 +1896,7 @@ useEffect(() => {
               ) : (
                 <div className="flex items-center justify-center h-full text-dark-400">
                   <div className="text-center">
-                    <div className="text-sm">No order book data</div>
+                    <div className="text-fluid-sm">No order book data</div>
                     <div className="text-xs mt-1">
                       Waiting for WebSocket connection...
                     </div>

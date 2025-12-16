@@ -1,63 +1,128 @@
 /* ============================================
-   TRADING HEADER - AGGRESSIVE STATS HIDING
-   Ẩn stats row sớm hơn để tránh cắt trading form
+   TRADING HEADER - FULLY FLUID RESPONSIVE
+   Aggressive stats hiding with fluid scaling
    ============================================ */
+
+/* ===== MAIN HEADER CONTAINER ===== */
+.trading-header {
+  width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-panel);
+}
 
 /* ===== SYMBOL SELECTOR ROW ===== */
 .symbol-selector-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: var(--trading-gap-md) var(--trading-gap-lg);
   min-height: var(--header-height);
-  gap: 1rem;
+  gap: var(--trading-gap-lg);
   overflow: hidden;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
-/* Left side: Symbol + Stats */
+/* ===== LEFT SIDE: Symbol + Stats ===== */
 .symbol-info-group {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--trading-gap-xl);
   flex: 1;
   min-width: 0;
   overflow: hidden;
 }
 
-/* Symbol selector */
+/* Symbol selector dropdown */
 .symbol-selector {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--trading-gap-sm);
   flex-shrink: 0;
 }
 
-/* Price display */
+.symbol-selector .symbol-name {
+  font-size: var(--price-font-md);
+  font-weight: 600;
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.symbol-selector .symbol-icon {
+  width: clamp(20px, 1.302vw, 36px);
+  height: clamp(20px, 1.302vw, 36px);
+}
+
+.symbol-selector .dropdown-arrow {
+  width: clamp(12px, 0.781vw, 20px);
+  height: clamp(12px, 0.781vw, 20px);
+  opacity: 0.7;
+}
+
+/* ===== PRICE DISPLAY ===== */
 .price-display-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--trading-gap-lg);
   flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
 }
 
-/* Right side: Controls */
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-shrink: 0;
+.current-price {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--price-font-xl);
+  font-weight: 600;
+  letter-spacing: -0.5px;
 }
 
-/* ===== STATS ROW - AGGRESSIVE HIDING ===== */
+.current-price.positive {
+  color: #10b981;
+}
+
+.current-price.negative {
+  color: #ef4444;
+}
+
+.price-change {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--trading-gap-xs);
+}
+
+.price-change .usd-price {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--stats-font-md);
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.price-change .percent {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--stats-font-md);
+  font-weight: 500;
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
+  border-radius: var(--trading-radius-sm);
+}
+
+.price-change .percent.positive {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.price-change .percent.negative {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ===== STATS ROW 24H - FULLY FLUID ===== */
 .stats-row-24h {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  padding: 0 1rem;
-  font-size: 0.75rem;
+  gap: var(--trading-gap-xl);
+  padding: 0 var(--trading-gap-lg);
+  font-size: var(--stats-font-md);
   white-space: nowrap;
   flex-shrink: 1;
   min-width: 0;
@@ -72,23 +137,97 @@
   overflow: hidden;
 }
 
-/* ===== AGGRESSIVE HIDING STRATEGY ===== */
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--trading-gap-xs);
+}
 
-/* >= 1800px: Show all 4 stats (Ultra wide only) */
+.stat-item .label {
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.stat-item .value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: var(--stats-font-md);
+  font-weight: 500;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+/* ===== RIGHT SIDE: Controls ===== */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-md);
+  flex-shrink: 0;
+}
+
+.header-controls button,
+.header-controls .control-btn {
+  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  font-size: var(--stats-font-sm);
+  border-radius: var(--trading-radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-xs);
+  transition: all var(--transition-fast);
+}
+
+.header-controls button:hover {
+  background: rgba(71, 85, 105, 0.4);
+}
+
+.header-controls .icon,
+.header-controls svg {
+  width: clamp(14px, 0.833vw, 24px);
+  height: clamp(14px, 0.833vw, 24px);
+}
+
+/* Connection status */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-xs);
+  font-size: var(--stats-font-sm);
+}
+
+.connection-status .dot {
+  width: clamp(6px, 0.417vw, 12px);
+  height: clamp(6px, 0.417vw, 12px);
+  border-radius: 50%;
+}
+
+.connection-status .dot.connected {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.connection-status .dot.disconnected {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+/* ============================================
+   ✅ AGGRESSIVE STATS HIDING - FLUID VERSION
+   Chỉ control visibility, giữ nguyên fluid sizing
+   ============================================ */
+
+/* >= 1800px: Show all 4 stats */
 @media (min-width: 1800px) {
   .stats-row-24h {
     display: flex !important;
-    gap: 2rem;
-    font-size: 0.7rem;
   }
 }
 
-/* 1650-1799px: Show 4 stats, compact */
+/* 1650-1799px: Show 4 stats, slightly tighter gap */
 @media (min-width: 1650px) and (max-width: 1799px) {
   .stats-row-24h {
     display: flex !important;
-    gap: 0.5rem;
-    font-size: 0.6rem;
+    --stats-gap-scale: 0.7;
+    gap: calc(var(--trading-gap-lg) * var(--stats-gap-scale, 1));
   }
 }
 
@@ -96,13 +235,13 @@
 @media (min-width: 1500px) and (max-width: 1649px) {
   .stats-row-24h {
     display: flex !important;
-    gap: 1.25rem;
-    padding: 0 0.75rem;
-    font-size: 0.7rem;
+    --stats-gap-scale: 0.8;
+    gap: calc(var(--trading-gap-lg) * var(--stats-gap-scale, 1));
+    padding: 0 var(--trading-gap-md);
   }
   
   .stats-row-24h > *:nth-child(4) {
-    display: none !important; /* Hide "24h Volume (USDT)" */
+    display: none !important;
   }
 }
 
@@ -110,14 +249,14 @@
 @media (min-width: 1350px) and (max-width: 1499px) {
   .stats-row-24h {
     display: flex !important;
-    gap: 1rem;
-    padding: 0 0.5rem;
-    font-size: 0.65rem;
+    --stats-gap-scale: 0.7;
+    gap: calc(var(--trading-gap-md) * var(--stats-gap-scale, 1));
+    padding: 0 var(--trading-gap-sm);
   }
   
   .stats-row-24h > *:nth-child(3),
   .stats-row-24h > *:nth-child(4) {
-    display: none !important; /* Hide both volume stats */
+    display: none !important;
   }
 }
 
@@ -125,13 +264,12 @@
 @media (min-width: 1200px) and (max-width: 1349px) {
   .stats-row-24h {
     display: flex !important;
-    gap: 0.75rem;
-    padding: 0 0.5rem;
-    font-size: 0.65rem;
+    gap: var(--trading-gap-sm);
+    padding: 0 var(--trading-gap-sm);
   }
   
   .stats-row-24h > *:not(:first-child) {
-    display: none !important; /* Only show "24h High" */
+    display: none !important;
   }
 }
 
@@ -142,47 +280,100 @@
   }
 }
 
-/* ===== HEADER CONTROLS HIDING ===== */
+/* ============================================
+   ✅ HEADER CONTROLS HIDING - FLUID
+   ============================================ */
 
-/* Hide controls progressively */
 @media (max-width: 1599px) {
-  .header-controls > *:nth-child(3) { /* Subscriptions */
+  .header-controls > *:nth-child(3) {
     display: none !important;
   }
 }
 
 @media (max-width: 1399px) {
-  .header-controls > *:nth-child(4) { /* Refresh */
+  .header-controls > *:nth-child(4) {
     display: none !important;
   }
 }
 
 @media (max-width: 1299px) {
-  .header-controls > *:nth-child(5) { /* Settings */
+  .header-controls > *:nth-child(5) {
     display: none !important;
   }
 }
 
 @media (max-width: 1199px) {
-  /* Keep only connection + account */
   .header-controls > *:not(:first-child):not(:nth-child(2)) {
     display: none !important;
   }
 }
 
-/* ===== MOBILE/TABLET ===== */
+/* ===== MARKET SELECTOR LABEL ===== */
+@media (max-width: 1399px) {
+  .symbol-info-group > div:has(select) > span {
+    display: none;
+  }
+}
+
+/* ============================================
+   ✅ PRICE DISPLAY - FLUID (không dùng fixed px)
+   ============================================ */
+
+@media (max-width: 1299px) {
+  .price-display-group {
+    gap: var(--trading-gap-sm);
+  }
+  
+  .price-display-group > div:nth-child(2) {
+    display: none;
+  }
+}
+
+/* ============================================
+   ✅ 2K SCREENS - Scale up via CSS variables
+   ============================================ */
+
+@media (min-width: 2400px) {
+  .symbol-selector-row {
+    --header-height-scale: 1.3;
+    min-height: calc(var(--header-height) * var(--header-height-scale, 1));
+    padding: var(--trading-gap-lg) var(--trading-gap-xl);
+  }
+}
+
+/* ============================================
+   ✅ 4K SCREENS - Scale up via CSS variables
+   ============================================ */
+
+@media (min-width: 3200px) {
+  .symbol-selector-row {
+    --header-height-scale: 1.6;
+    min-height: calc(var(--header-height) * var(--header-height-scale, 1));
+    padding: var(--trading-gap-xl) calc(var(--trading-gap-xl) * 1.5);
+  }
+}
+
+/* ============================================
+   ✅ MOBILE/TABLET - FLUID
+   ============================================ */
+
 @media (max-width: 767px) {
   .symbol-selector-row {
-    padding: 0.5rem 0.75rem;
-    gap: 0.5rem;
+    padding: var(--trading-gap-sm) var(--trading-gap-md);
+    gap: var(--trading-gap-sm);
+    min-height: clamp(44px, 6vh, 56px);
   }
   
   .symbol-info-group {
-    gap: 0.75rem;
+    gap: var(--trading-gap-md);
   }
   
   .header-controls {
-    gap: 0.5rem;
+    gap: var(--trading-gap-sm);
+  }
+  
+  .header-controls button {
+    padding: var(--trading-gap-xs) var(--trading-gap-sm);
   }
   
   .non-essential {
@@ -192,11 +383,12 @@
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .symbol-selector-row {
-    gap: 0.75rem;
+    gap: var(--trading-gap-md);
+    min-height: clamp(48px, 5.5vh, 60px);
   }
   
   .symbol-info-group {
-    gap: 1rem;
+    gap: var(--trading-gap-lg);
   }
   
   /* Hide market selector */
@@ -206,41 +398,9 @@
 }
 
 /* ===== ENSURE PROPER WIDTHS ===== */
-.trading-header {
-  width: 100%;
-  max-width: 100vw;
-  overflow: hidden;
-  background: #1e293b;
-}
-
-.symbol-selector-row {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
 .symbol-info-group,
 .price-display-group,
 .stats-row-24h {
   min-width: 0 !important;
   overflow: hidden;
-}
-
-/* ===== ADDITIONAL: HIDE MARKET SELECTOR LABEL EARLIER ===== */
-@media (max-width: 1399px) {
-  .symbol-info-group > div:has(select) > span {
-    display: none; /* Hide "Market:" label */
-  }
-}
-
-/* ===== PRICE DISPLAY COMPACT ===== */
-@media (max-width: 1299px) {
-  .price-display-group {
-    gap: 0.5rem;
-  }
-  
-  /* Hide secondary price info */
-  .price-display-group > div:nth-child(2) {
-    display: none;
-  }
 }

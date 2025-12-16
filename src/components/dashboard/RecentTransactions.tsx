@@ -52,7 +52,7 @@ export default function RecentTransactions() {
         <div key={transaction.id} className="flex items-center justify-between border-b border-dark-700 pb-4 last:border-0">
           <div className="flex items-center">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full ${
+              className={`flex h-fluid-input-sm w-8 items-center justify-center rounded-full ${
                 transaction.type === 'buy' ? 'bg-success-500/10' : 'bg-danger-500/10'
               }`}
             >
@@ -63,14 +63,14 @@ export default function RecentTransactions() {
               )}
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium">
+              <p className="text-fluid-sm font-medium">
                 {transaction.type === 'buy' ? 'Buy' : 'Sell'} {transaction.pair}
               </p>
               <p className="text-xs text-dark-400">{formatDistanceToNow(transaction.timestamp, { addSuffix: true })}</p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-sm font-medium">${transaction.total.toFixed(2)}</p>
+            <p className="text-fluid-sm font-medium">${transaction.total.toFixed(2)}</p>
             <p className="text-xs text-dark-400">
               via {transaction.botName}
             </p>

@@ -53,15 +53,15 @@ const ConfirmOrderModal: React.FC<Props> = ({ open, data, onConfirm, onClose }) 
         aria-hidden
       />
       {/* panel */}
-      <div className="absolute inset-0 flex items-center justify-center p-3">
+      <div className="absolute inset-0 flex items-center justify-center p-fluid-3">
         <div className="w-full max-w-md rounded-xl border border-dark-600 bg-dark-800 shadow-2xl">
           {/* header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-dark-600">
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-0.5 rounded text-[11px] ${pillColorBySide(side)}`}>
+          <div className="flex items-center justify-between px-fluid-4 py-fluid-3 border-b border-dark-600">
+            <div className="flex items-center gap-fluid-2">
+              <span className={`px-2 py-0.5 rounded text-fluid-xs ${pillColorBySide(side)}`}>
                 {side}
               </span>
-              <span className="text-sm text-gray-300 font-medium">
+              <span className="text-fluid-sm text-gray-300 font-medium">
                 Xác nhận đặt lệnh
               </span>
             </div>
@@ -75,7 +75,7 @@ const ConfirmOrderModal: React.FC<Props> = ({ open, data, onConfirm, onClose }) 
           </div>
 
           {/* body */}
-          <div className="px-4 py-3 text-sm">
+          <div className="px-fluid-4 py-fluid-3 text-fluid-sm">
             <div className="grid grid-cols-2 gap-y-2">
               <div className="text-gray-400">Symbol</div>
               <div className="text-gray-200 text-right">{symbol ?? "—"}</div>
@@ -97,23 +97,23 @@ const ConfirmOrderModal: React.FC<Props> = ({ open, data, onConfirm, onClose }) 
             </div>
 
             {/* cảnh báo nhỏ giống Binance */}
-            <div className="mt-3 text-[11px] text-amber-300/80 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1.5">
+            <div className="mt-3 text-fluid-xs text-amber-300/80 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-fluid-1.5">
               Vui lòng kiểm tra kỹ thông số trước khi xác nhận. Lệnh TP/SL sẽ được đặt ở chế độ <b>reduce-only</b> (nếu áp dụng).
             </div>
           </div>
 
           {/* footer */}
-          <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-dark-600">
+          <div className="flex items-center justify-end gap-fluid-2 px-fluid-4 py-fluid-3 border-t border-dark-600">
             <button
               onClick={onClose}
-              className="h-8 px-3 rounded border border-dark-600 text-gray-300 hover:bg-white/5"
+              className="h-fluid-input-sm px-fluid-3 rounded border border-dark-600 text-gray-300 hover:bg-white/5"
             >
               Hủy
             </button>
             <button
               autoFocus
               onClick={onConfirm}
-              className="h-8 px-3 rounded bg-primary/90 hover:bg-primary text-white"
+              className="h-fluid-input-sm px-fluid-3 rounded bg-primary/90 hover:bg-primary text-white"
             >
               Xác nhận
             </button>

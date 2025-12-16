@@ -54,12 +54,12 @@ useEffect(() => {
   return (
     <div className="h-full flex flex-col">
       {/* Header with Tabs */}
-      <div className="flex items-center justify-between p-3 border-b border-dark-700">
+      <div className="flex items-center justify-between p-fluid-3 border-b border-dark-700">
         <div className="flex items-center space-x-4">
 
             {/* Top Coins Tab */}
           <button
-            className={`flex items-center space-x-1.5 text-sm font-medium transition-colors relative pb-1 ${
+            className={`flex items-center gap-fluid-1.5 text-fluid-sm font-medium transition-colors relative pb-1 ${
               viewMode === "topcoins"
                 ? "text-primary-400"
                 : "text-dark-400 hover:text-dark-200"
@@ -74,7 +74,7 @@ useEffect(() => {
           </button>
           {/* OrderBook Tab */}
           <button
-            className={`flex items-center space-x-1.5 text-sm font-medium transition-colors relative pb-1 ${
+            className={`flex items-center gap-fluid-1.5 text-fluid-sm font-medium transition-colors relative pb-1 ${
               viewMode === "orderbook"
                 ? "text-primary-400"
                 : "text-dark-400 hover:text-dark-200"
@@ -93,8 +93,8 @@ useEffect(() => {
 
         {/* Settings (only show for orderbook) */}
         {viewMode === "orderbook" && (
-          <div className="flex items-center space-x-2">
-            <button className="text-xs text-dark-400 hover:text-dark-200">
+          <div className="flex items-center gap-fluid-2">
+            <button className="text-fluid-sm text-dark-400 hover:text-dark-200">
               0.01
             </button>
             <Settings className="h-3 w-3 text-dark-400" />
@@ -110,14 +110,14 @@ useEffect(() => {
       <div className="h-full flex flex-col">
         {/* Asks */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="space-y-0.5 p-2">
+          <div className="space-y-0.5 p-fluid-2">
             {orderbookData.asks
               .slice(0, 15)
               .reverse()
               .map((ask, index) => (
                 <div
                   key={index}
-                  className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                  className="flex justify-between text-fluid-sm relative cursor-pointer hover:bg-dark-700"
                   onClick={() => onClickPrice(ask.price)}
                 >
                   <span className="text-danger-500 font-mono">
@@ -141,10 +141,10 @@ useEffect(() => {
         </div>
 
         {/* Current Price */}
-        <div className="px-2 py-1 border-y border-dark-700 flex-shrink-0">
+        <div className="px-2 py-fluid-1 border-y border-dark-700 flex-shrink-0">
           <div className="text-center">
             <div
-              className={`text-sm font-bold ${
+              className={`text-fluid-sm font-bold ${
                 tickerData && parseFloat(tickerData.priceChange) >= 0
                   ? "text-success-500"
                   : "text-danger-500"
@@ -154,7 +154,7 @@ useEffect(() => {
                 ? parseFloat(tickerData.lastPrice).toFixed(4)
                 : "0.0000"}
             </div>
-            <div className="text-xs text-dark-400">
+            <div className="text-fluid-sm text-dark-400">
               ≈ $
               {tickerData
                 ? parseFloat(tickerData.lastPrice).toFixed(2)
@@ -165,11 +165,11 @@ useEffect(() => {
 
         {/* Bids */}
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="space-y-0.5 p-2">
+          <div className="space-y-0.5 p-fluid-2">
             {orderbookData.bids.slice(0, 15).map((bid, index) => (
               <div
                 key={index}
-                className="flex justify-between text-xs relative cursor-pointer hover:bg-dark-700"
+                className="flex justify-between text-fluid-sm relative cursor-pointer hover:bg-dark-700"
                 onClick={() => onClickPrice(bid.price)}
               >
                 <span className="text-success-500 font-mono">
@@ -195,8 +195,8 @@ useEffect(() => {
     ) : (
       <div className="flex items-center justify-center h-full text-dark-400">
         <div className="text-center">
-          <div className="text-sm">Đang kết nối Binance...</div>
-          <div className="text-xs mt-1">
+          <div className="text-fluid-sm">Đang kết nối Binance...</div>
+          <div className="text-fluid-sm mt-1">
             Real-time orderbook đang tải
           </div>
         </div>

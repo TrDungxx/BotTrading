@@ -1,3 +1,10 @@
+/* ============================================
+   🎯 TRADING VARIABLES - FLUID RESPONSIVE
+   Baseline: 1920px = 1x scale
+   
+   Range: 1280px (0.67x) → 3840px (2x)
+   ============================================ */
+
 :root {
   /* ===== BREAKPOINTS ===== */
   --bp-mobile-max: 767px;
@@ -6,33 +13,52 @@
   --bp-desktop-min: 1024px;
   --bp-large-min: 1280px;
   --bp-xl-min: 1536px;
+  --bp-2k-min: 2400px;
+  --bp-4k-min: 3200px;
   
-  /* ===== LAYOUT DIMENSIONS ===== */
-  --header-height: 56px;
-  --stats-row-height: 52px;
-  --position-panel-desktop: 280px;
-  --position-panel-collapsed: 44px;
+  /* ===== FLUID LAYOUT DIMENSIONS ===== */
+  /* Header: 56px @ 1920 → 37px @ 1280, 112px @ 3840 */
+  --header-height: clamp(37px, 2.917vw, 112px);
   
-  /* ===== COMPONENT WIDTHS ===== */
-  /* OrderBook */
-  --orderbook-xl: 300px;      /* > 1536px */
-  --orderbook-lg: 280px;      /* 1280-1536px */
-  --orderbook-md: 260px;      /* 1024-1280px */
-  --orderbook-sm: 240px;      /* < 1024px (floating) */
+  /* Stats row: 52px @ 1920 → 35px @ 1280, 104px @ 3840 */
+  --stats-row-height: clamp(35px, 2.708vw, 104px);
   
-  /* Trading Form */
-  --form-xl: 340px;           /* > 1536px */
-  --form-lg: 320px;           /* 1280-1536px */
-  --form-md: 300px;           /* 1024-1280px */
-  --form-sm: 280px;           /* 768-1024px */
-  --form-xs: 100%;            /* < 768px (bottom sheet) */
+  /* Position panel desktop: 280px @ 1920 → 187px @ 1280, 560px @ 3840 */
+  --position-panel-desktop: clamp(187px, 14.583vw, 560px);
   
-  /* Mobile */
-  --mobile-chart-min: 400px;
+  /* Position panel collapsed: 44px @ 1920 → 29px @ 1280, 88px @ 3840 */
+  --position-panel-collapsed: clamp(29px, 2.292vw, 88px);
+  
+  /* ===== FLUID COMPONENT WIDTHS ===== */
+  
+  /* OrderBook - scales with viewport */
+  --orderbook-width: clamp(200px, 15.625vw, 400px);
+  /* Fallback fixed widths for specific breakpoints */
+  --orderbook-xl: clamp(250px, 15.625vw, 400px);   /* > 1536px */
+  --orderbook-lg: clamp(230px, 14.583vw, 360px);   /* 1280-1536px */
+  --orderbook-md: clamp(210px, 13.542vw, 320px);   /* 1024-1280px */
+  --orderbook-sm: clamp(200px, 12.5vw, 280px);     /* < 1024px (floating) */
+  
+  /* Trading Form - scales with viewport */
+  --form-width: clamp(240px, 17.708vw, 440px);
+  /* Fallback fixed widths */
+  --form-xl: clamp(280px, 17.708vw, 440px);        /* > 1536px */
+  --form-lg: clamp(260px, 16.667vw, 400px);        /* 1280-1536px */
+  --form-md: clamp(240px, 15.625vw, 360px);        /* 1024-1280px */
+  --form-sm: clamp(220px, 14.583vw, 320px);        /* 768-1024px */
+  --form-xs: 100%;                                  /* < 768px (bottom sheet) */
+  
+  /* ===== FLUID MOBILE DIMENSIONS ===== */
+  /* Mobile chart min: 400px @ 1920 → scales down on smaller mobile */
+  --mobile-chart-min: clamp(280px, 20.833vw, 500px);
+  
+  /* Bottom sheet max height */
   --bottom-sheet-max: 85vh;
-  --floating-btn-size: 56px;
   
-  /* ===== Z-INDEX LAYERS ===== */
+  /* Floating button: 56px @ 1920 → 44px @ 1280, 80px @ 3840 */
+  --floating-btn-size: clamp(44px, 2.917vw, 80px);
+  
+  /* ===== Z-INDEX LAYERS (unchanged) ===== */
   --z-base: 1;
   --z-header: 40;
   --z-floating: 50;
@@ -41,20 +67,95 @@
   --z-trading-tab: 80;
   --z-modal: 100;
   
-  /* ===== COLORS (Dark Theme) ===== */
+  /* ===== COLORS (Dark Theme - unchanged) ===== */
   --bg-workspace: #0b1426;
   --bg-panel: #1e293b;
   --bg-panel-hover: #2d3b52;
   --border-panel: rgba(51, 65, 85, 0.5);
   --border-active: rgba(59, 130, 246, 0.5);
   
-  /* ===== TRANSITIONS ===== */
+  /* ===== TRANSITIONS (unchanged) ===== */
   --transition-fast: 0.15s ease;
   --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-panel: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   
-  /* ===== SHADOWS ===== */
+  /* ===== SHADOWS (unchanged) ===== */
   --shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.15);
   --shadow-floating: 0 4px 20px rgba(0, 0, 0, 0.3);
   --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.4);
+  
+  /* ===== FLUID SPACING (Trading specific) ===== */
+  /* These complement the global fluid variables */
+  --trading-gap-xs: clamp(2px, 0.156vw, 6px);
+  --trading-gap-sm: clamp(4px, 0.313vw, 12px);
+  --trading-gap-md: clamp(8px, 0.521vw, 16px);
+  --trading-gap-lg: clamp(12px, 0.781vw, 24px);
+  --trading-gap-xl: clamp(16px, 1.042vw, 32px);
+  
+  /* ===== FLUID TYPOGRAPHY (Trading specific) ===== */
+  /* Price display - larger, prominent */
+  --price-font-xl: clamp(18px, 1.25vw, 36px);
+  --price-font-lg: clamp(16px, 1.042vw, 32px);
+  --price-font-md: clamp(14px, 0.833vw, 28px);
+  --price-font-sm: clamp(12px, 0.729vw, 24px);
+  
+  /* Stats/labels - smaller */
+  --stats-font-lg: clamp(11px, 0.625vw, 18px);
+  --stats-font-md: clamp(10px, 0.573vw, 16px);
+  --stats-font-sm: clamp(9px, 0.521vw, 14px);
+  --stats-font-xs: clamp(8px, 0.469vw, 12px);
+  
+  /* ===== FLUID BORDER RADIUS (Trading specific) ===== */
+  --trading-radius-sm: clamp(2px, 0.156vw, 6px);
+  --trading-radius-md: clamp(4px, 0.26vw, 10px);
+  --trading-radius-lg: clamp(6px, 0.365vw, 14px);
+  
+  /* ===== FLUID INPUT HEIGHTS ===== */
+  --input-height-sm: clamp(28px, 1.823vw, 44px);
+  --input-height-md: clamp(32px, 2.083vw, 52px);
+  --input-height-lg: clamp(40px, 2.604vw, 64px);
+  
+  /* ===== FLUID BUTTON HEIGHTS ===== */
+  --btn-height-sm: clamp(24px, 1.563vw, 40px);
+  --btn-height-md: clamp(32px, 2.083vw, 52px);
+  --btn-height-lg: clamp(40px, 2.604vw, 64px);
+  
+  /* ===== ORDERBOOK SPECIFIC ===== */
+  --orderbook-row-height: clamp(18px, 1.146vw, 32px);
+  --orderbook-price-width: clamp(70px, 4.688vw, 120px);
+  --orderbook-size-width: clamp(60px, 3.906vw, 100px);
+  
+  /* ===== SCROLLBAR ===== */
+  --scrollbar-width: clamp(4px, 0.313vw, 10px);
+  --scrollbar-width-thin: clamp(3px, 0.208vw, 6px);
+}
+
+/* ===== RESOLUTION-SPECIFIC OVERRIDES ===== */
+
+/* HD (1280×720) - More compact */
+@media (max-width: 1366px) {
+  :root {
+    --orderbook-row-height: 18px;
+    --input-height-md: 32px;
+    --btn-height-md: 32px;
+  }
+}
+
+/* 2K (2560×1440) - Comfortable */
+@media (min-width: 2400px) {
+  :root {
+    --orderbook-row-height: 26px;
+    --input-height-md: 44px;
+    --btn-height-md: 44px;
+  }
+}
+
+/* 4K (3840×2160) - Larger targets */
+@media (min-width: 3200px) {
+  :root {
+    --orderbook-row-height: 32px;
+    --input-height-md: 52px;
+    --btn-height-md: 52px;
+    --scrollbar-width: 10px;
+  }
 }

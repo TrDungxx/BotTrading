@@ -515,14 +515,14 @@ useEffect(() => {
     <div className="card">
       <div className="card-header">Positions</div>
       <div className="card-body overflow-x-auto">
-        <table className="min-w-full text-sm text-left">
+        <table className="min-w-full text-fluid-sm text-left">
           <thead>
             <tr className="text-dark-400 border-b border-dark-700">
-              <th className="px-4 py-2">Symbol</th>
-              <th className="px-4 py-2">Size</th>
-              <th className="px-4 py-2">Entry</th>
-              <th className="px-4 py-2">Mark Price</th>
-              <th className="px-4 py-2">PNL</th>
+              <th className="px-fluid-4 py-2">Symbol</th>
+              <th className="px-fluid-4 py-2">Size</th>
+              <th className="px-fluid-4 py-2">Entry</th>
+              <th className="px-fluid-4 py-2">Mark Price</th>
+              <th className="px-fluid-4 py-2">PNL</th>
             </tr>
           </thead>
           <tbody>
@@ -537,13 +537,13 @@ useEffect(() => {
 
               return (
                 <tr key={pos.symbol} className="border-b border-dark-700">
-                  <td className="px-4 py-3 font-medium">{pos.symbol}</td>
-                  <td className={`px-4 py-3 font-medium ${sizeClass}`}>
+                  <td className="px-fluid-4 py-fluid-3 font-medium">{pos.symbol}</td>
+                  <td className={`px-fluid-4 py-fluid-3 font-medium ${sizeClass}`}>
                     {size > 0 ? "" : "-"} {Math.abs(size)}
                   </td>
-                  <td className="px-4 py-3">{pos.entryPrice}</td>
-                  <td className="px-4 py-3">{pos.markPrice ?? "--"}</td>
-                  <td className={`px-4 py-3 font-medium ${pnlClass}`}>
+                  <td className="px-fluid-4 py-fluid-3">{pos.entryPrice}</td>
+                  <td className="px-fluid-4 py-fluid-3">{pos.markPrice ?? "--"}</td>
+                  <td className={`px-fluid-4 py-fluid-3 font-medium ${pnlClass}`}>
                     {pnl.toFixed(4)}
                   </td>
                 </tr>

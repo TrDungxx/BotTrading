@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ISeriesApi, CandlestickData, HistogramData, LineData } from 'lightweight-charts';
 import { calculateMA, calculateEMA, calculateVolumeMA } from '../utils/calculations';
 
@@ -139,11 +139,23 @@ export function useIndicators({ selectedSymbol, market }: UseIndicatorsProps) {
   const mavol1Ref = useRef<ISeriesApi<'Line'> | null>(null);
   const mavol2Ref = useRef<ISeriesApi<'Line'> | null>(null);
 
-  // Ref to track mainVisible in closures
+  // ✅ Refs to track state in closures (for async/callback contexts)
   const mainVisibleRef = useRef(mainVisible);
+  const volumeVisibleRef = useRef(volumeVisible);
+  const indicatorPeriodsRef = useRef(indicatorPeriods);
+
+  // ✅ Sync refs with state
   useEffect(() => {
     mainVisibleRef.current = mainVisible;
   }, [mainVisible]);
+
+  useEffect(() => {
+    volumeVisibleRef.current = volumeVisible;
+  }, [volumeVisible]);
+
+  useEffect(() => {
+    indicatorPeriodsRef.current = indicatorPeriods;
+  }, [indicatorPeriods]);
 
   // Save settings to localStorage
   useEffect(() => {
@@ -163,37 +175,50 @@ export function useIndicators({ selectedSymbol, market }: UseIndicatorsProps) {
     }
   }, [mainVisible, volumeVisible, indicatorPeriods, indicatorColors, bollFillVisible, selectedSymbol, market]);
 
-  // Update main chart indicators
-  const updateMainIndicators = (candles: CandlestickData[]) => {
-    if (candles.length >= indicatorPeriods.ma7 && ma7Ref.current && mainVisible.ma7) {
-      ma7Ref.current.setData(calculateMA(candles, indicatorPeriods.ma7));
-    }
-    if (candles.length >= indicatorPeriods.ma25 && ma25Ref.current && mainVisible.ma25) {
-      ma25Ref.current.setData(calculateMA(candles, indicatorPeriods.ma25));
-    }
-    if (candles.length >= indicatorPeriods.ma99 && ma99Ref.current && mainVisible.ma99) {
-      ma99Ref.current.setData(calculateMA(candles, indicatorPeriods.ma99));
-    }
-    if (candles.length >= indicatorPeriods.ema12 && ema12Ref.current && mainVisible.ema12) {
-      ema12Ref.current.setData(calculateEMA(candles, indicatorPeriods.ema12));
-    }
-    if (candles.length >= indicatorPeriods.ema26 && ema26Ref.current && mainVisible.ema26) {
-      ema26Ref.current.setData(calculateEMA(candles, indicatorPeriods.ema26));
-    }
-  };
+  /**
+   * ✅ FIX: Update main chart indicators
+   * ALWAYS calculate and setData for ALL indicators (regardless of visibility)
+   * Visibility is controlled separately via applyOptions({ visible: ... })
+   */
+  const updateMainIndicators = useCallback((candles: CandlestickData[]) => {
+    const periods = indicatorPeriodsRef.current;
 
-  // Update volume indicators
-  const updateVolumeIndicators = (volumeData: HistogramData[]) => {
-    if (volumeData.length >= indicatorPeriods.mavol1 && mavol1Ref.current && volumeVisible.mavol1) {
-      mavol1Ref.current.setData(calculateVolumeMA(volumeData, indicatorPeriods.mavol1));
+    // ✅ ALWAYS setData - visibility is controlled by applyOptions, not by whether data exists
+    if (candles.length >= periods.ma7 && ma7Ref.current) {
+      ma7Ref.current.setData(calculateMA(candles, periods.ma7));
     }
-    if (volumeData.length >= indicatorPeriods.mavol2 && mavol2Ref.current && volumeVisible.mavol2) {
-      mavol2Ref.current.setData(calculateVolumeMA(volumeData, indicatorPeriods.mavol2));
+    if (candles.length >= periods.ma25 && ma25Ref.current) {
+      ma25Ref.current.setData(calculateMA(candles, periods.ma25));
     }
-  };
+    if (candles.length >= periods.ma99 && ma99Ref.current) {
+      ma99Ref.current.setData(calculateMA(candles, periods.ma99));
+    }
+    if (candles.length >= periods.ema12 && ema12Ref.current) {
+      ema12Ref.current.setData(calculateEMA(candles, periods.ema12));
+    }
+    if (candles.length >= periods.ema26 && ema26Ref.current) {
+      ema26Ref.current.setData(calculateEMA(candles, periods.ema26));
+    }
+  }, []);
+
+  /**
+   * ✅ FIX: Update volume indicators
+   * ALWAYS calculate and setData (regardless of visibility)
+   */
+  const updateVolumeIndicators = useCallback((volumeData: HistogramData[]) => {
+    const periods = indicatorPeriodsRef.current;
+
+    // ✅ ALWAYS setData
+    if (volumeData.length >= periods.mavol1 && mavol1Ref.current) {
+      mavol1Ref.current.setData(calculateVolumeMA(volumeData, periods.mavol1));
+    }
+    if (volumeData.length >= periods.mavol2 && mavol2Ref.current) {
+      mavol2Ref.current.setData(calculateVolumeMA(volumeData, periods.mavol2));
+    }
+  }, []);
 
   // Clear all indicators
-  const clearAllIndicators = () => {
+  const clearAllIndicators = useCallback(() => {
     ma7Ref.current?.setData([]);
     ma25Ref.current?.setData([]);
     ma99Ref.current?.setData([]);
@@ -201,53 +226,65 @@ export function useIndicators({ selectedSymbol, market }: UseIndicatorsProps) {
     ema26Ref.current?.setData([]);
     mavol1Ref.current?.setData([]);
     mavol2Ref.current?.setData([]);
-  };
+  }, []);
 
-  // Toggle all main indicators (MA/EMA only, excluding BOLL)
-  const toggleAllMainIndicators = () => {
+  /**
+   * ✅ Toggle all main indicators (MA/EMA only, excluding BOLL)
+   */
+  const toggleAllMainIndicators = useCallback(() => {
+    const current = mainVisibleRef.current;
     const hasAnyVisible = 
-      mainVisible.ma7 || 
-      mainVisible.ma25 || 
-      mainVisible.ma99 || 
-      mainVisible.ema12 || 
-      mainVisible.ema26;
+      current.ma7 || 
+      current.ma25 || 
+      current.ma99 || 
+      current.ema12 || 
+      current.ema26;
+    
+    const newVisible = !hasAnyVisible;
     
     const newState: MainIndicatorConfig = {
-      ma7: !hasAnyVisible,
-      ma25: !hasAnyVisible,
-      ma99: !hasAnyVisible,
-      ema12: !hasAnyVisible,
-      ema26: !hasAnyVisible,
-      boll: mainVisible.boll, // Keep BOLL state unchanged
+      ma7: newVisible,
+      ma25: newVisible,
+      ma99: newVisible,
+      ema12: newVisible,
+      ema26: newVisible,
+      boll: current.boll, // Keep BOLL state unchanged
     };
     
-    setMainVisible(newState);
+    // ✅ Apply visibility to series FIRST (before state update)
+    ma7Ref.current?.applyOptions({ visible: newVisible });
+    ma25Ref.current?.applyOptions({ visible: newVisible });
+    ma99Ref.current?.applyOptions({ visible: newVisible });
+    ema12Ref.current?.applyOptions({ visible: newVisible });
+    ema26Ref.current?.applyOptions({ visible: newVisible });
     
-    // Apply visibility to series
-    ma7Ref.current?.applyOptions({ visible: newState.ma7 });
-    ma25Ref.current?.applyOptions({ visible: newState.ma25 });
-    ma99Ref.current?.applyOptions({ visible: newState.ma99 });
-    ema12Ref.current?.applyOptions({ visible: newState.ema12 });
-    ema26Ref.current?.applyOptions({ visible: newState.ema26 });
-  };
+    // Then update state
+    setMainVisible(newState);
+  }, []);
 
-  // Toggle all volume indicators
-  const toggleAllVolumeIndicators = () => {
-    const hasAnyVisible = volumeVisible.mavol1 || volumeVisible.mavol2;
+  /**
+   * ✅ Toggle all volume indicators
+   */
+  const toggleAllVolumeIndicators = useCallback(() => {
+    const current = volumeVisibleRef.current;
+    const hasAnyVisible = current.mavol1 || current.mavol2;
+    
+    const newVisible = !hasAnyVisible;
     
     const newState: VolumeIndicatorConfig = {
-      mavol1: !hasAnyVisible,
-      mavol2: !hasAnyVisible,
+      mavol1: newVisible,
+      mavol2: newVisible,
     };
     
-    setVolumeVisible(newState);
+    // ✅ Apply visibility FIRST
+    mavol1Ref.current?.applyOptions({ visible: newVisible });
+    mavol2Ref.current?.applyOptions({ visible: newVisible });
     
-    mavol1Ref.current?.applyOptions({ visible: newState.mavol1 });
-    mavol2Ref.current?.applyOptions({ visible: newState.mavol2 });
-  };
+    setVolumeVisible(newState);
+  }, []);
 
   // Apply color changes to series
-  const applyColorChanges = (colors: IndicatorColors) => {
+  const applyColorChanges = useCallback((colors: IndicatorColors) => {
     ma7Ref.current?.applyOptions({ color: colors.ma7 });
     ma25Ref.current?.applyOptions({ color: colors.ma25 });
     ma99Ref.current?.applyOptions({ color: colors.ma99 });
@@ -255,7 +292,7 @@ export function useIndicators({ selectedSymbol, market }: UseIndicatorsProps) {
     ema26Ref.current?.applyOptions({ color: colors.ema26 });
     mavol1Ref.current?.applyOptions({ color: colors.mavol1 });
     mavol2Ref.current?.applyOptions({ color: colors.mavol2 });
-  };
+  }, []);
 
   return {
     // States
@@ -279,6 +316,7 @@ export function useIndicators({ selectedSymbol, market }: UseIndicatorsProps) {
     mavol1Ref,
     mavol2Ref,
     mainVisibleRef,
+    volumeVisibleRef,
     
     // Functions
     updateMainIndicators,

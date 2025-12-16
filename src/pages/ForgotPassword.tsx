@@ -29,17 +29,17 @@ export default function ForgotPassword() {
 
   if (isEmailSent) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-success-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute -top-fluid-40 -right-40 w-80 h-fluid-input-sm0 bg-success-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-fluid-input-sm0 bg-primary-500/10 rounded-full blur-3xl"></div>
         </div>
 
         <div className="relative w-full max-w-md text-center">
           <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-success-500/10 rounded-full mb-6">
-              <CheckCircle className="h-8 w-8 text-success-500" />
+              <CheckCircle className="h-fluid-input-sm w-8 text-success-500" />
             </div>
             
             <h1 className="text-2xl font-bold mb-4">
@@ -56,7 +56,7 @@ export default function ForgotPassword() {
             <div className="space-y-4">
               <Link
                 to="/login"
-                className="w-full btn btn-primary py-3 text-base font-medium inline-flex items-center justify-center"
+                className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium inline-flex items-center justify-center"
               >
                 <ArrowLeft className="mr-2 h-5 w-5" />
                 <FormattedMessage id="auth.backToLogin" />
@@ -64,7 +64,7 @@ export default function ForgotPassword() {
               
               <button
                 onClick={() => setIsEmailSent(false)}
-                className="w-full btn btn-outline py-3 text-base font-medium"
+                className="w-full btn btn-outline py-fluid-3 text-fluid-base font-medium"
               >
                 <FormattedMessage id="auth.resendEmail" />
               </button>
@@ -76,11 +76,11 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-warning-300/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-fluid-40 -right-40 w-80 h-fluid-input-sm0 bg-warning-300/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-fluid-input-sm0 bg-primary-500/10 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
@@ -101,9 +101,9 @@ export default function ForgotPassword() {
         <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-3 p-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
+              <div className="flex items-center gap-fluid-3 p-fluid-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
-                <p className="text-sm text-danger-500">{error}</p>
+                <p className="text-fluid-sm text-danger-500">{error}</p>
               </div>
             )}
 
@@ -125,7 +125,7 @@ export default function ForgotPassword() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              <p className="mt-2 text-sm text-dark-400">
+              <p className="mt-2 text-fluid-sm text-dark-400">
                 <FormattedMessage id="auth.resetPasswordDescription" />
               </p>
             </div>
@@ -133,7 +133,7 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn btn-primary py-3 text-base font-medium relative overflow-hidden group"
+              className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium relative overflow-hidden group"
             >
               <span className="relative z-10 flex items-center justify-center">
                 {isLoading ? (

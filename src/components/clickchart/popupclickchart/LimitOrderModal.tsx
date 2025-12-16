@@ -84,8 +84,8 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
       {/* Modal */}
       <div className="relative bg-[#1e2329] rounded-lg shadow-2xl w-[340px] max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2b3139]">
-          <h3 className="text-base font-medium text-[#eaecef]">Đặt lệnh</h3>
+        <div className="flex items-center justify-between px-fluid-4 py-fluid-3 border-b border-[#2b3139]">
+          <h3 className="text-fluid-base font-medium text-[#eaecef]">Đặt lệnh</h3>
           <button 
             onClick={onClose}
             className="text-[#848e9c] hover:text-[#eaecef] transition-colors"
@@ -97,11 +97,11 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-fluid-4">
           {/* Tabs Mở/Đóng */}
           <div className="flex bg-[#2b3139] rounded-lg p-1 mb-4">
             <button
-              className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+              className={`flex-1 py-2 text-fluid-sm rounded-fluid-md transition-colors ${
                 tab === 'open' 
                   ? 'bg-[#3c4043] text-[#eaecef]' 
                   : 'text-[#848e9c] hover:text-[#eaecef]'
@@ -111,7 +111,7 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
               Mở
             </button>
             <button
-              className={`flex-1 py-2 text-sm rounded-md transition-colors ${
+              className={`flex-1 py-2 text-fluid-sm rounded-fluid-md transition-colors ${
                 tab === 'close' 
                   ? 'bg-[#3c4043] text-[#eaecef]' 
                   : 'text-[#848e9c] hover:text-[#eaecef]'
@@ -123,9 +123,9 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
           </div>
 
           {/* Order Type Tabs */}
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-fluid-4 mb-4">
             <button
-              className={`text-sm pb-1 border-b-2 transition-colors ${
+              className={`text-fluid-sm pb-1 border-b-2 transition-colors ${
                 orderType === 'limit'
                   ? 'text-[#f0b90b] border-[#f0b90b]'
                   : 'text-[#848e9c] border-transparent hover:text-[#eaecef]'
@@ -135,7 +135,7 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
               Giới hạn
             </button>
             <button
-              className={`text-sm pb-1 border-b-2 transition-colors ${
+              className={`text-fluid-sm pb-1 border-b-2 transition-colors ${
                 orderType === 'stopLimit'
                   ? 'text-[#f0b90b] border-[#f0b90b]'
                   : 'text-[#848e9c] border-transparent hover:text-[#eaecef]'
@@ -160,13 +160,13 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
                 type="text"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-3 py-2.5 text-sm text-[#eaecef] outline-none focus:border-[#f0b90b]"
+                className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-fluid-3 py-2.5 text-fluid-sm text-[#eaecef] outline-none focus:border-[#f0b90b]"
                 placeholder="0"
               />
-              <button className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] text-sm text-[#eaecef]">
+              <button className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] text-fluid-sm text-[#eaecef]">
                 USDT
               </button>
-              <button className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-sm text-[#848e9c] hover:text-[#eaecef]">
+              <button className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-fluid-sm text-[#848e9c] hover:text-[#eaecef]">
                 BBO
               </button>
             </div>
@@ -180,11 +180,11 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
                 type="text"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-3 py-2.5 text-sm text-[#eaecef] outline-none focus:border-[#f0b90b]"
+                className="flex-1 bg-[#2b3139] border border-[#3c4043] rounded-l px-fluid-3 py-2.5 text-fluid-sm text-[#eaecef] outline-none focus:border-[#f0b90b]"
                 placeholder="0"
               />
               <button 
-                className="px-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-sm text-[#eaecef] flex items-center gap-1"
+                className="px-fluid-3 py-2.5 bg-[#2b3139] border border-l-0 border-[#3c4043] rounded-r text-fluid-sm text-[#eaecef] flex items-center gap-fluid-1"
                 onClick={() => setUnit(unit === 'COIN' ? 'USDT' : 'COIN')}
               >
                 {coinName}
@@ -197,7 +197,7 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
 
           {/* Slider */}
           <div className="mb-4 px-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-fluid-2">
               <svg className="w-4 h-4 text-[#848e9c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
               </svg>
@@ -213,16 +213,16 @@ const LimitOrderModal: React.FC<LimitOrderModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-fluid-3 mb-4">
             <button
               onClick={() => handleSubmit('BUY')}
-              className="flex-1 py-2.5 bg-[#0ecb81] hover:bg-[#0ecb81]/90 text-white text-sm font-medium rounded transition-colors"
+              className="flex-1 py-2.5 bg-[#0ecb81] hover:bg-[#0ecb81]/90 text-white text-fluid-sm font-medium rounded transition-colors"
             >
               Mở lệnh Long
             </button>
             <button
               onClick={() => handleSubmit('SELL')}
-              className="flex-1 py-2.5 bg-[#f6465d] hover:bg-[#f6465d]/90 text-white text-sm font-medium rounded transition-colors"
+              className="flex-1 py-2.5 bg-[#f6465d] hover:bg-[#f6465d]/90 text-white text-fluid-sm font-medium rounded transition-colors"
             >
               Mở lệnh Short
             </button>

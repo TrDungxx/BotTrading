@@ -152,7 +152,7 @@ const ChartWithToolbar: React.FC<Props> = (props) => {
       {/* header mỏng nằm trong chart, chừa AXIS_RIGHT_PX cho right price scale */}
       <div
         ref={headerRef}
-        className="absolute top-0 left-0 z-10 px-2 pt-1 pb-0.5 flex items-center gap-2 text-[11px] leading-none"
+        className="absolute top-0 left-0 z-10 px-2 pt-1 pb-0.5 flex items-center gap-fluid-2 text-fluid-xs leading-none"
         style={{ width: `calc(100% - ${AXIS_RIGHT_PX}px)` }}
       >
         {renderPairControl ? (
@@ -172,12 +172,12 @@ const ChartWithToolbar: React.FC<Props> = (props) => {
           {symbolPretty} · {String(interval)} · {exchangeLabel}
         </div>
 
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-fluid-1 ml-auto">
           {TF_LIST.map((tf) => (
             <button
               key={tf}
               onClick={() => handleSetInterval(tf)}
-              className={`px-1.5 py-0.5 rounded border text-[10px]
+              className={`px-1.5 py-0.5 rounded border text-fluid-2xs
                 ${
                   String(interval) === tf
                     ? "border-primary-600 text-white bg-primary-600/60"

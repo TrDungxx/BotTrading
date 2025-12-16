@@ -78,11 +78,11 @@ export default function Register() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
         <div className="relative w-full max-w-md text-center">
           <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-warning-300/10 rounded-full mb-6">
-              <Clock className="h-8 w-8 text-warning-300" />
+              <Clock className="h-fluid-input-sm w-8 text-warning-300" />
             </div>
             
             <h1 className="text-2xl font-bold mb-4 text-warning-300">
@@ -90,11 +90,11 @@ export default function Register() {
             </h1>
             
             <div className="text-left space-y-4 mb-6">
-              <div className="p-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
-                <div className="flex items-start gap-3">
+              <div className="p-fluid-4 bg-warning-300/10 border border-warning-300/20 rounded-lg">
+                <div className="flex items-start gap-fluid-3">
                   <Clock className="h-5 w-5 text-warning-300 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-medium text-warning-300 mb-2">Tài khoản đang chờ xét duyệt</h3>
+                    <h3 className="text-fluid-sm font-medium text-warning-300 mb-2">Tài khoản đang chờ xét duyệt</h3>
                     <ul className="text-xs text-warning-300/80 space-y-1">
                       <li>• Tài khoản của bạn đã được tạo thành công</li>
                       <li>• Hiện tại đang ở trạng thái chờ phê duyệt</li>
@@ -105,11 +105,11 @@ export default function Register() {
                 </div>
               </div>
 
-              <div className="p-4 bg-info-500/10 border border-info-500/20 rounded-lg">
-                <div className="flex items-start gap-3">
+              <div className="p-fluid-4 bg-info-500/10 border border-info-500/20 rounded-lg">
+                <div className="flex items-start gap-fluid-3">
                   <AlertCircle className="h-5 w-5 text-info-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-sm font-medium text-info-500 mb-2">Thông tin tài khoản</h3>
+                    <h3 className="text-fluid-sm font-medium text-info-500 mb-2">Thông tin tài khoản</h3>
                     <div className="text-xs text-info-400 space-y-1">
                       <p><strong>Username:</strong> {formData.username}</p>
                       <p><strong>Email:</strong> {formData.email}</p>
@@ -123,14 +123,14 @@ export default function Register() {
             <div className="space-y-3">
               <Link
                 to="/login"
-                className="w-full btn btn-primary py-3 text-base font-medium inline-flex items-center justify-center"
+                className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium inline-flex items-center justify-center"
               >
                 Về trang đăng nhập
               </Link>
               
               <Link
                 to="/guest"
-                className="w-full btn btn-outline py-3 text-base font-medium"
+                className="w-full btn btn-outline py-fluid-3 text-fluid-base font-medium"
               >
                 Tiếp tục ở chế độ khách
               </Link>
@@ -142,11 +142,11 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900 flex items-center justify-center p-fluid-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-success-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-fluid-40 -right-40 w-80 h-fluid-input-sm0 bg-success-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-fluid-input-sm0 bg-primary-500/10 rounded-full blur-3xl"></div>
       </div>
 
       <div className="relative w-full max-w-md">
@@ -167,9 +167,9 @@ export default function Register() {
         <div className="card p-8 backdrop-blur-sm bg-dark-800/80 border border-dark-700/50">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="flex items-center gap-3 p-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
+              <div className="flex items-center gap-fluid-3 p-fluid-4 bg-danger-500/10 border border-danger-500/20 rounded-lg">
                 <AlertCircle className="h-5 w-5 text-danger-500 flex-shrink-0" />
-                <p className="text-sm text-danger-500">{error}</p>
+                <p className="text-fluid-sm text-danger-500">{error}</p>
               </div>
             )}
 
@@ -288,7 +288,7 @@ export default function Register() {
                 checked={formData.acceptTerms}
                 onChange={handleChange}
               />
-              <label htmlFor="acceptTerms" className="ml-2 text-sm text-dark-300">
+              <label htmlFor="acceptTerms" className="ml-2 text-fluid-sm text-dark-300">
                 <FormattedMessage id="auth.acceptTerms" />
               </label>
             </div>
@@ -296,7 +296,7 @@ export default function Register() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn btn-primary py-3 text-base font-medium relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full btn btn-primary py-fluid-3 text-fluid-base font-medium relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="relative z-10 flex items-center justify-center">
                 {isLoading ? (
@@ -325,11 +325,11 @@ export default function Register() {
         </div>
 
         {/* Information about approval process */}
-        <div className="mt-6 p-4 bg-info-500/10 border border-info-500/20 rounded-lg">
-          <div className="flex items-start gap-3">
+        <div className="mt-6 p-fluid-4 bg-info-500/10 border border-info-500/20 rounded-lg">
+          <div className="flex items-start gap-fluid-3">
             <AlertCircle className="h-5 w-5 text-info-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-medium text-info-500 mb-2">Quy trình đăng ký</h3>
+              <h3 className="text-fluid-sm font-medium text-info-500 mb-2">Quy trình đăng ký</h3>
               <ul className="text-xs text-info-400 space-y-1">
                 <li>• Sau khi đăng ký, tài khoản sẽ ở trạng thái chờ phê duyệt</li>
                 <li>• Administrator sẽ xem xét và phê duyệt tài khoản của bạn</li>

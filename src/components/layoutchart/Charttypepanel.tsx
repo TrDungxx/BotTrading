@@ -167,8 +167,8 @@ const ChartTypePanel: React.FC<Props> = ({ currentType, onTypeChange }) => {
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-dark-800/95 hover:bg-dark-700 
-                   border border-dark-600 rounded-lg text-dark-100 text-sm
+        className="flex items-center gap-fluid-2 px-fluid-3 py-2 bg-dark-800/95 hover:bg-dark-700 
+                   border border-dark-600 rounded-lg text-dark-100 text-fluid-sm
                    transition-colors duration-150 backdrop-blur-sm"
       >
         <span className="flex items-center justify-center w-5 h-5">
@@ -219,8 +219,8 @@ const ChartTypePanel: React.FC<Props> = ({ currentType, onTypeChange }) => {
                       setIsOpen(false);
                     }}
                     className={`
-                      w-full px-4 py-2.5 text-left text-sm
-                      flex items-center gap-3
+                      w-full px-fluid-4 py-2.5 text-left text-fluid-sm
+                      flex items-center gap-fluid-3
                       transition-colors duration-150
                       ${isSelected 
                         ? 'bg-blue-600/20 text-blue-400 font-medium' 

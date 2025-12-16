@@ -203,30 +203,30 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between px-4 mb-2">
-        <div className="text-yellow-400 text-sm font-semibold relative" />
+      <div className="flex items-center justify-between px-fluid-4 mb-2">
+        <div className="text-yellow-400 text-fluid-sm font-semibold relative" />
       </div>
 
       <div className="card-body overflow-x-auto">
-        <table className="min-w-full text-left text-[13px] leading-[16px] font-sans">
+        <table className="min-w-full text-left text-fluid-sm leading-[16px] font-sans">
           <thead>
             <tr className="text-gray-400 border-b border-dark-700">
-              <th className="px-4 py-2">Thời gian</th>
-              <th className="px-4 py-2">Cặp</th>
-              <th className="px-4 py-2">Loại</th>
-              <th className="px-4 py-2">Phương thức</th>
-              <th className="px-4 py-2">Giá</th>
-              <th className="px-4 py-2">Giá kích hoạt</th>
-              <th className="px-4 py-2">Theo giá</th>
-              <th className="px-4 py-2">Số lượng</th>
-              <th className="px-4 py-2">Đã khớp</th>
-              <th className="px-4 py-2">TP/SL</th>
-              <th className="px-4 py-2">Giảm chi</th>
-              <th className="px-4 py-2 text-right relative">
+              <th className="px-fluid-4 py-2">Thời gian</th>
+              <th className="px-fluid-4 py-2">Cặp</th>
+              <th className="px-fluid-4 py-2">Loại</th>
+              <th className="px-fluid-4 py-2">Phương thức</th>
+              <th className="px-fluid-4 py-2">Giá</th>
+              <th className="px-fluid-4 py-2">Giá kích hoạt</th>
+              <th className="px-fluid-4 py-2">Theo giá</th>
+              <th className="px-fluid-4 py-2">Số lượng</th>
+              <th className="px-fluid-4 py-2">Đã khớp</th>
+              <th className="px-fluid-4 py-2">TP/SL</th>
+              <th className="px-fluid-4 py-2">Giảm chi</th>
+              <th className="px-fluid-4 py-2 text-right relative">
                 <button
                   type="button"
                   onClick={() => setShowCancelMenu((prev) => !prev)}
-                  className="inline-flex items-center gap-1 hover:text-yellow-500"
+                  className="inline-flex items-center gap-fluid-1 hover:text-yellow-500"
                 >
                   <span>Huỷ bỏ tất cả</span>
                   <ChevronDown size={16} />
@@ -236,21 +236,21 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
                   <div className="absolute right-0 mt-2 w-44 bg-dark-800 border border-dark-700 rounded shadow-md z-50">
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
+                      className="w-full text-left px-fluid-3 py-2 text-fluid-sm text-white hover:bg-dark-700"
                       onClick={() => { cancelFilteredOrders((o) => o.symbol === selectedSymbol); setShowCancelMenu(false); }}
                     >
                       Tất cả ({selectedSymbol})
                     </button>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
+                      className="w-full text-left px-fluid-3 py-2 text-fluid-sm text-white hover:bg-dark-700"
                       onClick={() => { cancelFilteredOrders((o) => o.symbol === selectedSymbol && o.type === 'LIMIT'); setShowCancelMenu(false); }}
                     >
                       LIMIT
                     </button>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-dark-700"
+                      className="w-full text-left px-fluid-3 py-2 text-fluid-sm text-white hover:bg-dark-700"
                       onClick={() => {
                         cancelFilteredOrders(
                           (o) => o.symbol === selectedSymbol &&
@@ -294,22 +294,22 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
 
               return (
                 <tr className="border-b border-dark-700" key={String(order.orderId)}>
-                  <td className="px-4 py-3 text-white">{timeStr}</td>
-                  <td className="px-4 py-3 text-white">{order.symbol}</td>
-                  <td className={`px-4 py-3 font-medium ${order.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{timeStr}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{order.symbol}</td>
+                  <td className={`px-fluid-4 py-fluid-3 font-medium ${order.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
                     {order.side === 'BUY' ? 'Mua' : 'Bán'}
                   </td>
-                  <td className="px-4 py-3 text-white">{order.type}</td>
-                  <td className="px-4 py-3 text-white">{limitPrice}</td>
-                  <td className="px-4 py-3 text-white">{triggerPrice}</td>
-                  <td className="px-4 py-3 text-white">{mapWorkingType(order.workingType)}</td>
-                  <td className="px-4 py-3 text-white">{qty}</td>
-                  <td className="px-4 py-3 text-white">{filled}</td>
-                  <td className="px-4 py-3 text-white">–</td>
-                  <td className="px-4 py-3 text-white">
+                  <td className="px-fluid-4 py-fluid-3 text-white">{order.type}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{limitPrice}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{triggerPrice}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{mapWorkingType(order.workingType)}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{qty}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">{filled}</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">–</td>
+                  <td className="px-fluid-4 py-fluid-3 text-white">
                     {order.closePosition || order.reduceOnly ? 'Có' : 'Không'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-fluid-4 py-fluid-3">
                     <button
                       type="button"
                       className={`${canCancel ? 'text-gray-400 hover:text-red-500' : 'text-gray-600 cursor-not-allowed'}`}
@@ -326,7 +326,7 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
 
             {openOrders.length === 0 && (
               <tr>
-                <td className="px-4 py-6 text-gray-400" colSpan={12}>
+                <td className="px-fluid-4 py-6 text-gray-400" colSpan={12}>
                   Không có lệnh mở.
                 </td>
               </tr>

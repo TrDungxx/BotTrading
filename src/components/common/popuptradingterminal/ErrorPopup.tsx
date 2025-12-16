@@ -65,22 +65,22 @@ export const ErrorPopup: React.FC<ErrorPopupProps> = ({ message, onClose }) => {
         }}
       >
         {/* Icon & Title */}
-        <div className="flex items-start gap-3 mb-4">
-          <div className="flex-shrink-0 w-8 h-8 bg-red-500 bg-opacity-20 rounded-full flex items-center justify-center">
+        <div className="flex items-start gap-fluid-3 mb-4">
+          <div className="flex-shrink-0 w-8 h-fluid-input-sm bg-red-500 bg-opacity-20 rounded-full flex items-center justify-center">
             <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-white mb-2">Order Failed</h3>
-            <p className="text-gray-300 text-sm leading-relaxed">{message}</p>
+            <p className="text-gray-300 text-fluid-sm leading-relaxed">{message}</p>
           </div>
         </div>
 
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded transition-colors"
+          className="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-fluid-4 rounded transition-colors"
         >
           Close
         </button>

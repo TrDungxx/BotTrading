@@ -372,7 +372,7 @@ console.table(orders.map(o => ({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">
             <FormattedMessage id="orderHistory.title" />
@@ -381,7 +381,7 @@ console.table(orders.map(o => ({
             <FormattedMessage id="orderHistory.subtitle" />
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-fluid-2">
           {/* {(user?.role === 'admin' || user?.role === 'superadmin') && (
   <button
     onClick={() => {
@@ -409,14 +409,14 @@ console.table(orders.map(o => ({
 
       {/* Error message */}
       {error && (
-        <div className="bg-danger-500/10 border border-danger-500/20 rounded-lg p-4">
-          <div className="flex items-center gap-3">
+        <div className="bg-danger-500/10 border border-danger-500/20 rounded-lg p-fluid-4">
+          <div className="flex items-center gap-fluid-3">
             <div className="w-5 h-5 rounded-full bg-danger-500 flex items-center justify-center">
               <span className="text-white text-xs">!</span>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-danger-500">Error Loading Order History</h3>
-              <p className="text-sm text-danger-400 mt-1">{error}</p>
+              <h3 className="text-fluid-sm font-medium text-danger-500">Error Loading Order History</h3>
+              <p className="text-fluid-sm text-danger-400 mt-1">{error}</p>
             </div>
           </div>
           <button
@@ -429,7 +429,7 @@ console.table(orders.map(o => ({
       )}
 
       {/* Filters and search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-fluid-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-4 w-4 text-dark-400" />
@@ -442,7 +442,7 @@ console.table(orders.map(o => ({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-fluid-2">
           <button className="btn btn-outline inline-flex items-center">
             <Calendar className="mr-2 h-4 w-4" />
             <FormattedMessage id="orderHistory.dateRange" />
@@ -457,13 +457,13 @@ console.table(orders.map(o => ({
       {/* Orders table */}
       <div className="card overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-fluid-12">
+            <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-fluid-12">
             <div className="w-16 h-16 bg-dark-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="h-8 w-8 text-dark-400" />
+              <Search className="h-fluid-input-sm w-8 text-dark-400" />
             </div>
             <h3 className="text-lg font-medium text-dark-300 mb-2">No Orders Found</h3>
             <p className="text-dark-400">
@@ -475,34 +475,34 @@ console.table(orders.map(o => ({
             <table className="min-w-full divide-y divide-dark-700">
               <thead>
                 <tr>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-left text-xs font-medium text-dark-400">
                     Order ID
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-left text-xs font-medium text-dark-400">
                     Symbol
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-left text-xs font-medium text-dark-400">
                     Side/Type
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     Price
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     Quantity
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     Executed
                   </th>
-                  <th className="px-4 py-3.5 text-center text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-center text-xs font-medium text-dark-400">
                     Status
                   </th>
-                  <th className="px-4 py-3.5 text-left text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-left text-xs font-medium text-dark-400">
                     Indicator
                   </th>
-                  <th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  <th className="px-fluid-4 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     Date
                   </th>
-                  {/*<th className="px-4 py-3.5 text-right text-xs font-medium text-dark-400">
+                  {/*<th className="px-fluid-4 py-fluid-3.5 text-right text-xs font-medium text-dark-400">
                     Actions
                   </th>*/}
                 </tr>
@@ -510,17 +510,17 @@ console.table(orders.map(o => ({
               <tbody className="divide-y divide-dark-700">
                 {filteredOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-dark-700/40">
-                    <td className="whitespace-nowrap px-4 py-4 text-sm font-mono align-top">
-                      <div className="flex flex-col gap-1 text-white font-semibold">
-                        <div className="text-sm font-mono">{order.orderId}</div>
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm font-mono align-top">
+                      <div className="flex flex-col gap-fluid-1 text-white font-semibold">
+                        <div className="text-fluid-sm font-mono">{order.orderId}</div>
 
                         {order.binanceAccount && accountInfoMap?.[order.binanceAccount.toString()] && (
                           <>
-                            <div className="flex items-center gap-1 text-xs">
+                            <div className="flex items-center gap-fluid-1 text-xs">
                               <User className="h-4 w-4 text-primary-500" />
                               {accountInfoMap[order.binanceAccount.toString()].name}
                             </div>
-                            <div className="flex items-center gap-1 text-xs">
+                            <div className="flex items-center gap-fluid-1 text-xs">
                               <Link2 className="h-4 w-4 text-warning-300" />
                               {accountInfoMap[order.binanceAccount.toString()].email}
                             </div>
@@ -531,10 +531,10 @@ console.table(orders.map(o => ({
 
 
 
-                    <td className="whitespace-nowrap px-4 py-4 text-sm font-medium">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm font-medium">
                       {order.symbol}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm">
                       <div className="flex flex-col">
                         <span className={`inline-flex items-center ${order.side === 'BUY' ? 'text-success-500' : 'text-danger-500'
                           }`}>
@@ -548,7 +548,7 @@ console.table(orders.map(o => ({
                         <span className="text-xs text-dark-400">{order.type}</span>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-right">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-right">
                       {order.type === 'MARKET' ? (
                         <span className="text-dark-400">Market</span>
                       ) : (
@@ -559,14 +559,14 @@ console.table(orders.map(o => ({
                         />
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-right">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-right">
                       <FormattedNumber
                         value={formatQuantity(order.origQty)}
                         minimumFractionDigits={0}
                         maximumFractionDigits={8}
                       />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-right">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-right">
                       <div>
                         <FormattedNumber
                           value={formatQuantity(order.executedQty)}
@@ -585,17 +585,17 @@ console.table(orders.map(o => ({
                         </div>
                       </div>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-center">
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${getStatusBadgeColor(order.status)}`}>
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-center">
+                      <span className={`inline-flex rounded-full px-2 py-fluid-1 text-xs font-medium ${getStatusBadgeColor(order.status)}`}>
                         {getStatusLabel(order.status)}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm">
-                      <span className="inline-flex items-center rounded-full bg-primary-500/10 px-2 py-1 text-xs font-medium text-primary-500">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm">
+                      <span className="inline-flex items-center rounded-full bg-primary-500/10 px-2 py-fluid-1 text-xs font-medium text-primary-500">
                         {order.indicatorCall}
                       </span>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-4 text-sm text-right text-dark-400">
+                    <td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-right text-dark-400">
                       <div>
                         <FormattedDate
                           value={order.update_time}
@@ -613,8 +613,8 @@ console.table(orders.map(o => ({
                         </div>
                       </div>
                     </td>
-                    {/*<td className="whitespace-nowrap px-4 py-4 text-sm text-right">
-                      <div className="flex justify-end space-x-2">
+                    {/*<td className="whitespace-nowrap px-fluid-4 py-fluid-4 text-fluid-sm text-right">
+                      <div className="flex justify-end gap-fluid-2">
                         <button
                           className="text-dark-400 hover:text-primary-500"
                           onClick={() => handleEdit(order)}
@@ -640,13 +640,13 @@ console.table(orders.map(o => ({
       {/* Pagination */}
       {!loading && filteredOrders.length > 0 && totalPages > 1 && (
         <div className="flex justify-between items-center">
-          <div className="text-sm text-dark-400">
+          <div className="text-fluid-sm text-dark-400">
             <FormattedMessage
               id="orderHistory.showing"
               values={{ page, total: totalPages }}
             />
           </div>
-          <div className="flex space-x-2">
+          <div className="flex gap-fluid-2">
             <button
               onClick={() => handlePageChange(page - 1)}
               disabled={page === 1}
@@ -656,7 +656,7 @@ console.table(orders.map(o => ({
             </button>
 
             {/* Page numbers */}
-            <div className="flex space-x-1">
+            <div className="flex gap-fluid-1">
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + i;
                 if (pageNum > totalPages) return null;
@@ -665,7 +665,7 @@ console.table(orders.map(o => ({
                   <button
                     key={pageNum}
                     onClick={() => handlePageChange(pageNum)}
-                    className={`px-3 py-2 text-sm rounded-md ${pageNum === page
+                    className={`px-fluid-3 py-2 text-fluid-sm rounded-fluid-md ${pageNum === page
                       ? 'bg-primary-500 text-white'
                       : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
                       }`}
@@ -689,7 +689,7 @@ console.table(orders.map(o => ({
 
       {/* Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-2xl">
             <div className="card-header flex justify-between items-center">
               <h2 className="text-lg font-medium">
@@ -707,7 +707,7 @@ console.table(orders.map(o => ({
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="orderId" className="form-label">Order ID</label>
                   <input
@@ -734,7 +734,7 @@ console.table(orders.map(o => ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-fluid-4">
                 <div>
                   <label htmlFor="side" className="form-label">Side</label>
                   <select
@@ -781,7 +781,7 @@ console.table(orders.map(o => ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-fluid-4">
                 <div>
                   <label htmlFor="price" className="form-label">Price</label>
                   <input
@@ -845,7 +845,7 @@ console.table(orders.map(o => ({
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end gap-fluid-2 pt-4">
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -869,10 +869,10 @@ console.table(orders.map(o => ({
 
       {/* Delete Confirmation Modal */}
       {deletingOrder && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-md">
             <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-danger-500/10 mx-auto mb-4">
+              <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-danger-500/10 mx-auto mb-4">
                 <AlertTriangle className="h-6 w-6 text-danger-500" />
               </div>
 

@@ -375,27 +375,27 @@ useEffect(() => {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-[#1e2329] border border-[#2b3139] shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2b3139]">
-          <div className="font-semibold text-[16px] text-white">TP/SL cho toàn bộ vị thế</div>
+        <div className="flex items-center justify-between px-5 py-fluid-4 border-b border-[#2b3139]">
+          <div className="font-semibold text-fluid-lg text-white">TP/SL cho toàn bộ vị thế</div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-[#2b3139] transition-colors">
             <X size={18} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-5">
+        <div className="px-5 py-fluid-4 space-y-5">
           {/* Position Info */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[13px]">
+          <div className="gap-fluid-2">
+            <div className="flex items-center justify-between text-fluid-sm">
               <span className="text-gray-400">Mã</span>
               <span className="text-white font-medium">
                 {symbol} • <span className={isLong ? "text-[#0ecb81]" : "text-[#f6465d]"}>{isLong ? "Long" : "Short"}</span> • {lev}x
               </span>
             </div>
-            <div className="flex items-center justify-between text-[13px]">
+            <div className="flex items-center justify-between text-fluid-sm">
               <span className="text-gray-400">Giá vào lệnh</span>
               <span className="text-white">{fmt(entryPrice)} USDT</span>
             </div>
-            <div className="flex items-center justify-between text-[13px]">
+            <div className="flex items-center justify-between text-fluid-sm">
               <span className="text-gray-400">Giá đánh dấu</span>
               <span className="text-white">{fmt(markPrice)} USDT</span>
             </div>
@@ -405,12 +405,12 @@ useEffect(() => {
           <div className="border-t border-[#2b3139]" />
 
           {/* Trigger + Mode */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-fluid-4">
             <div>
-              <label className="text-[12px] text-gray-400 mb-2 block">Trigger</label>
+              <label className="text-fluid-sm text-gray-400 mb-2 block">Trigger</label>
               <div className="flex rounded-lg overflow-hidden border border-[#2b3139]">
                 <button
-                  className={`flex-1 px-3 py-2 text-[13px] font-medium transition-colors ${
+                  className={`flex-1 px-fluid-3 py-2 text-fluid-sm font-medium transition-colors ${
                     trigger === "MARK_PRICE" 
                       ? "bg-[#fcd535] text-black" 
                       : "bg-transparent text-gray-300 hover:bg-[#2b3139]"
@@ -420,7 +420,7 @@ useEffect(() => {
                   Mark
                 </button>
                 <button
-                  className={`flex-1 px-3 py-2 text-[13px] font-medium transition-colors ${
+                  className={`flex-1 px-fluid-3 py-2 text-fluid-sm font-medium transition-colors ${
                     trigger === "LAST" 
                       ? "bg-[#fcd535] text-black" 
                       : "bg-transparent text-gray-300 hover:bg-[#2b3139]"
@@ -433,11 +433,11 @@ useEffect(() => {
             </div>
 
             <div>
-              <label className="text-[12px] text-gray-400 mb-2 block">Nhập theo</label>
+              <label className="text-fluid-sm text-gray-400 mb-2 block">Nhập theo</label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as InputMode)}
-                className="w-full bg-transparent border border-[#2b3139] rounded-lg px-3 py-2 text-[13px] text-white outline-none focus:border-[#fcd535] transition-colors cursor-pointer"
+                className="w-full bg-transparent border border-[#2b3139] rounded-lg px-fluid-3 py-2 text-fluid-sm text-white outline-none focus:border-[#fcd535] transition-colors cursor-pointer"
               >
                 <option value="pnl_abs" className="bg-[#1e2329]">PnL</option>
                 <option value="roi_pct" className="bg-[#1e2329]">ROI%</option>
@@ -448,14 +448,14 @@ useEffect(() => {
 
           {/* Take Profit */}
           <div>
-            <label className="text-[12px] text-gray-400 mb-2 block">
+            <label className="text-fluid-sm text-gray-400 mb-2 block">
               Take Profit <span className="text-gray-500">({getModeLabel()})</span>
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-fluid-3">
               <div className="flex-1 relative">
                 {/* Prefix "+" cho PnL/ROI mode */}
                 {mode !== "price" && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0ecb81] text-[13px] font-medium">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#0ecb81] text-fluid-sm font-medium">
                     +
                   </span>
                 )}
@@ -466,14 +466,14 @@ useEffect(() => {
                     const cleaned = e.target.value.replace(/[^0-9.]/g, '');
                     setTpInput(cleaned);
                   }}
-                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-[13px] text-white outline-none focus:border-[#0ecb81] transition-colors placeholder:text-gray-500 ${
-                    mode !== "price" ? "pl-7 pr-3" : "px-3"
+                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-fluid-sm text-white outline-none focus:border-[#0ecb81] transition-colors placeholder:text-gray-500 ${
+                    mode !== "price" ? "pl-7 pr-3" : "px-fluid-3"
                   }`}
                   placeholder={getPlaceholder("tp")}
                   inputMode="decimal"
                 />
               </div>
-              <div className="text-[11px] text-gray-400 min-w-[140px] text-right">
+              <div className="text-fluid-xs text-gray-400 min-w-[140px] text-right">
                 {tpPrice ? (
                   <div className="space-y-0.5">
                     <div className="text-white">{fmt(tpPrice, 5)} USDT</div>
@@ -490,14 +490,14 @@ useEffect(() => {
 
           {/* Stop Loss */}
           <div>
-            <label className="text-[12px] text-gray-400 mb-2 block">
+            <label className="text-fluid-sm text-gray-400 mb-2 block">
               Stop Loss <span className="text-gray-500">({getModeLabel()})</span>
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-fluid-3">
               <div className="flex-1 relative">
                 {/* Prefix "-" cho PnL/ROI mode */}
                 {mode !== "price" && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#f6465d] text-[13px] font-medium">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#f6465d] text-fluid-sm font-medium">
                     -
                   </span>
                 )}
@@ -508,14 +508,14 @@ useEffect(() => {
                     const cleaned = e.target.value.replace(/[^0-9.]/g, '');
                     setSlInput(cleaned);
                   }}
-                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-[13px] text-white outline-none focus:border-[#f6465d] transition-colors placeholder:text-gray-500 ${
-                    mode !== "price" ? "pl-7 pr-3" : "px-3"
+                  className={`w-full bg-transparent border border-[#2b3139] rounded-lg py-2.5 text-fluid-sm text-white outline-none focus:border-[#f6465d] transition-colors placeholder:text-gray-500 ${
+                    mode !== "price" ? "pl-7 pr-3" : "px-fluid-3"
                   }`}
                   placeholder={getPlaceholder("sl")}
                   inputMode="decimal"
                 />
               </div>
-              <div className="text-[11px] text-gray-400 min-w-[140px] text-right">
+              <div className="text-fluid-xs text-gray-400 min-w-[140px] text-right">
                 {slPrice ? (
                   <div className="space-y-0.5">
                     <div className="text-white">{fmt(slPrice, 5)} USDT</div>
@@ -534,11 +534,11 @@ useEffect(() => {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-[#2b3139]">
+        <div className="px-5 py-fluid-4 border-t border-[#2b3139]">
           <button
             onClick={handleConfirm}
             disabled={!tpPrice && !slPrice}
-            className="w-full rounded-xl bg-[#fcd535] text-black font-semibold py-3 hover:bg-[#e5c22d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-[#fcd535] text-black font-semibold py-fluid-3 hover:bg-[#e5c22d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Xác nhận
           </button>

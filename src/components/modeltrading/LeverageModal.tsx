@@ -51,7 +51,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-[#2b3139]">
+        <div className="flex justify-between items-center px-6 py-fluid-4 border-b border-[#2b3139]">
           <h2 className="text-lg font-semibold text-[#eaecef]">Điều chỉnh đòn bẩy</h2>
           <button 
             onClick={onClose} 
@@ -63,12 +63,12 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
 
         <div className="px-6 py-5">
           {/* Label */}
-          <div className="text-sm text-[#848e9c] mb-4">Đòn bẩy</div>
+          <div className="text-fluid-sm text-[#848e9c] mb-4">Đòn bẩy</div>
 
           {/* Leverage Control with +/- buttons */}
           <div className="flex items-center justify-center space-x-6 mb-6">
             <button
-              className="w-10 h-10 rounded border border-[#2b3139] hover:border-[#474d57] text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
+              className="w-10 h-fluid-input rounded border border-[#2b3139] hover:border-[#474d57] text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
               onClick={() => setLocalLeverage(Math.max(1, localLeverage - 1))}
             >
               −
@@ -79,7 +79,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
             </div>
 
             <button
-              className="w-10 h-10 rounded border border-[#2b3139] hover:border-[#474d57] text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
+              className="w-10 h-fluid-input rounded border border-[#2b3139] hover:border-[#474d57] text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
               onClick={() => setLocalLeverage(Math.min(150, localLeverage + 1))}
             >
               +
@@ -87,12 +87,12 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           </div>
 
           {/* ✅ Quick Leverage Buttons */}
-          <div className="grid grid-cols-6 gap-2 mb-6">
+          <div className="grid grid-cols-6 gap-fluid-2 mb-6">
             {quickLeverages.map((value) => (
               <button
                 key={value}
                 onClick={() => handleQuickSelect(value)}
-                className={`py-2 px-3 rounded text-sm font-medium transition-all ${
+                className={`py-2 px-fluid-3 rounded text-fluid-sm font-medium transition-all ${
                   localLeverage === value
                     ? 'bg-[#fcd535] text-[#1e2329]'
                     : 'bg-[#2b3139] text-[#848e9c] hover:bg-[#474d57] hover:text-[#eaecef]'
@@ -119,7 +119,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
               
               {/* Progress Fill */}
               <div 
-                className="absolute top-2 left-0 h-1 bg-[#3b82f6] rounded-full pointer-events-none"
+                className="absolute top-fluid-2 left-0 h-1 bg-[#3b82f6] rounded-full pointer-events-none"
                 style={{ 
                   width: `${((localLeverage - 1) / 149) * 100}%`,
                   transition: 'width 0.1s ease'
@@ -153,7 +153,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           </div>
 
           {/* Max Position Info */}
-          <div className="text-sm text-[#848e9c] mb-4">
+          <div className="text-fluid-sm text-[#848e9c] mb-4">
             * Vị thế tối đa {maxPosition}
           </div>
 
@@ -181,7 +181,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           {/* Additional Links */}
           <div className="space-y-3 mb-6">
             <button 
-              className="w-full text-left text-sm text-[#848e9c] hover:text-[#eaecef] flex items-center justify-between group transition-colors py-1"
+              className="w-full text-left text-fluid-sm text-[#848e9c] hover:text-[#eaecef] flex items-center justify-between group transition-colors py-fluid-1"
               onClick={() => {}}
             >
               <span>Kiểm tra bảng tỷ lệ Đòn bẩy & số tiền Ký quỹ</span>
@@ -189,7 +189,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
             </button>
             
             <button 
-              className="w-full text-left text-sm text-[#848e9c] hover:text-[#eaecef] flex items-center justify-between group transition-colors py-1"
+              className="w-full text-left text-fluid-sm text-[#848e9c] hover:text-[#eaecef] flex items-center justify-between group transition-colors py-fluid-1"
               onClick={() => {}}
             >
               <span>Tăng hạn mức vị thế</span>
@@ -200,7 +200,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           {/* Confirm Button */}
           <button 
             onClick={applyChange} 
-            className="btn btn-primary w-full py-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
+            className="btn btn-primary w-full py-fluid-3 rounded-lg font-medium hover:opacity-90 transition-opacity"
           >
             Xác nhận
           </button>

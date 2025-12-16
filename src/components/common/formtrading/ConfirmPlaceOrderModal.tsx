@@ -65,14 +65,14 @@ const ConfirmPlaceOrderModal: React.FC<Props> = ({
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
       {/* modal */}
       <div
-        className="relative z-10 w-[420px] rounded-2xl bg-dark-800 border border-dark-600 p-4 shadow-xl"
+        className="relative z-10 w-[420px] rounded-2xl bg-dark-800 border border-dark-600 p-fluid-4 shadow-xl"
         role="dialog"
         aria-modal="true"
       >
         <div className="flex items-start justify-between">
           <div className="text-white font-semibold">
             {symbol}{" "}
-            <div className="text-sm font-medium text-emerald-400">
+            <div className="text-fluid-sm font-medium text-emerald-400">
               Mở lệnh {sideLabel === "LONG" ? "Long" : "Short"}
             </div>
           </div>
@@ -85,7 +85,7 @@ const ConfirmPlaceOrderModal: React.FC<Props> = ({
           </button>
         </div>
 
-        <div className="mt-3 space-y-2 text-sm">
+        <div className="mt-3 gap-fluid-2 text-fluid-sm">
           <div className="flex justify-between">
             <span className="text-dark-400">Giá</span>
             <span className="text-white">
@@ -122,7 +122,7 @@ const ConfirmPlaceOrderModal: React.FC<Props> = ({
           </div>
 
           {order.type === "MARKET" && (
-            <div className="text-[12px] text-warning-400 mt-2">
+            <div className="text-fluid-sm text-warning-400 mt-2">
               * Lệnh có thể không khớp nếu chênh lệch vượt ngưỡng cho phép.
             </div>
           )}

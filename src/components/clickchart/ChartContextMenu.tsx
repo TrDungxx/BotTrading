@@ -269,13 +269,13 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
     {open && (
     <div
       ref={menuRef}
-      className="fixed z-[9999] py-2 rounded-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl select-none"
+      className="fixed z-[9999] py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl select-none"
       style={{ left: position.x, top: position.y, minWidth: 220 }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Làm mới biểu đồ */}
       <button
-        className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3"
+        className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3"
         onClick={() => {
           onRefreshChart?.();
           onClose();
@@ -292,9 +292,9 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
         onMouseLeave={() => setOrderSubMenuOpen(false)}
       >
         <button
-          className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between"
+          className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-fluid-3">
             <PlusIcon />
             <span>Đặt lệnh mới</span>
           </div>
@@ -303,17 +303,17 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
         {orderSubMenuOpen && (
           <div 
-            className="absolute left-full top-0 ml-0.5 py-2 rounded-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
+            className="absolute left-full top-0 ml-0.5 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
             style={{ minWidth: 200 }}
           >
             <button 
-              className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139]"
+              className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
               onClick={handleLimitOrder}
             >
               Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Limit
             </button>
             <button 
-              className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139]"
+              className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
               onClick={handleStopOrder}
             >
               Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Dừng
@@ -324,7 +324,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
       {/* Sao chép giá */}
       <button
-        className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3"
+        className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3"
         onClick={handleCopyPrice}
       >
         <CopyIcon />
@@ -333,7 +333,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
       {/* Tạo cảnh báo */}
       <button
-        className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3"
+        className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3"
         onClick={handleCreateAlert}
       >
         <BellIcon />
@@ -342,7 +342,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
       {/* Vẽ đường kẻ ngang */}
       <button
-        className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3"
+        className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3"
         onMouseDown={handleDrawHLine}
       >
         <HLineIcon />
@@ -355,8 +355,8 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
         onMouseEnter={() => onSubMenuOpen(true)}
         onMouseLeave={() => onSubMenuOpen(false)}
       >
-        <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between">
+          <div className="flex items-center gap-fluid-3">
             <SettingsIcon />
             <span>Thêm cài đặt</span>
           </div>
@@ -365,16 +365,16 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
         {subMenuOpen && (
           <div 
-            className="absolute left-full top-0 ml-0.5 py-2 rounded-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
+            className="absolute left-full top-0 ml-0.5 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
             style={{ minWidth: 160 }}
           >
-            <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139]">
+            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
               Ẩn thanh công cụ
             </button>
-            <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139]">
+            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
               Khóa bản vẽ
             </button>
-            <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139]">
+            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
               Hiển thị lưới
             </button>
           </div>
@@ -386,7 +386,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
 
       {/* Xóa bản vẽ */}
       <button
-        className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3"
+        className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3"
         onClick={handleClearHLines}
       >
         <span className="w-4" />
@@ -394,7 +394,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
       </button>
 
       {/* Xóa chỉ báo */}
-      <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3">
+      <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3">
         <span className="w-4" />
         <span>Xóa chỉ báo</span>
       </button>
@@ -403,13 +403,13 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
       <div className="my-1.5 h-px bg-[#2b3139]" />
 
       {/* Công cụ thời gian */}
-      <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3">
+      <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3">
         <ClockIcon />
         <span>Công cụ thời gian</span>
       </button>
 
       {/* Cài đặt đồ thị */}
-      <button className="w-full px-3 py-2 text-left text-[13px] text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-3">
+      <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center gap-fluid-3">
         <ChartIcon />
         <span>Cài đặt đồ thị</span>
       </button>

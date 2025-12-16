@@ -1151,9 +1151,9 @@ useEffect(() => {
           style={{ left: ctxPos.x, top: ctxPos.y, width: 280 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="py-2 text-sm text-dark-100">
+          <div className="py-2 text-fluid-sm text-dark-100">
             <button
-  className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+  className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
   onClick={() => {
     const base =
       ctxClickPriceRef.current ??
@@ -1173,7 +1173,7 @@ useEffect(() => {
 </button>
 
             <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+              className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
               onClick={async () => {
                 const ok = await copyPrice(hoverPrice);
                 setCtxOpen(false);
@@ -1187,7 +1187,7 @@ useEffect(() => {
             </button>
 
             <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between"
+              className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between"
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1256,7 +1256,7 @@ setCtxOpen(false);
               onMouseEnter={() => setCtxSubOpen(true)}
               onMouseLeave={() => setCtxSubOpen(false)}
             >
-              <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between">
+              <button className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="i-lucide-settings-2 shrink-0" /> Thêm cài đặt
                 </div>
@@ -1265,13 +1265,13 @@ setCtxOpen(false);
 
               {ctxSubOpen && (
                 <div className="absolute left-[calc(100%+6px)] top-0 min-w-[220px] rounded-xl border border-dark-600 bg-dark-800/95 shadow-xl p-1">
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                  <button className="w-full px-fluid-3 py-2 text-left hover:bg-dark-700 rounded-lg">
                     Ẩn thanh công cụ
                   </button>
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                  <button className="w-full px-fluid-3 py-2 text-left hover:bg-dark-700 rounded-lg">
                     Khóa bản vẽ
                   </button>
-                  <button className="w-full px-3 py-2 text-left hover:bg-dark-700 rounded-lg">
+                  <button className="w-full px-fluid-3 py-2 text-left hover:bg-dark-700 rounded-lg">
                     Hiển thị lưới
                   </button>
                 </div>
@@ -1281,7 +1281,7 @@ setCtxOpen(false);
             <div className="my-2 h-px bg-dark-600" />
 
             <button
-              className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
+              className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3"
               onClick={() => {
                 if (candleSeries.current) {
                   clearAllHLines(candleSeries.current);
@@ -1295,16 +1295,16 @@ setCtxOpen(false);
               Xóa bản vẽ
             </button>
 
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+            <button className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
               <span className="i-lucide-sliders-horizontal shrink-0" /> Xóa chỉ báo
             </button>
 
             <div className="my-2 h-px bg-dark-600" />
 
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+            <button className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
               <span className="i-lucide-clock shrink-0" /> Công cụ thời gian
             </button>
-            <button className="w-full px-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
+            <button className="w-full px-fluid-4 py-2 text-left hover:bg-dark-700 flex items-center gap-3">
               <span className="i-lucide-monitor-cog shrink-0" /> Cài đặt đồ thị
             </button>
           </div>

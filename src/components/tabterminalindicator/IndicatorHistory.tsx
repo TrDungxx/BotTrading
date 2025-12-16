@@ -9,7 +9,7 @@ const Chip: React.FC<{ type: string }> = ({ type }) => {
     type === "long"  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" :
     type === "short" ? "bg-rose-500/10 text-rose-400 border-rose-500/30" :
     "bg-slate-500/10 text-slate-300 border-slate-500/30";
-  return <span className={`px-2 py-0.5 rounded-md border text-xs ${cls}`}>{t}</span>;
+  return <span className={`px-2 py-0.5 rounded-fluid-md border text-xs ${cls}`}>{t}</span>;
 };
 
 const IndicatorHistory: React.FC = () => {
@@ -36,10 +36,10 @@ const IndicatorHistory: React.FC = () => {
 
   return (
     <div className="h-full min-h-[14rem] rounded border border-dark-600 bg-dark-700 flex flex-col">
-      <div className="p-2 border-b border-dark-600 flex items-center justify-between">
+      <div className="p-fluid-2 border-b border-dark-600 flex items-center justify-between">
         
         <button
-          className="text-xs border border-dark-500 rounded px-2 py-1 hover:bg-dark-600"
+          className="text-xs border border-dark-500 rounded px-2 py-fluid-1 hover:bg-dark-600"
           onClick={load}
           disabled={loading}
         >
@@ -47,12 +47,12 @@ const IndicatorHistory: React.FC = () => {
         </button>
       </div>
 
-      {error && <div className="p-3 text-xs text-rose-400">{error}</div>}
+      {error && <div className="p-fluid-3 text-xs text-rose-400">{error}</div>}
 
       <div className="flex-1 overflow-auto">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-dark-700/70 backdrop-blur border-b border-dark-600">
-            <tr className="[&>th]:px-3 [&>th]:py-2 text-gray-400 text-[11px]">
+            <tr className="[&>th]:px-fluid-3 [&>th]:py-2 text-gray-400 text-fluid-xs">
               <th>Time</th>
               <th>Type</th>
               <th>Symbol</th>
@@ -62,9 +62,9 @@ const IndicatorHistory: React.FC = () => {
               {/*<th>Req ID</th>*/}
             </tr>
           </thead>
-          <tbody className="[&>tr>td]:px-3 [&>tr>td]:py-2">
+          <tbody className="[&>tr>td]:px-fluid-3 [&>tr>td]:py-2">
             {rows.length === 0 && !loading && (
-              <tr><td className="p-3 text-gray-400" colSpan={7}>Chưa có dữ liệu lịch sử</td></tr>
+              <tr><td className="p-fluid-3 text-gray-400" colSpan={7}>Chưa có dữ liệu lịch sử</td></tr>
             )}
             {rows.map(r => (
               <tr key={r.id} className="border-b border-dark-600/60 hover:bg-dark-600/40">

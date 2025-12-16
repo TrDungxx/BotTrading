@@ -84,7 +84,7 @@ const BinanceAccountSelector: React.FC<Props> = ({
     <select
       value={selectedAccountId ?? ''}
       onChange={handleChange}
-      className="bg-dark-700 text-white px-2 py-1 rounded border border-dark-500 text-sm"
+      className="bg-dark-700 text-white px-2 py-fluid-1 rounded border border-dark-500 text-fluid-base"
     >
       <option value="" disabled>
         Hãy chọn tài khoản để giao dịch

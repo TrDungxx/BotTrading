@@ -154,7 +154,7 @@ const FloatingPositionTagV2: React.FC<Props> = ({
     >
       {/* Tag khung */}
       <div
-        className="flex items-center gap-2 bg-dark-600/90 border border-dark-400 rounded px-3 py-1.5 shadow-md"
+        className="flex items-center gap-fluid-2 bg-dark-600/90 border border-dark-400 rounded px-fluid-3 py-fluid-1.5 shadow-md"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* drag handle */}
@@ -168,7 +168,7 @@ const FloatingPositionTagV2: React.FC<Props> = ({
         </button>
 
         {/* Nội dung */}
-        <div className={`flex items-center gap-2 ${compact ? 'text-[11px]' : 'text-xs'}`}>
+        <div className={`flex items-center gap-fluid-2 ${compact ? 'text-fluid-xs' : 'text-xs'}`}>
           <span className="text-white/70">Entry:</span>
           <b className="text-white">{localEntry.toFixed(6)}</b>
           {leverage ? <span className="ml-1 text-white/50">{leverage}x</span> : null}
@@ -191,7 +191,7 @@ const FloatingPositionTagV2: React.FC<Props> = ({
           <>
             <button
               type="button"
-              className="text-[11px] px-2 py-[3px] bg-primary-600 hover:bg-primary-500 rounded text-white"
+              className="text-fluid-xs px-2 py-[3px] bg-primary-600 hover:bg-primary-500 rounded text-white"
               disabled={disabled}
               onClick={() => onConfirm?.(localEntry)}
               title="Xác nhận entry này và gửi message cho bot"
@@ -200,7 +200,7 @@ const FloatingPositionTagV2: React.FC<Props> = ({
             </button>
             <button
               type="button"
-              className="text-[11px] px-2 py-[3px] bg-dark-400 hover:bg-dark-300 rounded text-white"
+              className="text-fluid-xs px-2 py-[3px] bg-dark-400 hover:bg-dark-300 rounded text-white"
               onClick={onCancelPreview}
               title="Huỷ"
             >
@@ -210,7 +210,7 @@ const FloatingPositionTagV2: React.FC<Props> = ({
         ) : (
           <button
             type="button"
-            className="text-[11px] px-2 py-[3px] rounded text-white"
+            className="text-fluid-xs px-2 py-[3px] rounded text-white"
             style={{ background: closeBg }}
             onClick={onClosePosition}
             title="Đóng vị thế"

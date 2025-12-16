@@ -236,8 +236,8 @@ const SymbolDropdown: React.FC<Props> = ({
 
   if ((!symbols || symbols.length === 0) && loading) {
     return (
-      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl p-4">
-        <div className="flex items-center justify-center py-8 text-[#848e9c] text-sm">
+      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl p-fluid-4">
+        <div className="flex items-center justify-center py-8 text-[#848e9c] text-fluid-sm">
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#fcd535] border-t-transparent mr-3"></div>
           Đang tải...
         </div>
@@ -247,8 +247,8 @@ const SymbolDropdown: React.FC<Props> = ({
   
   if ((!symbols || symbols.length === 0) && err) {
     return (
-      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#cf304a] rounded-lg shadow-2xl p-4">
-        <div className="text-[#f6465d] text-sm py-4 text-center">Lỗi: {err}</div>
+      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#cf304a] rounded-lg shadow-2xl p-fluid-4">
+        <div className="text-[#f6465d] text-fluid-sm py-fluid-4 text-center">Lỗi: {err}</div>
       </div>
     );
   }
@@ -274,24 +274,24 @@ const SymbolDropdown: React.FC<Props> = ({
       onMouseLeave={handleMouseLeave}
     >
       {/* Header với search và tabs */}
-      <div className="px-4 pt-4 pb-3 border-b border-[#2b3139]">
+      <div className="px-fluid-4 pt-4 pb-3 border-b border-[#2b3139]">
         {/* Search Bar */}
         <div className="relative mb-3">
           <input
             type="text"
             placeholder="Tìm kiếm"
-            className="w-full h-9 pl-9 pr-3 text-sm bg-[#2b3139] text-[#eaecef] rounded border border-transparent 
+            className="w-full h-9 pl-9 pr-3 text-fluid-sm bg-[#2b3139] text-[#eaecef] rounded border border-transparent 
                      hover:border-[#474d57] focus:outline-none focus:border-[#fcd535] transition-colors"
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
           />
-          <svg className="absolute left-3 top-2.5 w-4 h-4 text-[#848e9c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="absolute left-3 top-fluid-2.5 w-4 h-4 text-[#848e9c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex items-center gap-fluid-4 text-fluid-sm">
           <button
             onClick={() => onTabChange("favorites")}
             className={`relative pb-2 transition-colors ${
@@ -326,8 +326,8 @@ const SymbolDropdown: React.FC<Props> = ({
       </div>
 
       {/* Column Headers */}
-      <div className="sticky top-0 z-10 bg-[#1e2329] px-4 py-2 border-b border-[#2b3139]">
-        <div className="grid grid-cols-[32px_minmax(140px,1fr)_100px_100px] gap-3 text-xs text-[#848e9c]">
+      <div className="sticky top-0 z-10 bg-[#1e2329] px-fluid-4 py-2 border-b border-[#2b3139]">
+        <div className="grid grid-cols-[32px_minmax(140px,1fr)_100px_100px] gap-fluid-3 text-xs text-[#848e9c]">
           <div></div>
           <div>Hợp đồng</div>
           <div className="text-right">Giá gần nhất</div>
@@ -354,7 +354,7 @@ const SymbolDropdown: React.FC<Props> = ({
         `}</style>
 
         {listToRender.length === 0 ? (
-          <div className="py-12 text-center text-[#848e9c] text-sm">
+          <div className="py-fluid-12 text-center text-[#848e9c] text-fluid-sm">
             {activeTab === "favorites" ? "Chưa có mục yêu thích" : "Không tìm thấy kết quả"}
           </div>
         ) : (
@@ -368,7 +368,7 @@ const SymbolDropdown: React.FC<Props> = ({
             return (
               <div
                 key={item.symbol}
-                className={`grid grid-cols-[32px_minmax(140px,1fr)_100px_100px] gap-3 items-center px-4 py-2.5 cursor-pointer transition-colors
+                className={`grid grid-cols-[32px_minmax(140px,1fr)_100px_100px] gap-fluid-3 items-center px-fluid-4 py-2.5 cursor-pointer transition-colors
                   ${isActive ? "bg-[#2b3139]" : "hover:bg-[#2b3139]/60"}`}
                 onClick={() => {
                   onSelect(item.symbol);
@@ -397,7 +397,7 @@ const SymbolDropdown: React.FC<Props> = ({
                 </div>
 
                 {/* Symbol & Volume */}
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-fluid-2.5 min-w-0">
                   {coinIcons[base] ? (
                     <img 
                       src={coinIcons[base]} 
@@ -405,14 +405,14 @@ const SymbolDropdown: React.FC<Props> = ({
                       className="w-6 h-6 rounded-full flex-shrink-0" 
                     />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-[#fcd535] text-[#1e2329] text-[10px] font-bold 
+                    <div className="w-6 h-6 rounded-full bg-[#fcd535] text-[#1e2329] text-fluid-2xs font-bold 
                                   flex items-center justify-center flex-shrink-0">
                       {base[0]}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[#eaecef] font-medium text-sm truncate">
+                    <div className="flex items-center gap-fluid-1.5">
+                      <span className="text-[#eaecef] font-medium text-fluid-sm truncate">
                         {item.symbol}
                       </span>
                       {market === "futures" && (
@@ -421,21 +421,21 @@ const SymbolDropdown: React.FC<Props> = ({
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-[#848e9c] mt-0.5">
+                    <div className="text-fluid-xs text-[#848e9c] mt-0.5">
                       KL {compactNumber(item.volume)}
                     </div>
                   </div>
                 </div>
 
                 {/* Price */}
-                <div className="text-right text-[#eaecef] text-sm font-medium tabular-nums">
+                <div className="text-right text-[#eaecef] text-fluid-sm font-medium tabular-nums">
                   {formatPrice(item.price)}
                 </div>
 
                 {/* Change Percent */}
                 <div className="text-right">
                   <span
-                    className={`inline-block text-sm font-medium tabular-nums ${
+                    className={`inline-block text-fluid-sm font-medium tabular-nums ${
                       isPositive ? "text-[#0ecb81]" : "text-[#f6465d]"
                     }`}
                   >

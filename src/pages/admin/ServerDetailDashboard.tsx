@@ -34,7 +34,7 @@ interface ServerDetailProps {
 
 const GaugeCard = ({ label, value, unit = '%', color }: { label: string; value: number; unit?: string; color: string }) => {
   return (
-    <div className="bg-dark-800 p-4 rounded shadow border border-dark-600 w-full">
+    <div className="bg-dark-800 p-fluid-4 rounded shadow border border-dark-600 w-full">
       <p className="text-white mb-2 font-semibold">{label}</p>
       <ReactApexChart
         type="radialBar"
@@ -64,17 +64,17 @@ const GaugeCard = ({ label, value, unit = '%', color }: { label: string; value: 
 };
 
 const StatCard = ({ icon, title, value }: { icon: React.ReactNode; title: string; value: string }) => (
-  <div className="bg-dark-800 p-4 rounded border border-dark-600 flex items-center gap-3 w-full">
+  <div className="bg-dark-800 p-fluid-4 rounded border border-dark-600 flex items-center gap-fluid-3 w-full">
     <div className="text-primary-500">{icon}</div>
     <div>
-      <p className="text-white text-sm">{title}</p>
+      <p className="text-white text-fluid-sm">{title}</p>
       <p className="text-lg font-semibold text-white">{value}</p>
     </div>
   </div>
 );
 
 const TimeChart = ({ title, data }: { title: string; data: { time: string; value: number }[] }) => (
-  <div className="bg-dark-800 p-4 rounded border border-dark-600">
+  <div className="bg-dark-800 p-fluid-4 rounded border border-dark-600">
     <p className="text-white font-semibold mb-2">{title}</p>
     <ReactApexChart
       type="area"
@@ -152,7 +152,7 @@ export default function ServerDetailDashboard({
       <h2 className="text-2xl font-bold text-white">Server: {hostname}</h2>
 
       {/* Gauge Panel */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-fluid-4">
         <GaugeCard label="CPU Usage" value={cpu} color="#00C9A7" />
         <GaugeCard label="RAM Usage" value={memory} color="#F6C343" />
         <GaugeCard label="Disk Usage" value={disk} color="#E63757" />
@@ -160,7 +160,7 @@ export default function ServerDetailDashboard({
       </div>
 
       {/* Stat Panel */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-fluid-4">
         <StatCard icon={<TimerReset />} title="Uptime" value={formatUptime(uptime)} />
 
         <StatCard icon={<MemoryStick />} title="Memory Used" value={`${(memoryUsed / 1024 / 1024).toFixed(0)} / ${(memoryTotal / 1024 / 1024).toFixed(0)} MB`} />

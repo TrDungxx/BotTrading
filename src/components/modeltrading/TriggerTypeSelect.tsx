@@ -47,7 +47,7 @@ const TriggerTypeSelect: React.FC<Props> = ({ value, onChange }) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className={`text-white text-xs flex items-center gap-1.5 px-2.5 py-1  transition-all ${
+        className={`text-white text-xs flex items-center gap-fluid-1.5 px-2.5 py-fluid-1  transition-all ${
           isOpen 
             ? "bg-primary-600 border-primary-500" 
             : "bg-transparent border-dark-600 hover:bg-dark-700/30"
@@ -81,7 +81,7 @@ const TriggerTypeSelect: React.FC<Props> = ({ value, onChange }) => {
                 onChange(option.value);
                 setIsOpen(false);
               }}
-              className={`w-full px-3 py-2 text-xs text-left transition-colors ${
+              className={`w-full px-fluid-3 py-2 text-xs text-left transition-colors ${
                 value === option.value
                   ? "bg-primary-600 text-white"
                   : "text-slate-300 hover:bg-dark-700"

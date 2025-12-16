@@ -25,7 +25,7 @@ const MarginModeModal: React.FC<MarginModeModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-fluid-4">
       <div className="bg-[#1e2329] rounded-lg w-full max-w-md border border-dark-700">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-dark-700">
@@ -42,14 +42,14 @@ const MarginModeModal: React.FC<MarginModeModalProps> = ({
         <div className="p-5">
           {/* Symbol Info */}
           <div className="mb-5">
-            <span className="text-sm text-white font-medium">{symbol}</span>
-            <span className="ml-2 text-xs bg-dark-700 text-dark-300 px-2 py-1 rounded">
+            <span className="text-fluid-sm text-white font-medium">{symbol}</span>
+            <span className="ml-2 text-xs bg-dark-700 text-dark-300 px-2 py-fluid-1 rounded">
               Vĩnh cửu
             </span>
           </div>
 
           {/* Mode Toggle Buttons */}
-          <div className="flex gap-3 mb-6">
+          <div className="flex gap-fluid-3 mb-6">
             <button
               onClick={() => setTempMode('cross')}
               className={`flex-1 py-2.5 rounded-lg font-medium transition-all ${
@@ -99,7 +99,7 @@ const MarginModeModal: React.FC<MarginModeModalProps> = ({
           {/* Confirm Button */}
           <button 
             onClick={handleConfirm}
-            className="w-full py-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-gray-900 font-semibold transition-colors"
+            className="w-full py-fluid-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-gray-900 font-semibold transition-colors"
           >
             Xác nhận
           </button>

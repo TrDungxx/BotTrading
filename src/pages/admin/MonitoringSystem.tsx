@@ -98,7 +98,7 @@ export default function MonitoringSystem() {
 
       {/* Error */}
       {error && (
-        <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-4 rounded-md flex items-center gap-3">
+        <div className="bg-danger-500/10 text-danger-500 border border-danger-500/20 p-fluid-4 rounded-fluid-md flex items-center gap-fluid-3">
           <AlertTriangle className="h-5 w-5" />
           {error}
         </div>
@@ -107,13 +107,13 @@ export default function MonitoringSystem() {
       {/* Stream Status */}
       <div className="card p-6">
         <h2 className="text-lg font-medium mb-2">Stream Connection</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-fluid-3">
           <span className={`h-3 w-3 rounded-full ${isConnected ? 'bg-success-500 animate-pulse' : 'bg-danger-500'}`} />
-          <p className={`text-sm ${isConnected ? 'text-success-500' : 'text-danger-500'}`}>
+          <p className={`text-fluid-sm ${isConnected ? 'text-success-500' : 'text-danger-500'}`}>
             {isConnected === null ? 'Loading...' : isConnected ? 'Connected' : 'Disconnected'}
           </p>
           {lastPing && (
-            <p className="ml-4 text-sm text-dark-400">
+            <p className="ml-4 text-fluid-sm text-dark-400">
               Last Update:{' '}
               <span className="text-dark-300">{new Date(lastPing).toLocaleTimeString()}</span>
             </p>
@@ -176,9 +176,9 @@ export default function MonitoringSystem() {
       {/* Latest Metrics */}
       <div className="card p-6">
         <h2 className="text-lg font-medium mb-4">Latest Metrics</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-fluid-4">
           {latestMetrics.map((m, i) => (
-            <div key={i} className="rounded-md bg-dark-700 p-4 text-sm space-y-1 leading-relaxed">
+            <div key={i} className="rounded-fluid-md bg-dark-700 p-fluid-4 text-fluid-sm space-y-1 leading-relaxed">
               <div className="flex justify-between font-semibold">
                 <span>Conn: {m.CurrentConnections}</span>
                 <span>ActivePos: {m.ActivePositions}</span>

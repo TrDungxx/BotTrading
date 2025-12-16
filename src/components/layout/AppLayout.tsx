@@ -15,6 +15,9 @@ export default function AppLayout() {
     return saved ? JSON.parse(saved) : true;
   });
 
+  // Track actual sidebar margin based on viewport
+  const [sidebarMargin, setSidebarMargin] = useState(0);
+
   useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 1024 && sidebarOpen) setSidebarOpen(false);
@@ -33,6 +36,44 @@ export default function AppLayout() {
     return () => window.removeEventListener('sidebar-toggle', handleSidebarToggle as EventListener);
   }, []);
 
+  // Calculate actual sidebar margin based on viewport and state
+  useEffect(() => {
+    const calculateMargin = () => {
+      const width = window.innerWidth;
+      
+      // Mobile (< 1024px): no margin, sidebar is overlay
+      if (width < 1024) {
+        setSidebarMargin(0);
+        return;
+      }
+      
+      // Tablet/Small Desktop (1024px - 1279px): always collapsed (60px)
+      if (width < 1280) {
+        setSidebarMargin(60);
+        return;
+      }
+      
+      // Desktop (1280px - 2399px): respect user preference
+      if (width < 2400) {
+        setSidebarMargin(sidebarExpanded ? 270 : 60);
+        return;
+      }
+      
+      // 2K (2400px - 3199px)
+      if (width < 3200) {
+        setSidebarMargin(sidebarExpanded ? 320 : 72);
+        return;
+      }
+      
+      // 4K (3200px+)
+      setSidebarMargin(sidebarExpanded ? 400 : 88);
+    };
+
+    calculateMargin();
+    window.addEventListener('resize', calculateMargin);
+    return () => window.removeEventListener('resize', calculateMargin);
+  }, [sidebarExpanded]);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
@@ -45,14 +86,10 @@ export default function AppLayout() {
           sidebarExpanded={sidebarExpanded}
         />
         
-        {/* Main content với dynamic margin */}
+        {/* Main content với dynamic margin sync với sidebar CSS */}
         <main 
-          className={cn(
-            "flex-1 min-h-0 overflow-hidden pt-14 md:pt-16 transition-all duration-300",
-            // Mobile/Tablet: không có margin
-            // Desktop: margin theo sidebar state
-            sidebarExpanded ? "lg:ml-64" : "lg:ml-16"
-          )}
+          className="flex-1 min-h-0 overflow-hidden pt-14 md:pt-16 transition-all duration-300"
+          style={{ marginLeft: sidebarMargin }}
         >
           <Outlet />
         </main>

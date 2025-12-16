@@ -107,7 +107,7 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({ onClose, onSave, 
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-6 py-4 border-b border-dark-700">
+          <div className="flex items-center justify-between px-6 py-fluid-4 border-b border-dark-700">
             <h3 className="text-lg font-semibold text-white">Time</h3>
             <button onClick={onClose} className="text-dark-400 hover:text-white">
               <X className="w-5 h-5"/>
@@ -117,17 +117,17 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({ onClose, onSave, 
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-medium text-dark-300">Pinned</h4>
-                <button onClick={handleSave} className="text-sm font-medium text-yellow-400 hover:text-yellow-300">
+                <h4 className="text-fluid-sm font-medium text-dark-300">Pinned</h4>
+                <button onClick={handleSave} className="text-fluid-sm font-medium text-yellow-400 hover:text-yellow-300">
                   Save
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-fluid-3">
                 {pinned.map(tf=>(
                   <button 
                     key={tf.value}
                     onClick={()=>toggle(tf,true)}
-                    className="relative px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                    className="relative px-fluid-4 py-2 rounded-fluid-md text-fluid-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
                   >
                     {tf.label}
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full"/>
@@ -135,33 +135,33 @@ const TimeframeSelector: React.FC<TimeframeSelectorProps> = ({ onClose, onSave, 
                 ))}
               </div>
               {pinned.length===0 && (
-                <p className="text-sm text-dark-400 text-center py-4">No pinned timeframes.</p>
+                <p className="text-fluid-sm text-dark-400 text-center py-fluid-4">No pinned timeframes.</p>
               )}
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-dark-300 mb-3">Available</h4>
-              <div className="grid grid-cols-3 gap-3">
+              <h4 className="text-fluid-sm font-medium text-dark-300 mb-3">Available</h4>
+              <div className="grid grid-cols-3 gap-fluid-3">
                 {available.map(tf=>(
                   <button 
                     key={tf.value}
                     onClick={()=>toggle(tf,false)}
-                    className="px-4 py-2 rounded-md text-sm font-medium bg-dark-700 text-dark-300 hover:bg-dark-600"
+                    className="px-fluid-4 py-2 rounded-fluid-md text-fluid-sm font-medium bg-dark-700 text-dark-300 hover:bg-dark-600"
                   >
                     {tf.label}
                   </button>
                 ))}
               </div>
               {available.length===0 && (
-                <p className="text-sm text-dark-400 text-center py-4">All timeframes are pinned</p>
+                <p className="text-fluid-sm text-dark-400 text-center py-fluid-4">All timeframes are pinned</p>
               )}
             </div>
 
             <div>
-              <h4 className="text-sm font-medium text-dark-300 mb-3">Custom Intervals</h4>
+              <h4 className="text-fluid-sm font-medium text-dark-300 mb-3">Custom Intervals</h4>
               <button
                 onClick={()=>setShowAdd(true)}
-                className="w-full py-3 border-2 border-dashed border-dark-600 rounded-md text-dark-400 hover:border-dark-500 hover:text-dark-300 text-sm"
+                className="w-full py-fluid-3 border-2 border-dashed border-dark-600 rounded-fluid-md text-dark-400 hover:border-dark-500 hover:text-dark-300 text-fluid-sm"
               >
                 + Add Custom Interval
               </button>

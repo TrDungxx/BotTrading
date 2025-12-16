@@ -313,7 +313,7 @@ setHasUserChangedSecretKey(false);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
         <div>
           <h1 className="text-2xl font-bold">Binance Accounts</h1>
           <p className="text-dark-400">Manage Binance trading accounts and connections</p>
@@ -333,7 +333,7 @@ setHasUserChangedSecretKey(false);
 
       {/* Global message */}
       {message && (
-        <div className={`flex items-center gap-3 p-4 rounded-lg ${message.type === 'success'
+        <div className={`flex items-center gap-fluid-3 p-fluid-4 rounded-lg ${message.type === 'success'
           ? 'bg-success-500/10 border border-success-500/20'
           : 'bg-danger-500/10 border border-danger-500/20'
           }`}>
@@ -342,76 +342,76 @@ setHasUserChangedSecretKey(false);
           ) : (
             <AlertTriangle className="h-5 w-5 text-danger-500 flex-shrink-0" />
           )}
-          <p className={`text-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
+          <p className={`text-fluid-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
             {message.text}
           </p>
         </div>
       )}
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-fluid-4 sm:grid-cols-4">
         <div
-          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
+          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
             }`}
           onClick={() => handleAccountStatusCardClick('all')}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-primary-500/10">
                 <Building2 className="h-4 w-4 text-primary-500" />
               </div>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Total Accounts</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Total Accounts</p>
               <p className="text-lg font-semibold">{accounts.length}</p>
             </div>
           </div>
         </div>
 
         <div
-          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
+          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
             }`}
           onClick={() => handleAccountStatusCardClick(1)}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-success-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-success-500/10">
                 <CheckCircle className="h-4 w-4 text-success-500" />
               </div>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Active</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Active</p>
               <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 1).length}</p>
             </div>
           </div>
         </div>
 
-        <div className="card p-4">
+        <div className="card p-fluid-4">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-300/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-warning-300/10">
                 <Building2 className="h-4 w-4 text-warning-300" />
               </div>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Connected</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Connected</p>
               <p className="text-lg font-semibold">{accounts.filter(a => a.BinanceId).length}</p>
             </div>
           </div>
         </div>
 
         <div
-          className={`card p-4 cursor-pointer transition ${selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
+          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
             }`}
           onClick={() => handleAccountStatusCardClick(0)}
         >
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-danger-500/10">
+              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-danger-500/10">
                 <XCircle className="h-4 w-4 text-danger-500" />
               </div>
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-dark-400">Inactive</p>
+              <p className="text-fluid-sm font-medium text-dark-400">Inactive</p>
               <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 0).length}</p>
             </div>
           </div>
@@ -419,7 +419,7 @@ setHasUserChangedSecretKey(false);
       </div>
 
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-fluid-4">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
             <Search className="h-4 w-4 text-dark-400" />
@@ -443,45 +443,45 @@ setHasUserChangedSecretKey(false);
       {/* Accounts table */}
       <div className="card overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center py-fluid-12">
+            <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-dark-700">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Account Info</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Binance ID</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-dark-400">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-dark-400">Description</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Created</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-dark-400">Actions</th>
+                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">ID</th>
+                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Account Info</th>
+                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Binance ID</th>
+                  <th className="px-6 py-fluid-3 text-center text-xs font-medium text-dark-400">Status</th>
+                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Description</th>
+                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Created</th>
+                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
+                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-dark-700">
                 {filteredAccounts.map((account) => (
                   <tr key={account.id} className="hover:bg-dark-700/40">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
+                        <div className="h-fluid-input w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
                           <Building2 className="h-5 w-5 text-primary-500" />
                         </div>
                         <div className="ml-3">
-                          <div className="text-sm font-medium">#{account.id}</div>
+                          <div className="text-fluid-sm font-medium">#{account.id}</div>
                           <div className="text-xs text-dark-400">Internal: {account.internalAccountId}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap">
                       <div>
-                        <div className="text-sm font-medium">{account.Name}</div>
+                        <div className="text-fluid-sm font-medium">{account.Name}</div>
                         <div className="text-xs text-dark-400">{account.Email}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap">
                       {account.BinanceId ? (
                         <span className="inline-flex items-center rounded-full bg-warning-300/10 px-2.5 py-0.5 text-xs font-medium text-warning-300">
                           {account.BinanceId}
@@ -490,7 +490,7 @@ setHasUserChangedSecretKey(false);
                         <span className="text-xs text-dark-500">Not connected</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap text-center">
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(account.Status)}`}>
                         {account.Status === 1 ? (
                           <CheckCircle className="mr-1 h-3 w-3" />
@@ -500,12 +500,12 @@ setHasUserChangedSecretKey(false);
                         {getStatusLabel(account.Status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-dark-300 max-w-xs truncate">
+                    <td className="px-6 py-fluid-4">
+                      <div className="text-fluid-sm text-dark-300 max-w-xs truncate">
                         {account.Description || '-'}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                       <div>
                         <FormattedDate
                           value={account.create_time}
@@ -522,7 +522,7 @@ setHasUserChangedSecretKey(false);
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-dark-400">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
                       <div>
                         <FormattedDate
                           value={account.update_time}
@@ -539,8 +539,8 @@ setHasUserChangedSecretKey(false);
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex justify-end space-x-2">
+                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
+                      <div className="flex justify-end gap-fluid-2">
                         <button
                           className="text-dark-400 hover:text-primary-500"
                           onClick={() => handleEdit(account)}
@@ -566,10 +566,10 @@ setHasUserChangedSecretKey(false);
       </div>
       {!isLoading && accounts.length > 0 && (
         <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-dark-400">
+          <div className="text-fluid-sm text-dark-400">
             Showing page {page} of {totalPages}
           </div>
-          <div className="flex space-x-2">
+          <div className="flex gap-fluid-2">
             <button
               onClick={() => setPage(page - 1)}
               disabled={page === 1}
@@ -582,7 +582,7 @@ setHasUserChangedSecretKey(false);
               <button
                 key={i + 1}
                 onClick={() => setPage(i + 1)}
-                className={`px-3 py-2 text-sm rounded-md ${i + 1 === page
+                className={`px-fluid-3 py-2 text-fluid-sm rounded-fluid-md ${i + 1 === page
                   ? 'bg-primary-500 text-white'
                   : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
                   }`}
@@ -604,7 +604,7 @@ setHasUserChangedSecretKey(false);
 
       {/* Form Modal */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-2xl">
             <div className="card-header flex justify-between items-center">
               <h2 className="text-lg font-medium">
@@ -622,7 +622,7 @@ setHasUserChangedSecretKey(false);
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="name" className="form-label">Account Name *</label>
                   <input
@@ -649,7 +649,7 @@ setHasUserChangedSecretKey(false);
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="apiKey" className="form-label">API Key *</label>
                   <input
@@ -681,7 +681,7 @@ setHasUserChangedSecretKey(false);
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-fluid-4">
                 <div>
                   <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
                   <input
@@ -734,7 +734,7 @@ setHasUserChangedSecretKey(false);
                 />
               </div>
 
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end gap-fluid-2 pt-4">
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -773,14 +773,14 @@ setHasUserChangedSecretKey(false);
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-dark-800 rounded-lg shadow-lg w-full max-w-md p-6">
             <div className="text-center">
-              <AlertTriangle className="w-10 h-10 text-danger-500 mx-auto mb-4" />
+              <AlertTriangle className="w-10 h-fluid-input text-danger-500 mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-2">Delete Binance Account</h2>
               <p className="text-dark-400 mb-6">
                 Are you sure you want to delete <strong>{deletingAccount.Name}</strong>? This action cannot be undone.
               </p>
             </div>
 
-            <div className="flex justify-center gap-4">
+            <div className="flex justify-center gap-fluid-4">
               <button className="btn btn-outline" onClick={() => setDeletingAccount(null)}>
                 Cancel
               </button>
@@ -792,10 +792,10 @@ setHasUserChangedSecretKey(false);
         </div>
       )}
       {showUpdateConfirm && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
           <div className="card w-full max-w-md">
             <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-warning-500/10 mx-auto mb-4">
+              <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-warning-500/10 mx-auto mb-4">
                 <AlertTriangle className="h-6 w-6 text-warning-500" />
               </div>
               <h3 className="text-lg font-medium text-center text-danger-600 mb-2">Xác nhận cập nhật Binance</h3>

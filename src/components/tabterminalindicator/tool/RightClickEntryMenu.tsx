@@ -136,16 +136,16 @@ const RightClickEntryMenu: React.FC<Props> = ({
   return (
     <div
       ref={ref}
-      className={`absolute pointer-events-auto z-[95] rounded-xl border border-dark-600 bg-dark-700/95 shadow-lg backdrop-blur p-3 min-w-[220px] ${className ?? ""}`}
+      className={`absolute pointer-events-auto z-[95] rounded-xl border border-dark-600 bg-dark-700/95 shadow-lg backdrop-blur p-fluid-3 min-w-[220px] ${className ?? ""}`}
       style={{ left: pos.left, top: pos.top }}  // ⬅️ KHÔNG dùng transform nữa
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="text-[11px] text-white/80 mb-2">Đặt lệnh chờ</div>
+      <div className="text-fluid-xs text-white/80 mb-2">Đặt lệnh chờ</div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-fluid-2 mb-3">
         <button
           type="button"
-          className={`px-2 py-1 text-xs rounded border ${
+          className={`px-2 py-fluid-1 text-xs rounded border ${
             localSide === "long"
               ? "border-emerald-500 text-emerald-400 bg-emerald-500/10"
               : "border-dark-500 text-gray-300 hover:bg-dark-600/60"
@@ -156,7 +156,7 @@ const RightClickEntryMenu: React.FC<Props> = ({
         </button>
         <button
           type="button"
-          className={`px-2 py-1 text-xs rounded border ${
+          className={`px-2 py-fluid-1 text-xs rounded border ${
             localSide === "short"
               ? "border-rose-500 text-rose-400 bg-rose-500/10"
               : "border-dark-500 text-gray-300 hover:bg-dark-600/60"
@@ -167,11 +167,11 @@ const RightClickEntryMenu: React.FC<Props> = ({
         </button>
       </div>
 
-      <label className="block text-[11px] text-white/70 mb-1">Entry</label>
-      <div className="flex items-center gap-2 mb-3">
+      <label className="block text-fluid-xs text-white/70 mb-1">Entry</label>
+      <div className="flex items-center gap-fluid-2 mb-3">
         <input
           type="number"
-          className="w-full bg-dark-800 border border-dark-500 rounded px-2 py-1 text-xs text-white outline-none focus:border-primary-500/60"
+          className="w-full bg-dark-800 border border-dark-500 rounded px-2 py-fluid-1 text-xs text-white outline-none focus:border-primary-500/60"
           value={Number.isFinite(localPrice) ? toFixedSafe(localPrice, d) : text}
           onChange={(e) => {
             const v = clampDecimalsFromInput(e.target.value, d);
@@ -185,20 +185,20 @@ const RightClickEntryMenu: React.FC<Props> = ({
           step={step}
           inputMode="decimal"
         />
-        <span className="text-[11px] text-white/50">USD</span>
+        <span className="text-fluid-xs text-white/50">USD</span>
       </div>
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-fluid-2">
         <button
           type="button"
-          className="px-2 py-1 text-xs rounded border border-dark-500 text-gray-300 hover:bg-dark-600/60"
+          className="px-2 py-fluid-1 text-xs rounded border border-dark-500 text-gray-300 hover:bg-dark-600/60"
           onClick={onClose}
         >
           Huỷ
         </button>
         <button
           type="button"
-          className="px-3 py-1 text-xs rounded bg-primary-600 text-white hover:bg-primary-500"
+          className="px-fluid-3 py-fluid-1 text-xs rounded bg-primary-600 text-white hover:bg-primary-500"
           onClick={() => {
             const final = Number.isFinite(localPrice) ? Number(localPrice) : clampDecimalsFromInput(text, d);
             if (Number.isFinite(final)) onConfirm({ side: localSide, price: final });

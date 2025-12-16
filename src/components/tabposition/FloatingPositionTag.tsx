@@ -85,7 +85,7 @@ const FloatingPositionTag: React.FC<Props> = ({
       }}
     >
       <div 
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded border shadow-lg"
+        className="flex items-center gap-fluid-2 px-2.5 py-fluid-1.5 rounded border shadow-lg"
         style={{
           backgroundColor: bgColor,
           borderColor: borderColor,
@@ -133,7 +133,7 @@ const FloatingPositionTag: React.FC<Props> = ({
         {/* ✅ TP/SL Button - Darker background để nổi bật hơn */}
         <button
           type="button"
-          className="text-[11px] px-2 py-0.5 rounded font-medium transition-all"
+          className="text-fluid-xs px-2 py-0.5 rounded font-medium transition-all"
           style={{
             backgroundColor: 'rgba(0, 0, 0, 0.4)', // ✅ Đen hơn
             color: '#E0E0E0',

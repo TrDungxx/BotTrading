@@ -105,7 +105,7 @@ export default function AdminSystem() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">System Monitoring Dashboard</h1>
 
-      <div className="flex gap-2 mt-4">
+      <div className="flex gap-fluid-2 mt-4">
         <button className={`btn ${tab === 'list' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('list')}>
           <Server className="w-4 h-4 mr-1" /> List Server
         </button>
@@ -122,21 +122,21 @@ export default function AdminSystem() {
       </div>
 
       {tab === 'alert' && (
-        <div className="bg-dark-800 border border-yellow-600 p-4 rounded shadow-sm">
-          <div className="flex items-center gap-2 text-yellow-500 font-semibold mb-2">
+        <div className="bg-dark-800 border border-yellow-600 p-fluid-4 rounded shadow-sm">
+          <div className="flex items-center gap-fluid-2 text-yellow-500 font-semibold mb-2">
             <AlertTriangle className="w-5 h-5" /> High RAM Alerts (Last 5 hours)
           </div>
           {alerts.length > 0 ? (
-            <ul className="text-yellow-300 space-y-2 text-sm">
+            <ul className="text-yellow-300 gap-fluid-2 text-fluid-sm">
               {alerts.map(alert => (
-                <li key={alert.id} className="flex items-center gap-2">
+                <li key={alert.id} className="flex items-center gap-fluid-2">
                   <AlertTriangle className="w-4 h-4" />
                   <span><strong>{alert.hostname}</strong> - {alert.alert_types.join(', ')} at {dayjs(alert.create_time).format('HH:mm')}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <div className="text-green-400 flex items-center gap-2">
+            <div className="text-green-400 flex items-center gap-fluid-2">
               <CheckCircle className="w-5 h-5" /> All good. No alerts.
             </div>
           )}
@@ -144,11 +144,11 @@ export default function AdminSystem() {
       )}
 
       {tab === 'list' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-fluid-4">
           {representativeServers.map(s => (
-            <div key={s.hostname} onClick={() => handleSelectServer(s)} className="bg-dark-700 p-4 rounded border border-dark-500 hover:ring ring-primary-500 cursor-pointer">
+            <div key={s.hostname} onClick={() => handleSelectServer(s)} className="bg-dark-700 p-fluid-4 rounded border border-dark-500 hover:ring ring-primary-500 cursor-pointer">
               <p className="text-white font-bold mb-1">{s.hostname}</p>
-              <p className="text-xs text-dark-400 mb-2 flex items-center gap-1">
+              <p className="text-xs text-dark-400 mb-2 flex items-center gap-fluid-1">
                 <TimerReset size={14} /> {formatUptime(s.uptime_seconds ?? 0)}
               </p>
               <Bar label="CPU" value={parseFloat(s.cpu_usage_percent)} icon={<Cpu size={18} className='text-blue-600' />} />
@@ -197,7 +197,7 @@ const Bar = ({ label, value, icon }: { label: string; value: number; icon: React
   return (
     <div className="mb-2">
       <div className="flex justify-between text-xs text-white mb-1">
-        <div className="flex gap-1 items-center">{icon}<span>{label}</span></div>
+        <div className="flex gap-fluid-1 items-center">{icon}<span>{label}</span></div>
         <span>{value.toFixed(2)}%</span>
       </div>
       <div className="w-full h-2 bg-dark-400 rounded">

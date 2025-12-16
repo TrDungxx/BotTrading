@@ -1,35 +1,515 @@
-/* Trading Positions - With internal scroll */
+/* ============================================
+   TRADING POSITIONS - FLUID RESPONSIVE
+   With internal scroll support
+   ============================================ */
+
 .trading-positions {
   display: flex;
   flex-direction: column;
   width: 100%;
   background: var(--bg-panel, #1e293b);
+  overflow: hidden;
 }
 
+/* ===== POSITIONS HEADER ===== */
 .trading-positions-header {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--trading-gap-sm) var(--trading-gap-lg);
+  border-bottom: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
+  min-height: clamp(36px, 2.292vw, 56px);
 }
 
+.trading-positions-title {
+  font-size: var(--stats-font-lg);
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.trading-positions-count {
+  font-size: var(--stats-font-sm);
+  color: rgba(148, 163, 184, 0.7);
+  margin-left: var(--trading-gap-sm);
+}
+
+/* Tab switcher (Positions / Orders / History) */
+.positions-tabs {
+  display: flex;
+  gap: var(--trading-gap-sm);
+}
+
+.positions-tab {
+  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  font-size: var(--stats-font-sm);
+  font-weight: 500;
+  color: rgba(148, 163, 184, 0.7);
+  border-radius: var(--trading-radius-sm);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.positions-tab:hover {
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(71, 85, 105, 0.3);
+}
+
+.positions-tab.active {
+  color: rgba(59, 130, 246, 0.95);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Controls (close all, etc) */
+.positions-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-sm);
+}
+
+.positions-controls button {
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
+  font-size: var(--stats-font-xs);
+  border-radius: var(--trading-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+/* ===== TABLE CONTAINER - SCROLL ===== */
 .trading-positions-table-container {
   width: 100%;
+  flex: 1;
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 300px; /* ← Điều chỉnh theo ý bạn: 300px, 400px, 50vh */
+  max-height: clamp(200px, 18.75vw, 400px);
+  min-height: 0;
 }
 
-.trading-positions table {
+/* Custom scrollbar */
+.trading-positions-table-container::-webkit-scrollbar {
+  width: var(--scrollbar-width-thin, 6px);
+  height: var(--scrollbar-width-thin, 6px);
+}
+
+.trading-positions-table-container::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.3);
+}
+
+.trading-positions-table-container::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-radius: var(--trading-radius-sm, 3px);
+}
+
+.trading-positions-table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
+/* ===== TABLE ===== */
+.trading-positions table,
+.position-table {
   width: 100%;
   border-collapse: collapse;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* ✅ Sticky header khi scroll */
-.trading-positions table thead {
+/* ✅ Sticky header */
+.trading-positions table thead,
+.position-table thead {
   position: sticky;
   top: 0;
   background: var(--bg-panel, #1e293b);
   z-index: 10;
 }
 
-.trading-positions table thead th {
+/* Table header */
+.trading-positions table thead th,
+.position-table thead th {
   background: var(--bg-panel, #1e293b);
+  font-size: var(--stats-font-xs);
+  font-weight: 500;
+  color: rgba(148, 163, 184, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
+}
+
+/* Table body */
+.trading-positions table tbody tr,
+.position-table tbody tr {
+  border-bottom: 2px solid rgba(51, 65, 85, 1);
+  transition: background-color var(--transition-fast);
+}
+
+.trading-positions table tbody tr:hover,
+.position-table tbody tr:hover {
+  background: rgba(71, 85, 105, 0.2);
+}
+
+.trading-positions table tbody td,
+.position-table tbody td {
+  padding: var(--trading-gap-md) var(--trading-gap-md);
+  font-size: var(--stats-font-sm);
+  vertical-align: middle;
+}
+
+/* ===== COLUMN SPECIFIC STYLES ===== */
+
+/* Symbol column */
+.position-table tbody td:first-child,
+.trading-positions table tbody td:first-child {
+  font-weight: 600;
+  font-size: var(--stats-font-md);
+}
+
+.position-symbol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--trading-gap-xs);
+}
+
+.position-symbol-name {
+  font-weight: 600;
+  font-size: var(--stats-font-md);
+  color: rgba(226, 232, 240, 0.95);
+}
+
+.position-symbol-leverage {
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.7);
+}
+
+/* Side indicator */
+.position-side {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
+  border-radius: var(--trading-radius-sm);
+  font-size: var(--stats-font-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.position-side.long {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.position-side.short {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Numeric columns (Size, Entry, Mark, PnL) */
+.position-table tbody td:nth-child(2),
+.position-table tbody td:nth-child(3),
+.position-table tbody td:nth-child(4),
+.position-table tbody td:nth-child(5),
+.position-table tbody td:nth-child(6),
+.trading-positions table tbody td:nth-child(2),
+.trading-positions table tbody td:nth-child(3),
+.trading-positions table tbody td:nth-child(4),
+.trading-positions table tbody td:nth-child(5),
+.trading-positions table tbody td:nth-child(6) {
+  font-family: 'IBM Plex Mono', 'Roboto Mono', monospace;
+  font-weight: 500;
+  font-size: var(--font-mono-base);
+  letter-spacing: -0.2px;
+}
+
+/* PnL column */
+.position-pnl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--trading-gap-xs);
+}
+
+.position-pnl-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: var(--font-mono-md);
+}
+
+.position-pnl-value.positive {
+  color: #10b981;
+}
+
+.position-pnl-value.negative {
+  color: #ef4444;
+}
+
+.position-pnl-percent {
+  font-size: var(--stats-font-xs);
+  opacity: 0.8;
+}
+
+/* TP/SL column */
+.position-table tbody td:nth-child(7),
+.trading-positions table tbody td:nth-child(7) {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  font-size: var(--font-mono-sm);
+}
+
+.position-tpsl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--trading-gap-xs);
+  font-size: var(--stats-font-xs);
+}
+
+.position-tpsl .tp {
+  color: #10b981;
+}
+
+.position-tpsl .sl {
+  color: #ef4444;
+}
+
+/* Actions column */
+.position-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--trading-gap-sm);
+}
+
+.position-actions button {
+  padding: var(--trading-gap-xs) var(--trading-gap-sm);
+  font-size: var(--stats-font-xs);
+  border-radius: var(--trading-radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.position-actions .close-btn {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.position-actions .close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.position-actions .edit-btn {
+  color: rgba(148, 163, 184, 0.9);
+  background: rgba(71, 85, 105, 0.2);
+}
+
+.position-actions .edit-btn:hover {
+  background: rgba(71, 85, 105, 0.4);
+}
+
+/* ===== EMPTY STATE ===== */
+.positions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--trading-gap-xl);
+  color: rgba(148, 163, 184, 0.6);
+}
+
+.positions-empty-icon {
+  width: clamp(40px, 2.604vw, 64px);
+  height: clamp(40px, 2.604vw, 64px);
+  margin-bottom: var(--trading-gap-md);
+  opacity: 0.4;
+}
+
+.positions-empty-title {
+  font-size: var(--stats-font-lg);
+  margin-bottom: var(--trading-gap-xs);
+}
+
+.positions-empty-subtitle {
+  font-size: var(--stats-font-sm);
+  opacity: 0.7;
+}
+
+/* ===== LOADING STATE ===== */
+.positions-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--trading-gap-xl);
+}
+
+.positions-loading-spinner {
+  width: clamp(24px, 1.563vw, 40px);
+  height: clamp(24px, 1.563vw, 40px);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: rgba(59, 130, 246, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+/* Mobile (< 768px) */
+@media (max-width: 767px) {
+  .trading-positions-table-container {
+    max-height: 200px;
+  }
+  
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 8px;
+    font-size: 11px;
+  }
+  
+  .position-actions button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+  
+  /* Hide less important columns on mobile */
+  .position-table td:nth-child(7),
+  .position-table th:nth-child(7) {
+    display: none;
+  }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .trading-positions-table-container {
+    max-height: 250px;
+  }
+  
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+/* Desktop (1024px - 1535px) */
+@media (min-width: 1024px) and (max-width: 1535px) {
+  .trading-positions-table-container {
+    max-height: 280px;
+  }
+}
+
+/* Large Desktop (1536px - 2399px) */
+@media (min-width: 1536px) and (max-width: 2399px) {
+  .trading-positions-table-container {
+    max-height: 320px;
+  }
+  
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 12px 14px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 14px;
+  }
+}
+
+/* 2K (2400px - 3199px) */
+@media (min-width: 2400px) and (max-width: 3199px) {
+  .trading-positions-table-container {
+    max-height: 400px;
+  }
+  
+  .trading-positions-header {
+    padding: 14px 24px;
+    min-height: 52px;
+  }
+  
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 14px 18px;
+    font-size: 12px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 16px 18px;
+    font-size: 15px;
+  }
+  
+  .position-actions button {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+}
+
+/* 4K (3200px+) */
+@media (min-width: 3200px) {
+  .trading-positions-table-container {
+    max-height: 500px;
+  }
+  
+  .trading-positions-header {
+    padding: 18px 32px;
+    min-height: 64px;
+  }
+  
+  .trading-positions-title {
+    font-size: 18px;
+  }
+  
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 18px 24px;
+    font-size: 14px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 20px 24px;
+    font-size: 18px;
+  }
+  
+  .position-pnl-value {
+    font-size: 20px;
+  }
+  
+  .position-actions button {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+  
+  .positions-tab {
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+}
+
+/* ===== ROW HIGHLIGHT STATES ===== */
+.position-row.flash-green {
+  animation: flashGreen 0.5s ease;
+}
+
+.position-row.flash-red {
+  animation: flashRed 0.5s ease;
+}
+
+@keyframes flashGreen {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(16, 185, 129, 0.2); }
+}
+
+@keyframes flashRed {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(239, 68, 68, 0.2); }
 }

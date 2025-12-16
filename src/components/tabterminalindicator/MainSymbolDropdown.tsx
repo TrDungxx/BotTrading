@@ -93,7 +93,7 @@ const MainSymbolDropdown: React.FC<Props> = ({
         onClick={() => setOpen(v => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] leading-none
+        className={`flex items-center gap-fluid-1 px-2 py-0.5 rounded border text-fluid-xs leading-none
           ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}
           bg-transparent border-dark-600/40 hover:border-primary-500/50`}
         title="Select pair"
@@ -115,14 +115,14 @@ const MainSymbolDropdown: React.FC<Props> = ({
         <div
           role="listbox"
           aria-label="Select symbol"
-          className="absolute left-0 mt-1 w-64 rounded-xl border border-dark-600 bg-dark-800 shadow-xl p-2 z-50"
+          className="absolute left-0 mt-1 w-64 rounded-xl border border-dark-600 bg-dark-800 shadow-xl p-fluid-2 z-50"
         >
           <input
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search symbol…"
-            className="w-full mb-2 px-2 py-1.5 rounded bg-dark-700 border border-dark-600 text-sm focus:outline-none focus:border-primary-500/60"
+            className="w-full mb-2 px-2 py-fluid-1.5 rounded bg-dark-700 border border-dark-600 text-fluid-sm focus:outline-none focus:border-primary-500/60"
           />
           <div className="max-h-72 overflow-auto pr-1 space-y-1">
             {filtered.length === 0 ? (
@@ -141,16 +141,16 @@ const MainSymbolDropdown: React.FC<Props> = ({
                   className={`w-full flex items-center justify-between rounded px-2 py-2 hover:bg-dark-700
                     ${s === selectedSymbol ? "bg-dark-700" : ""}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-fluid-2 min-w-0">
                     <span
-                      className={`text-sm ${fav ? "text-yellow-400" : "text-gray-400"}`}
+                      className={`text-fluid-sm ${fav ? "text-yellow-400" : "text-gray-400"}`}
                       onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(s); }}
                       title={fav ? "Unfavorite" : "Favorite"}
                     >
                       {fav ? "★" : "☆"}
                     </span>
                     {renderIcon(s)}
-                    <span className="text-sm truncate">{b}/{qx || "USDT"}</span>
+                    <span className="text-fluid-sm truncate">{b}/{qx || "USDT"}</span>
                   </div>
                   <div className="text-xs text-right text-gray-300 min-w-[80px]">
                     {typeof bal === "number" ? bal.toLocaleString() : ""}

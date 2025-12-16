@@ -104,12 +104,12 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
       >
         {/* Card Header - Always Visible */}
         <div
-          className="p-4 cursor-pointer active:bg-dark-700"
+          className="p-fluid-4 cursor-pointer active:bg-dark-700"
           
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <span className="font-semibold text-white text-base">
+            <div className="flex items-center gap-fluid-2">
+              <span className="font-semibold text-white text-fluid-base">
                 {pos.symbol}
               </span>
               <span
@@ -119,7 +119,7 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
               </span>
             </div>
             <div className="text-right">
-              <div className={`font-bold text-base ${pnlColor}`}>
+              <div className={`font-bold text-fluid-base ${pnlColor}`}>
                 {pnl == null
                   ? "--"
                   : `${pnl > 0 ? "+" : ""}${formatNumber(pnl, 2)} USDT`}
@@ -133,7 +133,7 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
           </div>
 
           {/* Quick Info Row */}
-          <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="grid grid-cols-3 gap-fluid-2 text-xs">
             <div>
               <div className="text-dark-400 mb-0.5">Số lượng</div>
               <div className={`font-medium ${sideColor}`}>
@@ -157,9 +157,9 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
 
         {/* Expanded Content */}
         {isExpanded && (
-          <div className="border-t border-dark-700 p-4 space-y-3">
+          <div className="border-t border-dark-700 p-fluid-4 space-y-3">
             {/* Additional Info */}
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="grid grid-cols-2 gap-fluid-3 text-xs">
               <div>
                 <div className="text-dark-400 mb-1">Break Even</div>
                 <div className="text-white font-mono">
@@ -175,15 +175,15 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="space-y-2 pt-2">
+            <div className="gap-fluid-2 pt-2">
               {/* TP/SL & Advanced */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-fluid-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onTpSlClick?.(pos);
                   }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm rounded-lg border border-dark-600 text-dark-200 hover:bg-dark-700 active:bg-dark-600 font-medium"
+                  className="flex items-center justify-center gap-fluid-1.5 px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-dark-600 text-dark-200 hover:bg-dark-700 active:bg-dark-600 font-medium"
                 >
                   <Edit3 size={16} />
                   TP/SL
@@ -193,7 +193,7 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
                     e.stopPropagation();
                     onAdvancedClick?.(pos);
                   }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-sm rounded-lg border border-primary-600 text-primary-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
+                  className="flex items-center justify-center gap-fluid-1.5 px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-primary-600 text-primary-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
                 >
                   {isLong ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                   Nâng cao
@@ -201,13 +201,13 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
               </div>
 
               {/* Close Buttons */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-fluid-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onCloseMarket?.(pos);
                   }}
-                  className="px-3 py-2.5 text-sm rounded-lg bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white font-medium"
+                  className="px-fluid-3 py-2.5 text-fluid-sm rounded-lg bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white font-medium"
                 >
                   Đóng Market
                 </button>
@@ -216,7 +216,7 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
                     e.stopPropagation();
                     onCloseLimit?.(pos);
                   }}
-                  className="px-3 py-2.5 text-sm rounded-lg border border-danger-500 text-danger-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
+                  className="px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-danger-500 text-danger-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
                 >
                   Đóng Limit
                 </button>
@@ -229,19 +229,19 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
   };
 
   return (
-    <div className="position-mobile-container bg-dark-900 w-full p-4">
+    <div className="position-mobile-container bg-dark-900 w-full p-fluid-4">
       {/* Action Buttons */}
       {activePositions.length > 0 && (
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-fluid-2 mb-4">
           <button
             onClick={onCloseAll}
-            className="flex-1 px-4 py-2 text-sm rounded-lg border border-warning-500 text-warning-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
+            className="flex-1 px-fluid-4 py-2 text-fluid-sm rounded-lg border border-warning-500 text-warning-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
           >
             Đóng tất cả
           </button>
           <button
             onClick={onCloseByPnl}
-            className="flex-1 px-4 py-2 text-sm rounded-lg border border-success-500 text-success-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
+            className="flex-1 px-fluid-4 py-2 text-fluid-sm rounded-lg border border-success-500 text-success-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
           >
             Đóng theo PnL
           </button>
@@ -254,11 +254,11 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
           {activePositions.map((pos) => renderPositionCard(pos))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="flex flex-col items-center justify-center py-fluid-12 text-center">
           <div className="w-16 h-16 mb-4 rounded-full bg-dark-800 flex items-center justify-center">
-            <TrendingUp className="w-8 h-8 text-dark-600" />
+            <TrendingUp className="w-8 h-fluid-input-sm text-dark-600" />
           </div>
-          <div className="text-dark-400 text-sm mb-1">
+          <div className="text-dark-400 text-fluid-sm mb-1">
             Không có vị thế nào
           </div>
           <div className="text-dark-500 text-xs">

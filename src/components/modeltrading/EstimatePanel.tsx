@@ -75,8 +75,8 @@ const EstimatePanel: React.FC<EstimatePanelProps> = ({
   }, [est, selectedSymbol]);
 
   return (
-    <div className="mt-2 rounded-xl border border-dark-600 bg-dark-800 p-3">
-      <div className="mt-2 grid grid-cols-2 gap-6 text-xs">
+    <div className="mt-2 rounded-xl border border-dark-600 bg-dark-800 p-fluid-3">
+      <div className="mt-2 grid grid-cols-2 gap-6 text-fluid-sm">
         {/* Left Column */}
         <div className="space-y-1">
           <div className="text-dark-400">Giá thanh lý</div>
@@ -119,7 +119,7 @@ const EstimatePanel: React.FC<EstimatePanelProps> = ({
       </div>
 
       {/* Fee Rate */}
-      <div className="mt-2 text-[11px] text-dark-400">
+      <div className="mt-2 text-fluid-xs text-dark-400">
         % Mức phí: {(getFeeRate(orderType) * 100).toFixed(3)}%{" "}
         {orderType === "market" ? "(Taker)" : "(Maker)"}
       </div>

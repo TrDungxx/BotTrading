@@ -14,9 +14,9 @@ export type PnLPriceProps = {
 const Box: React.FC<{ title: string; value: React.ReactNode; className?: string }> = ({
   title, value, className = "",
 }) => (
-  <div className={`rounded-lg border border-dark-600 bg-dark-700 p-2 ${className}`}>
-    <div className="text-[10px] text-gray-400">{title}</div>
-    <div className="text-sm font-medium">{value}</div>
+  <div className={`rounded-lg border border-dark-600 bg-dark-700 p-fluid-2 ${className}`}>
+    <div className="text-fluid-2xs text-gray-400">{title}</div>
+    <div className="text-fluid-sm font-medium">{value}</div>
   </div>
 );
 
@@ -73,11 +73,11 @@ const PnLPrice: React.FC<PnLPriceProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-dark-700 bg-dark-800 p-3">
+      <div className="rounded-xl border border-dark-700 bg-dark-800 p-fluid-3">
         <div className="text-xs text-gray-400 mb-2">Summary</div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-fluid-3">
           <Box title="Symbol" value={symbol} />
-          <Box title="Side" value={<span className={`px-2 py-0.5 rounded-md border text-xs ${sideBadge}`}>{side.toUpperCase()}</span>} />
+          <Box title="Side" value={<span className={`px-2 py-0.5 rounded-fluid-md border text-xs ${sideBadge}`}>{side.toUpperCase()}</span>} />
           <Box title="Entry" value={entry ?? "—"} />
           <Box title="Current" value={currentPrice ?? "—"} />
           <Box title="Notional (by Capital %)" value={notional !== undefined ? `${notional.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT` : "—"} />
@@ -88,7 +88,7 @@ const PnLPrice: React.FC<PnLPriceProps> = ({
           {/* ⏱ Duration */}
           <Box title="Running" value={elapsedMs !== undefined ? fmtDuration(elapsedMs) : "—"} />
         </div>
-        <div className="mt-2 text-[10px] text-gray-500">
+        <div className="mt-2 text-fluid-2xs text-gray-500">
           * Tính theo Capital %: {capitalPct}% của {demoBalance.toLocaleString()} USDT{manualQty ? " (đã ưu tiên Manual Qty)" : ""}.
         </div>
       </div>
