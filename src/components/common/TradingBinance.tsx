@@ -18,7 +18,7 @@ import { copyPrice } from '../clickchart/CopyPrice';
 import { addHLine, clearAllHLines, getAllLinePrices } from '../clickchart/hline';
 import '../../style/Hidetradingviewlogo.css';
 import ChartContextMenu from '../clickchart/ChartContextMenu';
-
+import CandleCountdown from './popupchart/CandleCountdown';
 // ✅ NEW: Dynamic Indicators
 import { useDynamicIndicators } from './hooks/useDynamicIndicators';
 import { DynamicIndicatorConfig, IndicatorLine, BollConfig } from './hooks/indicatorTypes';
@@ -126,11 +126,17 @@ function heuristicMetaFromPrice(lastPrice?: number): SymbolMeta {
     tick = 0.01;
     precision = 2;
   } else if (p >= 0.1) {
-    tick = 0.0001;
-    precision = 4;
-  } else {
+    // DOGE ~0.13 cần 5 decimals
     tick = 0.00001;
     precision = 5;
+  } else if (p >= 0.01) {
+    // Giá 0.01-0.1 cần 6 decimals
+    tick = 0.000001;
+    precision = 6;
+  } else {
+    // 1000PEPE ~0.004 cần 6-7 decimals
+    tick = 0.000001;
+    precision = 7;
   }
 
   return { tickSize: tick, precision };
@@ -619,7 +625,7 @@ const TradingBinance: React.FC<Props> = ({
       wickDownColor: '#F6465D',
       borderVisible: false,
       priceScaleId: 'right',
-      lastValueVisible: true,
+      lastValueVisible: false,
       priceLineVisible: true,
       priceLineColor: '#e0e3e8',
       priceLineStyle: 2,
@@ -687,97 +693,203 @@ const TradingBinance: React.FC<Props> = ({
     };
   }, []);
 
-  // ============================================
-  // DATA LOADING
-  // ============================================
-  useEffect(() => {
-    if (!candleSeries.current || !volumeSeries.current || !chartRef.current) return;
+  
+// DATA LOADING - FIXED VERSION
 
-    const mySession = ++sessionRef.current;
-    console.log('[LoadHistory] 🔄 Starting load for', selectedSymbol, selectedInterval, market);
 
+useEffect(() => {
+  // ✅ FIX: Thêm flag để track nếu effect đã cleanup
+  let isCancelled = false;
+  
+  // ✅ FIX: Retry logic nếu series chưa ready
+  const waitForSeries = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 50; // 5 seconds max
+      
+      const check = () => {
+        if (isCancelled) {
+          resolve(false);
+          return;
+        }
+        
+        if (candleSeries.current && volumeSeries.current && chartRef.current) {
+          resolve(true);
+          return;
+        }
+        
+        attempts++;
+        if (attempts >= maxAttempts) {
+          console.error('[LoadHistory] ❌ Series not ready after 5s');
+          resolve(false);
+          return;
+        }
+        
+        setTimeout(check, 100);
+      };
+      
+      check();
+    });
+  };
+
+  const mySession = ++sessionRef.current;
+  console.log('[LoadHistory] 🔄 Starting load for', selectedSymbol, selectedInterval, market, 'session:', mySession);
+
+  // ✅ FIX: FORCE close context menu NGAY LẬP TỨC
+  setCtxOpen(false);
+  setCtxSubOpen(false);
+  ctxClickPriceRef.current = null;
+  ctxClickYRef.current = null;
+  setHoverPrice(null);
+  setHoverTime(null);
+
+  // ✅ FIX: Force close WebSocket TRƯỚC KHI làm gì khác
+  try {
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.close();
+      wsRef.current = null;
+      console.log('[WS] 🔌 Force closed old WebSocket');
+    }
+  } catch (e) {
+    console.warn('[WS] ⚠️ Error closing WebSocket:', e);
+  }
+
+  const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://data.binance.com';
+  const wsBase = market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
+
+  const controller = new AbortController();
+
+  const loadHistory = async () => {
+    // ✅ FIX: Wait for series to be ready
+    const seriesReady = await waitForSeries();
+    if (!seriesReady || isCancelled) {
+      console.log('[LoadHistory] ⚠️ Cancelled or series not ready');
+      return;
+    }
+
+    // ✅ FIX: Double check session sau khi wait
+    if (sessionRef.current !== mySession) {
+      console.log('[LoadHistory] ⚠️ Session changed during wait, aborting');
+      return;
+    }
+
+    // ✅ FIX: Clear data với error handling tốt hơn
     try {
-      candleSeries.current.setData([]);
-      volumeSeries.current.setData([]);
+      if (candleSeries.current) {
+        candleSeries.current.setData([]);
+      }
+      if (volumeSeries.current) {
+        volumeSeries.current.setData([]);
+      }
+      setCandles([]);
+      setVolumeData([]);
       clearAllIndicators();
+      
+      // ✅ FIX: Force reset price scale
+      if (chartRef.current) {
+        chartRef.current.priceScale('right').applyOptions({
+          autoScale: true,
+        });
+      }
+      
+      console.log('[LoadHistory] ✅ Cleared old data');
     } catch (e) {
       console.warn('[LoadHistory] ⚠️ Failed to clear series:', e);
     }
 
+    const path = market === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
+    const symbolUpper = selectedSymbol.toUpperCase().trim();
+    const url = `${restBase}${path}?symbol=${symbolUpper}&interval=${selectedInterval}&limit=500`;
+
+    console.log('[LoadHistory] 🔄 Fetching:', url);
+
     try {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+      const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
+
+      // ✅ FIX: Check cancellation sau fetch
+      if (isCancelled || sessionRef.current !== mySession) {
+        console.log('[LoadHistory] ⚠️ Cancelled after fetch');
+        return;
       }
-    } catch { }
 
-    const restBase = market === 'futures' ? 'https://fapi.binance.com' : 'https://data.binance.com';
-    const wsBase = market === 'futures' ? 'wss://fstream.binance.com/ws' : 'wss://stream.binance.com:9443/ws';
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[LoadHistory] ❌ API Error:', errorText);
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
 
-    const controller = new AbortController();
+      const data = await res.json();
 
-    const loadHistory = async () => {
-      const path = market === 'futures' ? '/fapi/v1/klines' : '/api/v3/klines';
-      const symbolUpper = selectedSymbol.toUpperCase().trim();
-      const url = `${restBase}${path}?symbol=${symbolUpper}&interval=${selectedInterval}&limit=500`;
+      if (!Array.isArray(data)) {
+        console.error('[LoadHistory] ❌ Invalid response:', data);
+        throw new Error('Expected array of klines');
+      }
 
-      console.log('[LoadHistory] 🔄 Fetching:', url);
+      if (data.length === 0) {
+        console.warn('[LoadHistory] ⚠️ Empty data for', symbolUpper);
+        return;
+      }
 
+      // ✅ FIX: Final session check trước khi set data
+      if (sessionRef.current !== mySession || isCancelled) {
+        console.log('[LoadHistory] ⚠️ Session mismatch, discarding data');
+        return;
+      }
+
+      const cs: Candle[] = data.map((d: any) => ({
+        time: toTs(d[0]),
+        open: +d[1],
+        high: +d[2],
+        low: +d[3],
+        close: +d[4],
+      }));
+
+      const vs: VolumeBar[] = data.map((d: any) => ({
+        time: toTs(d[0]),
+        value: +d[5],
+        color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
+      }));
+
+      console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles for', symbolUpper);
+
+      // ✅ FIX: Kiểm tra series còn valid không
+      if (!candleSeries.current || !volumeSeries.current) {
+        console.error('[LoadHistory] ❌ Series became null!');
+        return;
+      }
+
+      // ✅ FIX: Set data với try-catch
       try {
-        const res = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('[LoadHistory] ❌ API Error:', errorText);
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-
-        const data = await res.json();
-
-        if (!Array.isArray(data)) {
-          console.error('[LoadHistory] ❌ Invalid response:', data);
-          throw new Error('Expected array of klines');
-        }
-
-        if (data.length === 0) {
-          console.warn('[LoadHistory] ⚠️ Empty data for', symbolUpper);
-          return;
-        }
-
-        if (sessionRef.current !== mySession) return;
-
-        const cs: Candle[] = data.map((d: any) => ({
-          time: toTs(d[0]),
-          open: +d[1],
-          high: +d[2],
-          low: +d[3],
-          close: +d[4],
-        }));
-
-        const vs: VolumeBar[] = data.map((d: any) => ({
-          time: toTs(d[0]),
-          value: +d[5],
-          color: +d[4] >= +d[1] ? '#0ECB81' : '#F6465D',
-        }));
-
-        console.log('[LoadHistory] ✅ Loaded', cs.length, 'candles');
-
-        if (!candleSeries.current || !volumeSeries.current) return;
-
         candleSeries.current.setData(cs);
         volumeSeries.current.setData(vs);
-        setVolumeData(vs);
+        console.log('[LoadHistory] ✅ Data set successfully');
+      } catch (e) {
+        console.error('[LoadHistory] ❌ Failed to set data:', e);
+        return;
+      }
 
-        // ✅ Update dynamic indicators
-        updateMainIndicators(cs);
-        updateVolumeIndicators(vs);
+      setVolumeData(vs);
+      setCandles(cs);
 
+      // ✅ Update dynamic indicators
+      updateMainIndicators(cs);
+      updateVolumeIndicators(vs);
+
+      // ✅ FIX: Update price format với error handling
+      try {
         await updatePriceFormat(cs);
+      } catch (e) {
+        console.warn('[LoadHistory] ⚠️ Failed to update price format:', e);
+      }
 
-        if (cs.length > 0) {
-          setTimeout(() => {
-            if (!chartRef.current || !volumeChartRef.current || sessionRef.current !== mySession) return;
+      if (cs.length > 0) {
+        setTimeout(() => {
+          if (!chartRef.current || !volumeChartRef.current || sessionRef.current !== mySession || isCancelled) return;
 
+          try {
             const containerWidth = mainChartContainerRef.current?.clientWidth || 800;
             const minBarWidth = 8;
             const maxBarWidth = 16;
@@ -789,38 +901,56 @@ const TradingBinance: React.FC<Props> = ({
 
             const range = { from: cs[startIdx].time, to: cs[cs.length - 1].time };
             const optimalBarSpacing = Math.max(8, Math.min(16, Math.floor(containerWidth / visibleCount * 0.85)));
-            const spacingOptions = { rightOffset: 6, barSpacing: optimalBarSpacing, minBarSpacing: 6 };
+            const spacingOptions = { rightOffset: 16, barSpacing: optimalBarSpacing, minBarSpacing: 6 };
 
             isSyncingRef.current = true;
             chartRef.current.timeScale().setVisibleRange(range);
             chartRef.current.timeScale().applyOptions(spacingOptions);
             volumeChartRef.current.timeScale().setVisibleRange(range);
             volumeChartRef.current.timeScale().applyOptions(spacingOptions);
+            
+            
+            
+            
             isSyncingRef.current = false;
-          }, 150);
-        }
-
-        try {
-          const raw = localStorage.getItem(hlineKey(selectedSymbol, market));
-          const arr = raw ? (JSON.parse(raw) as number[]) : [];
-          if (Array.isArray(arr) && candleSeries.current) {
-            clearAllHLines(candleSeries.current);
-            arr.forEach((p) => addHLine(candleSeries.current!, p));
+            
+            console.log('[LoadHistory] ✅ Chart range set successfully');
+          } catch (e) {
+            console.warn('[LoadHistory] ⚠️ Failed to set chart range:', e);
+            isSyncingRef.current = false;
           }
-        } catch { }
+        }, 150);
+      }
 
-        setCandles(cs);
+      // Load horizontal lines
+      try {
+        const raw = localStorage.getItem(hlineKey(selectedSymbol, market));
+        const arr = raw ? (JSON.parse(raw) as number[]) : [];
+        if (Array.isArray(arr) && candleSeries.current) {
+          clearAllHLines(candleSeries.current);
+          arr.forEach((p) => addHLine(candleSeries.current!, p));
+        }
+      } catch { }
 
-        // Setup WebSocket
-        const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
-        wsRef.current = ws;
+      // Setup WebSocket
+      const ws = new WebSocket(`${wsBase}/${selectedSymbol.toLowerCase()}@kline_${selectedInterval}`);
+      wsRef.current = ws;
 
-        ws.onopen = () => {
-          console.log('[WS] ✅ Connected for', selectedSymbol, selectedInterval);
-        };
+      ws.onopen = () => {
+        if (sessionRef.current !== mySession || isCancelled) {
+          ws.close();
+          return;
+        }
+        console.log('[WS] ✅ Connected for', selectedSymbol, selectedInterval);
+      };
 
-        ws.onmessage = (ev) => {
-          if (sessionRef.current !== mySession) return;
+      ws.onmessage = (ev) => {
+        // ✅ Check session NGAY từ đầu
+        if (sessionRef.current !== mySession || isCancelled) {
+          return;
+        }
+        
+        try {
           const parsed = JSON.parse(ev.data) as KlineMessage;
           const k = parsed.k;
           const t = toTs(k.t);
@@ -842,65 +972,101 @@ const TradingBinance: React.FC<Props> = ({
             });
 
             if (isClosed) {
-              setTimeout(() => {
-                if (!chartRef.current || !volumeChartRef.current) return;
-                const mainTimeScale = chartRef.current.timeScale();
-                const volumeTimeScale = volumeChartRef.current.timeScale();
-                const logicalRange = mainTimeScale.getVisibleLogicalRange();
-                if (logicalRange) {
-                  volumeTimeScale.setVisibleLogicalRange(logicalRange);
-                }
-              }, 50);
-            }
+  setTimeout(() => {
+    if (!chartRef.current || !volumeChartRef.current) return;
+    const mainTimeScale = chartRef.current.timeScale();
+    const volumeTimeScale = volumeChartRef.current.timeScale();
+    
+    const visibleRange = mainTimeScale.getVisibleLogicalRange();
+    if (visibleRange) {
+      setCandles(currentCandles => {
+        // Chỉ scroll nếu đang xem candle mới nhất
+        const isViewingLatest = visibleRange.to >= currentCandles.length - 8;
+        
+        if (isViewingLatest) {
+          const newFrom = visibleRange.from + 1;
+          const newTo = visibleRange.to + 1;
+          mainTimeScale.setVisibleLogicalRange({ from: newFrom, to: newTo });
+          volumeTimeScale.setVisibleLogicalRange({ from: newFrom, to: newTo });
+        } else {
+          volumeTimeScale.setVisibleLogicalRange(visibleRange);
+        }
+        
+        return currentCandles;
+      });
+    }
+  }, 50);
+}
           }
 
           setCandles((prev) => {
-            if (sessionRef.current !== mySession) return prev;
+            if (sessionRef.current !== mySession || isCancelled) return prev;
             const i = prev.findIndex((c) => c.time === candle.time);
             const next = i >= 0 ? [...prev.slice(0, i), candle, ...prev.slice(i + 1)] : [...prev, candle];
             if (next.length > 500) next.shift();
             updateMainIndicators(next);
             return next;
           });
-        };
-
-        ws.onerror = (error) => {
-          console.error('[WS] ❌ WebSocket error:', error);
-        };
-
-        ws.onclose = () => {
-          console.log('[WS] 🔌 WebSocket closed for', selectedSymbol);
-        };
-
-      } catch (err) {
-        if (err instanceof Error) {
-          if (err.name === 'AbortError') return;
-          console.error('[LoadHistory] ❌ Error:', err.message);
+        } catch (e) {
+          console.warn('[WS] ⚠️ Failed to parse message:', e);
         }
+      };
 
-        if (sessionRef.current === mySession) {
-          setTimeout(() => {
-            if (sessionRef.current === mySession) loadHistory();
-          }, 3000);
+      ws.onerror = (error) => {
+        console.error('[WS] ❌ WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        console.log('[WS] 🔌 WebSocket closed for', selectedSymbol);
+      };
+
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          console.log('[LoadHistory] ⚠️ Fetch aborted');
+          return;
         }
+        console.error('[LoadHistory] ❌ Error:', err.message);
       }
-    };
 
-    loadHistory();
+      // ✅ FIX: Retry với delay nếu fail
+      if (sessionRef.current === mySession && !isCancelled) {
+        console.log('[LoadHistory] 🔄 Retrying in 3s...');
+        setTimeout(() => {
+          if (sessionRef.current === mySession && !isCancelled) {
+            loadHistory();
+          }
+        }, 3000);
+      }
+    }
+  };
 
-    return () => {
-      try {
-        if (candleSeries.current) {
-          const prices = getAllLinePrices(candleSeries.current);
-          localStorage.setItem(hlineKey(selectedSymbol, market), JSON.stringify(prices));
-        }
+  loadHistory();
+
+  return () => {
+    isCancelled = true;
+    controller.abort();
+    
+    // Save hlines trước khi cleanup
+    try {
+      if (candleSeries.current) {
+        const prices = getAllLinePrices(candleSeries.current);
+        localStorage.setItem(hlineKey(selectedSymbol, market), JSON.stringify(prices));
+      }
+    } catch { }
+    
+    // Close WebSocket
+    if (wsRef.current) {
+      try { 
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.close(); 
       } catch { }
-      controller.abort();
-      if (wsRef.current) {
-        try { wsRef.current.close(); } catch { }
-      }
-    };
-  }, [selectedSymbol, selectedInterval, market]);
+      wsRef.current = null;
+    }
+  };
+}, [selectedSymbol, selectedInterval, market]);
 
   // ============================================
   // ✅ NEW: DYNAMIC INDICATOR VALUES - SEPARATED BY TYPE
@@ -1236,8 +1402,14 @@ const TradingBinance: React.FC<Props> = ({
         candleSeries={candleSeries.current}
         selectedSymbol={selectedSymbol}
         market={market}
-        tickSize={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize ?? 0.01}
-        precision={symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision ?? 2}
+        tickSize={
+          symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.tickSize 
+          ?? heuristicMetaFromPrice(candles.at(-1)?.close).tickSize
+        }
+        precision={
+          symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision 
+          ?? heuristicMetaFromPrice(candles.at(-1)?.close).precision
+        }
         subMenuOpen={ctxSubOpen}
         onSubMenuOpen={setCtxSubOpen}
         onClose={() => setCtxOpen(false)}
@@ -1259,7 +1431,12 @@ const TradingBinance: React.FC<Props> = ({
           style={{ flex: '3 1 0%', minHeight: '300px', height: '75%' }}
           onContextMenu={openCtxMenu}
         />
-
+<CandleCountdown
+  interval={selectedInterval}
+  currentPrice={candles.at(-1)?.close ?? 0}
+  series={candleSeries.current}
+  isUp={(candles.at(-1)?.close ?? 0) >= (candles.at(-1)?.open ?? 0)}
+/>
         <div
           className="w-full h-[2px] bg-[#2b3139] shrink-0 relative z-10"
           style={{ boxShadow: '0 0 3px rgba(80, 77, 77, 0.4)' }}

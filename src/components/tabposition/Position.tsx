@@ -1433,7 +1433,7 @@ const sortedPositions = React.useMemo(() => {
                       style={{ gap: 'var(--trading-gap-sm)' }}
                     >
                       <div 
-                        className="font-normal text-white flex items-center"
+                        className="font-normal text-white flex items-center "
                         style={{ 
                           fontSize: 'var(--stats-font-lg)',
                           gap: 'var(--trading-gap-xs)'

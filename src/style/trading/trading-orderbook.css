@@ -298,10 +298,10 @@
   }
 }
 
-/* Desktop Small (1024px - 1279px) - Compact */
+/* Desktop Small (1024px - 1279px) - Compact +50px */
 @media (min-width: 1024px) and (max-width: 1279px) {
   .orderbook-panel {
-    width: 220px;
+    width: 270px;  /* 220 → 270 (+50) */
   }
   
   .orderbook-header {
@@ -321,10 +321,10 @@
   }
 }
 
-/* Desktop Medium (1280px - 1535px) */
+/* Desktop Medium (1280px - 1535px) +50px */
 @media (min-width: 1280px) and (max-width: 1535px) {
   .orderbook-panel {
-    width: 260px;
+    width: 310px;  /* 260 → 310 (+50) */
   }
   
   .order-row {
@@ -334,10 +334,10 @@
   }
 }
 
-/* Desktop Large (1536px - 2399px) */
+/* Desktop Large (1536px - 2399px) - ĐÃ SỬA */
 @media (min-width: 1536px) and (max-width: 2399px) {
   .orderbook-panel {
-    width: 280px;
+    width: 320px;
   }
   
   .order-row {
@@ -347,10 +347,10 @@
   }
 }
 
-/* 2K (2400px - 3199px) */
+/* 2K (2400px - 3199px) +50px */
 @media (min-width: 2400px) and (max-width: 3199px) {
   .orderbook-panel {
-    width: 340px;
+    width: 390px;  /* 340 → 390 (+50) */
   }
   
   .orderbook-header {
@@ -370,10 +370,10 @@
   }
 }
 
-/* 4K (3200px+) */
+/* 4K (3200px+) +50px */
 @media (min-width: 3200px) {
   .orderbook-panel {
-    width: 400px;
+    width: 450px;  /* 400 → 450 (+50) */
   }
   
   .orderbook-header {

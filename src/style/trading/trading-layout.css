@@ -67,7 +67,7 @@
 /* Top Row: Chart + OrderBook - FLUID HEIGHT */
 .workspace-chart-orderbook-row {
   display: grid;
-  grid-template-columns: 1fr var(--orderbook-width, 280px);
+  grid-template-columns: 1fr var(--orderbook-width, 320px);
   height: clamp(300px, 55vh, 700px);
   min-height: clamp(280px, 18.229vw, 450px);
   max-height: clamp(500px, 36.458vw, 900px);
@@ -416,19 +416,19 @@
   }
 }
 
-/* Desktop Medium (1400px - 1535px) */
+/* Desktop Medium (1400px - 1535px) - +50px */
 @media (min-width: 1400px) and (max-width: 1535px) {
   .trading-workspace {
     grid-template-columns: 1fr minmax(220px, 280px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 240px;
+    grid-template-columns: 1fr 290px;  /* 240 → 290 (+50) */
   }
   
   .orderbook-panel {
-    width: 240px;
-    min-width: 220px;
+    width: 290px;      /* 240 → 290 (+50) */
+    min-width: 270px;  /* 220 → 270 (+50) */
   }
   
   .trading-form-panel {
@@ -438,19 +438,19 @@
   }
 }
 
-/* Desktop Large (1536px - 2399px) */
+/* Desktop Large (1536px - 2399px) - ĐÃ SỬA */
 @media (min-width: 1536px) and (max-width: 2399px) {
   .trading-workspace {
     grid-template-columns: 1fr minmax(280px, 320px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 320px;
   }
   
   .orderbook-panel {
-    width: 280px;
-    min-width: 260px;
+    width: 320px;
+    min-width: 300px;
   }
   
   .trading-form-panel {
@@ -460,19 +460,19 @@
   }
 }
 
-/* 2K (2400px - 3199px) */
+/* 2K (2400px - 3199px) - +50px */
 @media (min-width: 2400px) and (max-width: 3199px) {
   .trading-workspace {
     grid-template-columns: 1fr minmax(340px, 400px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr 390px;  /* 340 → 390 (+50) */
   }
   
   .orderbook-panel {
-    width: 340px;
-    min-width: 320px;
+    width: 390px;      /* 340 → 390 (+50) */
+    min-width: 370px;  /* 320 → 370 (+50) */
   }
   
   .trading-form-panel {
@@ -482,19 +482,19 @@
   }
 }
 
-/* 4K (3200px+) */
+/* 4K (3200px+) - +50px */
 @media (min-width: 3200px) {
   .trading-workspace {
     grid-template-columns: 1fr minmax(400px, 500px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 400px;
+    grid-template-columns: 1fr 450px;  /* 400 → 450 (+50) */
   }
   
   .orderbook-panel {
-    width: 400px;
-    min-width: 380px;
+    width: 450px;      /* 400 → 450 (+50) */
+    min-width: 430px;  /* 380 → 430 (+50) */
   }
   
   .trading-form-panel {

@@ -236,7 +236,7 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
     const maxLines = 10;
 
     return (
-      <div className="space-y-4 flex-1 px-6 py-4">
+      <div className="space-y-6 flex-1 px-2 py-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-fluid-2">
             <h3 className="text-fluid-sm font-medium text-dark-200">{lineType}</h3>
@@ -751,7 +751,7 @@ const LineIndicatorSettings: React.FC<LineIndicatorSettingsProps> = ({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+      <div className="bg-dark-800 rounded-2xl border border-dark-600 shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
         {/* Header with Tabs */}
         <div className="border-b border-dark-600">
           <div className="flex items-center justify-between p-4">

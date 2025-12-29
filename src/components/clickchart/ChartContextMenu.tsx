@@ -148,23 +148,28 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   // Debug log
   React.useEffect(() => {
     if (open) {
-      console.log('[ChartContextMenu] Open with prices:', {
-        ctxClickPrice,
-        hoverPrice,
-        lastCandleClose,
-        displayPrice,
-      });
+      
     }
   }, [open, ctxClickPrice, hoverPrice, lastCandleClose, displayPrice]);
 
   if (!open && !orderModalOpen) return null;
 
+  // Format giá - CHỈ tính từ giá thực tế, không dùng tickSize/precision props
   const formatPrice = (price: number | null) => {
     if (price == null) return '--';
-    return price.toLocaleString('vi-VN', {
-      minimumFractionDigits: price >= 100 ? 2 : 5,
-      maximumFractionDigits: price >= 100 ? 2 : 5,
-    });
+    
+    // Tính decimals trực tiếp từ giá
+    let decimals: number;
+    if (price >= 1000) decimals = 1;
+    else if (price >= 100) decimals = 2;
+    else if (price >= 10) decimals = 3;
+    else if (price >= 1) decimals = 4;
+    else if (price >= 0.1) decimals = 5;   // DOGE ~0.13
+    else if (price >= 0.01) decimals = 6;  // 0.01-0.1
+    else decimals = 7;                     // 1000PEPE ~0.004
+    
+    // Format KHÔNG làm tròn
+    return price.toFixed(decimals).replace('.', ',');
   };
 
   const handleNewOrder = () => {
@@ -175,16 +180,13 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   };
 
   const handleLimitOrder = () => {
-    // Lưu giá TRƯỚC KHI đóng menu
+    // LƯU GIÁ GỐC - KHÔNG LÀM TRÒN
+    // Giá sẽ được snap trong ChartOrderModal/TradingForm nếu cần
     const priceToSave = displayPrice;
-    console.log('[ChartContextMenu] handleLimitOrder:', {
-      displayPrice,
-      ctxClickPrice,
-      priceToSave,
-    });
+    
     
     if (priceToSave != null) {
-      setSavedPrice(priceToSave);
+      setSavedPrice(priceToSave); // ← GIÁ GỐC CHÍNH XÁC
     }
     setOrderModalType('limit');
     setOrderModalOpen(true);
@@ -192,16 +194,13 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   };
 
   const handleStopOrder = () => {
-    // Lưu giá TRƯỚC KHI đóng menu
+    // LƯU GIÁ GỐC - KHÔNG LÀM TRÒN
+    // Giá sẽ được snap trong ChartOrderModal/TradingForm nếu cần
     const priceToSave = displayPrice;
-    console.log('[ChartContextMenu] handleStopOrder:', {
-      displayPrice,
-      ctxClickPrice,
-      priceToSave,
-    });
+    
     
     if (priceToSave != null) {
-      setSavedPrice(priceToSave);
+      setSavedPrice(priceToSave); // ← GIÁ GỐC CHÍNH XÁC
     }
     setOrderModalType('stop-limit');
     setOrderModalOpen(true);

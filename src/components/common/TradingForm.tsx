@@ -23,6 +23,7 @@ interface Props {
   price: number;
   internalBalance?: number;
   selectedMarket?: "spot" | "futures";
+  binanceAccountId?: number | null;  // ← THÊM
 }
 
 interface BinanceAccount {
@@ -150,8 +151,10 @@ const clampQtyToMax = ({
 const TradingForm: React.FC<Props> = ({
   selectedSymbol,
   price,
+  
   internalBalance: propInternal = 0,
   selectedMarket: propMarket = "futures",
+  binanceAccountId,
 }) => {
   const [orderAction, setOrderAction] = useState<OrderAction>("open");
 
@@ -493,6 +496,8 @@ useEffect(() => {
   // Balance tracking
   const [internalBalance, setInternalBalance] = useState<number>(propInternal);
   const [totalWalletBalance, setTotalWalletBalance] = useState<number>(0);
+  const [totalMarginBalance, setTotalMarginBalance] = useState<number>(0);     
+const [totalUnrealizedProfit, setTotalUnrealizedProfit] = useState<number>(0);
   const [balanceSource, setBalanceSource] = useState<BalanceSource>("none");
   const RANK: Record<BalanceSource, number> = {
     "ws-live": 3,
@@ -993,12 +998,16 @@ useEffect(() => {
       
       const availBal = parseFloat(String(msg.data.availableBalance || "0"));
       const totalBal = parseFloat(String(msg.data.totalWalletBalance || "0"));
+      const marginBal = parseFloat(String(msg.data.totalMarginBalance || "0"));      
+const unrealizedPnl = parseFloat(String(msg.data.totalUnrealizedProfit || "0")); 
       
       // Update available balance với priority system
       setBalanceIfHigherPriority(availBal, msg.data.source);
       
       // ✅ Update total wallet balance
       setTotalWalletBalance(totalBal);
+      setTotalMarginBalance(marginBal);           
+setTotalUnrealizedProfit(unrealizedPnl);    
     }
 
     // Giữ nguyên logic cũ cho multiAssetsMargin
@@ -1271,8 +1280,9 @@ useEffect(() => {
     type: child.type,
     stopPrice: finalStopPrice,
     workingType: child.type === "TAKE_PROFIT_MARKET" ? tpTriggerType : slTriggerType,
-    closePosition: "true",  // ✅ ĐÚNG - gửi closePosition
-    // quantity bỏ đi, không gửi nữa
+    //closePosition: "true",  
+    quantity: o.quantity,
+reduceOnly: true,
     positionSide: selectedMarket === "futures" ? o.positionSide : undefined,
   };
 });
@@ -1367,7 +1377,7 @@ useEffect(() => {
 
   // ✅ Cleanup
   setTpSlOrders([]);
-  setIsConfirmOpen(false);
+ // setIsConfirmOpen(false);
 }}
           />,
           document.body
@@ -1940,7 +1950,11 @@ useEffect(() => {
   getFeeRate={getFeeRate}
 />
 {/* Profit and Loss Analysis Panel */}
-<PnLAnalysisPanel />
+<PnLAnalysisPanel
+  binanceAccountId={binanceAccountId ?? selectedAccountId}
+  totalMarginBalance={totalMarginBalance}
+  totalUnrealizedProfit={totalUnrealizedProfit}
+/>
       </div>
     </>
   );

@@ -1,13 +1,42 @@
-/* FullscreenPositionModal.css */
+/* ========================================
+   Fullscreen Position Modal - Fluid Design
+   Logic: FIT VIEWPORT FIRST, scroll only when content overflows
+   Base: 1920px = 1x scale
+   Supports: 4K, 2K, 1080p, smaller
+======================================== */
 
-/* Overlay */
+/* Fluid spacing variables */
+:root {
+  --fs-space-xs: clamp(4px, 0.25vw, 8px);
+  --fs-space-sm: clamp(8px, 0.5vw, 16px);
+  --fs-space-md: clamp(12px, 0.75vw, 24px);
+  --fs-space-lg: clamp(16px, 1vw, 32px);
+  
+  --fs-text-xs: clamp(10px, 0.55vw, 14px);
+  --fs-text-sm: clamp(11px, 0.625vw, 16px);
+  --fs-text-md: clamp(12px, 0.7vw, 18px);
+  --fs-text-lg: clamp(14px, 0.85vw, 22px);
+  --fs-text-xl: clamp(16px, 1vw, 26px);
+  
+  --fs-radius-sm: clamp(4px, 0.25vw, 8px);
+  --fs-radius-md: clamp(6px, 0.4vw, 12px);
+  --fs-radius-lg: clamp(8px, 0.5vw, 16px);
+}
+
+/* Backdrop - full viewport */
 .fullscreen-position-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
   background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
   animation: fadeIn 0.2s ease-out;
+  
+  /* Center modal */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fs-space-lg);
 }
 
 @keyframes fadeIn {
@@ -15,16 +44,24 @@
   to { opacity: 1; }
 }
 
-/* Modal container */
+/* ========================================
+   MODAL - FIT VIEWPORT
+======================================== */
 .fullscreen-position-modal {
-  position: absolute;
-  inset: 16px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  
   background: #1e293b;
-  border-radius: 12px;
+  border-radius: var(--fs-radius-lg);
   border: 1px solid #334155;
+  
+  /* KEY: Flex column, no overflow on modal itself */
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  
   animation: slideUp 0.25s ease-out;
   box-shadow: 
     0 25px 50px -12px rgba(0, 0, 0, 0.5),
@@ -42,58 +79,66 @@
   }
 }
 
-/* Header */
+/* ========================================
+   HEADER - Fixed, không shrink
+======================================== */
 .fullscreen-position-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: var(--fs-space-md) var(--fs-space-lg);
   background: #0f172a;
   border-bottom: 1px solid #334155;
-  flex-shrink: 0;
+  flex-shrink: 0; /* Never shrink */
+  gap: var(--fs-space-md);
 }
 
 .fullscreen-position-header-left {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: var(--fs-space-md);
+  flex-shrink: 0;
 }
 
 .fullscreen-position-title {
-  font-size: 18px;
+  font-size: var(--fs-text-xl);
   font-weight: 600;
   color: #fff;
   margin: 0;
+  white-space: nowrap;
 }
 
 .fullscreen-position-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-text-xs);
   color: #64748b;
   background: #334155;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: var(--fs-space-xs) var(--fs-space-sm);
+  border-radius: var(--fs-radius-sm);
+  white-space: nowrap;
 }
 
-/* Tabs in header */
+/* Tabs */
 .fullscreen-position-tabs {
   display: flex;
-  gap: 4px;
+  gap: var(--fs-space-xs);
   background: #1e293b;
-  padding: 4px;
-  border-radius: 8px;
+  padding: var(--fs-space-xs);
+  border-radius: var(--fs-radius-md);
+  flex-shrink: 1;
+  overflow-x: auto;
 }
 
 .fullscreen-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 13px;
+  gap: var(--fs-space-xs);
+  padding: var(--fs-space-sm) var(--fs-space-md);
+  font-size: var(--fs-text-sm);
   font-weight: 500;
   color: #94a3b8;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--fs-radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -110,19 +155,22 @@
 }
 
 .fullscreen-tab-badge {
-  font-size: 11px;
+  font-size: var(--fs-text-xs);
   font-weight: 600;
-  padding: 2px 6px;
+  padding: 2px var(--fs-space-xs);
   border-radius: 10px;
   background: rgba(252, 213, 53, 0.15);
   color: #fcd535;
+  min-width: 18px;
+  text-align: center;
 }
 
-/* Header right buttons */
+/* Header right */
 .fullscreen-position-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--fs-space-sm);
+  flex-shrink: 0;
 }
 
 .fullscreen-position-minimize-btn,
@@ -130,9 +178,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: clamp(28px, 2vw, 40px);
+  height: clamp(28px, 2vw, 40px);
+  border-radius: var(--fs-radius-md);
   border: 1px solid #334155;
   background: #1e293b;
   color: #94a3b8;
@@ -152,52 +200,133 @@
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* Content area */
+/* ========================================
+   CONTENT - KEY SECTION
+   Takes remaining space, scroll only when needed
+======================================== */
 .fullscreen-position-content {
-  flex: 1;
-  overflow: auto;
-  padding: 20px 24px;
+  flex: 1 1 auto;
+  min-height: 0; /* CRITICAL: Allows flex child to shrink below content size */
+  
+  display: flex;
+  flex-direction: column;
+  
+  padding: var(--fs-space-md) var(--fs-space-lg);
   background: #1e293b;
+  
+  /* Scroll only when content overflows */
+  overflow: auto;
 }
 
-/* Override table styles in fullscreen */
+/* ========================================
+   TABLE STYLING FOR POSITION/ORDERS
+   Make table fit available space
+======================================== */
+
+/* Direct child wrapper */
+.fullscreen-position-content > div {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Position table container */
+.fullscreen-position-content .position-table-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: none !important; /* Override any inline max-height */
+}
+
+/* Table wrapper with scroll */
+.fullscreen-position-content .position-table-wrapper,
+.fullscreen-position-content .table-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Table itself */
 .fullscreen-position-content table {
   width: 100%;
+  border-collapse: collapse;
 }
 
-.fullscreen-position-content .position-table-container {
-  max-height: none !important;
-  overflow: visible;
-}
-
-/* Scrollbar styling */
-.fullscreen-position-content::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.fullscreen-position-content::-webkit-scrollbar-track {
+/* Sticky header */
+.fullscreen-position-content thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: #0f172a;
-  border-radius: 4px;
 }
 
-.fullscreen-position-content::-webkit-scrollbar-thumb {
+.fullscreen-position-content th {
+  padding: var(--fs-space-sm) var(--fs-space-md);
+  font-size: var(--fs-text-xs);
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #334155;
+}
+
+.fullscreen-position-content td {
+  padding: var(--fs-space-sm) var(--fs-space-md);
+  font-size: var(--fs-text-sm);
+  color: #e2e8f0;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.fullscreen-position-content tbody tr {
+  transition: background 0.15s ease;
+}
+
+.fullscreen-position-content tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ========================================
+   SCROLLBAR - Subtle, only when needed
+======================================== */
+.fullscreen-position-content::-webkit-scrollbar,
+.fullscreen-position-content *::-webkit-scrollbar {
+  width: clamp(6px, 0.4vw, 10px);
+  height: clamp(6px, 0.4vw, 10px);
+}
+
+.fullscreen-position-content::-webkit-scrollbar-track,
+.fullscreen-position-content *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fullscreen-position-content::-webkit-scrollbar-thumb,
+.fullscreen-position-content *::-webkit-scrollbar-thumb {
   background: #334155;
-  border-radius: 4px;
+  border-radius: var(--fs-radius-sm);
 }
 
-.fullscreen-position-content::-webkit-scrollbar-thumb:hover {
+.fullscreen-position-content::-webkit-scrollbar-thumb:hover,
+.fullscreen-position-content *::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
 
-/* Expand button style (for PositionFunction) */
+/* ========================================
+   EXPAND BUTTON (in PositionFunction)
+======================================== */
 .expand-fullscreen-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: clamp(24px, 1.5vw, 32px);
+  height: clamp(24px, 1.5vw, 32px);
+  border-radius: var(--fs-radius-sm);
   border: 1px solid #334155;
   background: transparent;
   color: #64748b;
@@ -215,46 +344,130 @@
   stroke: #fcd535;
 }
 
-/* Responsive */
+/* ========================================
+   RESPONSIVE - Screen-specific margins
+======================================== */
+
+/* 4K (3840px+) */
+@media (min-width: 3000px) {
+  .fullscreen-position-overlay {
+    padding: 32px;
+  }
+}
+
+/* 2K (2560px) */
+@media (min-width: 2400px) and (max-width: 2999px) {
+  .fullscreen-position-overlay {
+    padding: 24px;
+  }
+}
+
+/* 1080p (1920px) - Base */
+@media (min-width: 1800px) and (max-width: 2399px) {
+  .fullscreen-position-overlay {
+    padding: 16px;
+  }
+}
+
+/* Smaller displays */
+@media (max-width: 1799px) {
+  .fullscreen-position-overlay {
+    padding: 12px;
+  }
+}
+
+/* Tablet */
 @media (max-width: 1024px) {
-  .fullscreen-position-modal {
-    inset: 8px;
+  .fullscreen-position-overlay {
+    padding: 8px;
   }
   
   .fullscreen-position-header {
-    padding: 12px 16px;
     flex-wrap: wrap;
-    gap: 12px;
   }
   
   .fullscreen-position-tabs {
     order: 3;
     width: 100%;
-    overflow-x: auto;
     justify-content: flex-start;
-  }
-  
-  .fullscreen-tab-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-  
-  .fullscreen-position-content {
-    padding: 12px 16px;
   }
 }
 
+/* Mobile */
 @media (max-width: 640px) {
-  .fullscreen-position-modal {
-    inset: 0;
-    border-radius: 0;
+  .fullscreen-position-overlay {
+    padding: 0;
   }
   
-  .fullscreen-position-title {
-    font-size: 16px;
+  .fullscreen-position-modal {
+    border-radius: 0;
   }
   
   .fullscreen-position-subtitle {
     display: none;
   }
+}
+
+/* ========================================
+   FORCE FIT - Override Position component styles
+======================================== */
+
+/* Remove ALL height constraints from children */
+.fullscreen-position-content,
+.fullscreen-position-content > *,
+.fullscreen-position-content > * > *,
+.fullscreen-position-content > * > * > * {
+  max-height: none !important;
+  height: auto !important;
+}
+
+/* Only the main content area should have controlled height */
+.fullscreen-position-content {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Position wrapper - fill available space, no scroll */
+.fullscreen-position-content .position-wrapper,
+.fullscreen-position-content .positions-wrapper,
+.fullscreen-position-content .position-container,
+.fullscreen-position-content .positions-container,
+.fullscreen-position-content [class*="position"] {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  flex: none !important;
+}
+
+/* Table - natural height */
+.fullscreen-position-content table,
+.fullscreen-position-content .position-table,
+.fullscreen-position-content [class*="table"] {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* Remove any scrollable containers inside */
+.fullscreen-position-content .table-scroll,
+.fullscreen-position-content .scroll-container,
+.fullscreen-position-content [class*="scroll"] {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* Tbody - no internal scroll */
+.fullscreen-position-content tbody {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+  display: table-row-group !important;
+}
+
+/* Rows - natural height */
+.fullscreen-position-content tr {
+  height: auto !important;
 }

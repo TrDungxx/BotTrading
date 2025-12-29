@@ -1,0 +1,411 @@
+/* ============================================
+   TOP FUNDING RATE COMPONENT - FLUID RESPONSIVE
+   Simplified version - No tabs, combined list
+   ============================================ */
+
+/* Container */
+.top-funding-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel, #1e293b);
+  overflow: hidden;
+}
+
+/* ==================== HEADER - BINANCE STYLE ==================== */
+.top-funding-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--trading-gap-sm, 8px) var(--trading-gap-md, 12px);
+  border-bottom: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
+  flex-shrink: 0;
+}
+
+.funding-header-label {
+  font-size: var(--stats-font-sm, 12px);
+  color: rgba(148, 163, 184, 0.7);
+}
+
+/* ==================== FUNDING LIST ==================== */
+.top-funding-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Scrollbar styling */
+.top-funding-list::-webkit-scrollbar {
+  width: var(--scrollbar-width-thin, 3px);
+}
+
+.top-funding-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.top-funding-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--trading-radius-sm, 2px);
+}
+
+.top-funding-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ==================== FUNDING ITEM - FLUID ==================== */
+/* ✅ UPDATED: Thêm cột countdown */
+.top-funding-item {
+  display: grid;
+  grid-template-columns: 
+    clamp(14px, 0.833vw, 20px)      /* Rank */
+    clamp(24px, 1.458vw, 36px)      /* Icon */
+    minmax(50px, 1fr)               /* Info */
+    clamp(60px, 3.5vw, 80px)        /* Funding Rate */
+    clamp(55px, 3.5vw, 75px);       /* ✅ Countdown */
+  align-items: center;
+  gap: var(--trading-gap-sm);
+  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  height: clamp(40px, 2.5vw, 60px);
+  min-height: clamp(40px, 2.5vw, 60px);
+  max-height: clamp(40px, 2.5vw, 60px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.top-funding-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.top-funding-item:active {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ==================== RANK ==================== */
+.funding-rank {
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.6);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ==================== FUNDING ICON ==================== */
+.funding-icon {
+  width: clamp(20px, 1.25vw, 32px);
+  height: clamp(20px, 1.25vw, 32px);
+  min-width: clamp(20px, 1.25vw, 32px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(7px, 0.417vw, 10px);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.funding-icon.positive {
+  background: rgba(14, 203, 129, 0.15);
+  color: #0ecb81;
+}
+
+.funding-icon.negative {
+  background: rgba(246, 70, 93, 0.15);
+  color: #f6465d;
+}
+
+/* ==================== FUNDING INFO ==================== */
+.funding-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--trading-gap-xs);
+}
+
+.funding-symbol {
+  font-size: var(--stats-font-md);
+  font-weight: 600;
+  color: #eaecef;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.funding-type {
+  font-size: var(--stats-font-xs);
+  color: rgba(148, 163, 184, 0.6);
+  white-space: nowrap;
+}
+
+/* ==================== FUNDING RATE SECTION ==================== */
+.funding-rate-section {
+  text-align: right;
+}
+
+.funding-rate {
+  font-size: var(--stats-font-base);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.funding-rate.positive {
+  color: #0ecb81;
+}
+
+.funding-rate.negative {
+  color: #f6465d;
+}
+
+/* ==================== COUNTDOWN SECTION - NEW ==================== */
+.funding-countdown-section {
+  text-align: right;
+}
+
+.funding-countdown {
+  font-size: var(--stats-font-sm);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  color: rgba(148, 163, 184, 0.8);
+  white-space: nowrap;
+}
+
+/* ==================== LOADING STATE ==================== */
+.top-funding-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--trading-gap-xl);
+  flex: 1;
+}
+
+.top-funding-loading .loading-text {
+  font-size: var(--stats-font-md);
+  color: rgba(148, 163, 184, 0.6);
+  text-align: center;
+}
+
+/* ==================== EMPTY STATE ==================== */
+.top-funding-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--trading-gap-xl);
+  flex: 1;
+}
+
+.top-funding-empty .empty-text {
+  font-size: var(--stats-font-md);
+  color: rgba(148, 163, 184, 0.6);
+  text-align: center;
+}
+
+/* ==================== ANIMATION ==================== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.top-funding-item {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* ==================== HIGHLIGHT ==================== */
+.top-funding-item.highlighted {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-left: 2px solid rgba(59, 130, 246, 0.8);
+}
+
+.top-funding-item.highlighted:hover {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+/* Mobile (< 400px) - Extra compact */
+@media (max-width: 400px) {
+  .top-funding-header {
+    padding: 6px 8px;
+  }
+
+  .funding-header-label {
+    font-size: 10px;
+  }
+
+  .top-funding-item {
+    grid-template-columns: 14px 20px minmax(40px, 1fr) 55px 50px;
+    gap: 4px;
+    padding: 6px 8px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+  }
+
+  .funding-icon {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    font-size: 7px;
+  }
+
+  .funding-symbol {
+    font-size: 11px;
+  }
+
+  .funding-rate {
+    font-size: 10px;
+  }
+
+  .funding-countdown {
+    font-size: 9px;
+  }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .top-funding-item {
+    grid-template-columns: 16px 24px minmax(50px, 1fr) 65px 60px;
+    height: 46px;
+    min-height: 46px;
+    max-height: 46px;
+  }
+
+  .funding-countdown {
+    font-size: 11px;
+  }
+}
+
+/* Desktop (1024px - 1535px) */
+@media (min-width: 1024px) and (max-width: 1535px) {
+  .top-funding-item {
+    grid-template-columns: 18px 28px minmax(55px, 1fr) 70px 65px;
+    height: 48px;
+    min-height: 48px;
+    max-height: 48px;
+  }
+
+  .funding-countdown {
+    font-size: 11px;
+  }
+}
+
+/* Large Desktop (1536px - 2399px) */
+@media (min-width: 1536px) and (max-width: 2399px) {
+  .top-funding-header {
+    padding: 10px 14px;
+  }
+
+  .funding-header-label {
+    font-size: 13px;
+  }
+
+  .top-funding-item {
+    grid-template-columns: 18px 30px minmax(60px, 1fr) 75px 70px;
+    height: 49px;
+    min-height: 49px;
+    max-height: 49px;
+    padding: 10px 14px;
+  }
+
+  .funding-countdown {
+    font-size: 12px;
+  }
+}
+
+/* 2K (2400px - 3199px) */
+@media (min-width: 2400px) and (max-width: 3199px) {
+  .top-funding-header {
+    padding: 12px 18px;
+  }
+
+  .funding-header-label {
+    font-size: 14px;
+  }
+
+  .top-funding-item {
+    grid-template-columns: 20px 32px minmax(80px, 1fr) 85px 75px;
+    height: 56px;
+    min-height: 56px;
+    max-height: 56px;
+    padding: 12px 18px;
+    gap: 10px;
+  }
+  
+  .funding-icon {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 9px;
+  }
+  
+  .funding-symbol {
+    font-size: 15px;
+  }
+  
+  .funding-rate {
+    font-size: 14px;
+  }
+  
+  .funding-rank {
+    font-size: 12px;
+  }
+
+  .funding-countdown {
+    font-size: 13px;
+  }
+}
+
+/* 4K (3200px+) */
+@media (min-width: 3200px) {
+  .top-funding-header {
+    padding: 14px 22px;
+  }
+
+  .funding-header-label {
+    font-size: 15px;
+  }
+
+  .top-funding-item {
+    grid-template-columns: 22px 40px minmax(100px, 1fr) 100px 90px;
+    height: 64px;
+    min-height: 64px;
+    max-height: 64px;
+    padding: 14px 22px;
+    gap: 12px;
+  }
+  
+  .funding-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    font-size: 11px;
+  }
+  
+  .funding-symbol {
+    font-size: 18px;
+  }
+  
+  .funding-type {
+    font-size: 12px;
+  }
+  
+  .funding-rate {
+    font-size: 16px;
+  }
+  
+  .funding-rank {
+    font-size: 14px;
+  }
+
+  .funding-countdown {
+    font-size: 14px;
+  }
+}

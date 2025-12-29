@@ -124,7 +124,7 @@ const ClosePositionModal: React.FC<ClosePositionModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-[420px] max-w-[92vw] rounded-xl border border-dark-600 bg-dark-800 p-fluid-4 shadow-xl">
+      <div className="relative w-[420px] max-w-[92vw] rounded-xl border border-dark-600 bg-dark-800 p-fluid-16 shadow-xl">
         <button
           className="absolute right-3 top-fluid-3 text-dark-300 hover:text-white"
           onClick={onClose}

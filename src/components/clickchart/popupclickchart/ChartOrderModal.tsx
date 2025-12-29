@@ -84,7 +84,7 @@ const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
       />
       
       {/* Modal Container */}
-      <div className="relative bg-[#1e2329] rounded-xl shadow-2xl w-[360px] max-h-[90vh] overflow-hidden">
+      <div className="relative bg-[#1e293b] rounded-xl shadow-2xl w-[360px] max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-fluid-4 py-fluid-3 border-b border-[#2b3139]">
           <h3 className="text-fluid-base font-medium text-[#eaecef]">Đặt lệnh</h3>

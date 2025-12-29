@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 
 interface LeverageModalProps {
   isOpen: boolean;
@@ -7,6 +7,10 @@ interface LeverageModalProps {
   onChange: (value: number) => void;
   maxPosition?: string;
 }
+
+// Slider markers - giống Binance
+const SLIDER_VALUES = [1, 30, 60, 90, 120, 150];
+const SLIDER_LABELS = ['1x', '30x', '60x', '90x', '120x', '150x'];
 
 const LeverageModal: React.FC<LeverageModalProps> = ({ 
   isOpen, 
@@ -17,18 +21,61 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
 }) => {
   const [localLeverage, setLocalLeverage] = useState(leverage);
 
-  // ✅ Quick leverage buttons
+  // Quick leverage buttons
   const quickLeverages = [1, 5, 10, 20, 50, 100];
+
+  // Tính index và progress cho slider
+  const getSliderIndex = (value: number): number => {
+    for (let i = SLIDER_VALUES.length - 1; i >= 0; i--) {
+      if (value >= SLIDER_VALUES[i]) return i;
+    }
+    return 0;
+  };
+
+  const currentIndex = getSliderIndex(localLeverage);
+  const maxIndex = SLIDER_VALUES.length - 1;
   
-  // ✅ Slider markers
-  const sliderMarkers = [
-    { value: 1, label: '1x' },
-    { value: 30, label: '30x' },
-    { value: 60, label: '60x' },
-    { value: 90, label: '90x' },
-    { value: 120, label: '120x' },
-    { value: 150, label: '150x' },
-  ];
+  // Tính progress percent dựa trên giá trị thực tế (1-150)
+  const progressPercent = ((localLeverage - 1) / 149) * 100;
+
+  const handleSliderSelect = useCallback((index: number) => {
+    setLocalLeverage(SLIDER_VALUES[index]);
+  }, []);
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, x / rect.width));
+    
+    // Tính giá trị leverage từ 1-150 dựa trên vị trí click
+    const leverageValue = Math.round(1 + ratio * 149);
+    setLocalLeverage(leverageValue);
+  };
+
+  const handleDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const track = e.currentTarget.parentElement;
+    if (!track) return;
+
+    const onMove = (moveEvent: MouseEvent) => {
+      moveEvent.preventDefault();
+      const rect = track.getBoundingClientRect();
+      const x = moveEvent.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      
+      // Tính giá trị leverage từ 1-150
+      const leverageValue = Math.round(1 + ratio * 149);
+      setLocalLeverage(leverageValue);
+    };
+
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   const applyChange = () => {
     onChange(localLeverage);
@@ -68,7 +115,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           {/* Leverage Control with +/- buttons */}
           <div className="flex items-center justify-center space-x-6 mb-6">
             <button
-              className="w-10 h-fluid-input rounded border border-[#2b3139] hover:border-[#474d57] text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
+              className="w-10 h-fluid-input rounded border border-[#2b3139] hover:border-[#474d57]  text-[#848e9c] hover:text-[#eaecef] transition-colors flex items-center justify-center text-xl font-light"
               onClick={() => setLocalLeverage(Math.max(1, localLeverage - 1))}
             >
               −
@@ -86,7 +133,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
             </button>
           </div>
 
-          {/* ✅ Quick Leverage Buttons */}
+          {/* Quick Leverage Buttons */}
           <div className="grid grid-cols-6 gap-fluid-2 mb-6">
             {quickLeverages.map((value) => (
               <button
@@ -94,7 +141,7 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
                 onClick={() => handleQuickSelect(value)}
                 className={`py-2 px-fluid-3 rounded text-fluid-sm font-medium transition-all ${
                   localLeverage === value
-                    ? 'bg-[#fcd535] text-[#1e2329]'
+                    ? 'bg-blue-500 text-white-400'
                     : 'bg-[#2b3139] text-[#848e9c] hover:bg-[#474d57] hover:text-[#eaecef]'
                 }`}
               >
@@ -103,52 +150,64 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
             ))}
           </div>
 
-          {/* ✅ Custom Slider - Binance Style */}
-          <div className="relative mb-8 px-1">
-            {/* Slider Container */}
-            <div className="relative pt-2 pb-6">
-              <input
-                type="range"
-                min={1}
-                max={150}
-                step={1}
-                value={localLeverage}
-                onChange={(e) => setLocalLeverage(Number(e.target.value))}
-                className="leverage-slider"
-              />
-              
-              {/* Progress Fill */}
-              <div 
-                className="absolute top-fluid-2 left-0 h-1 bg-[#3b82f6] rounded-full pointer-events-none"
-                style={{ 
-                  width: `${((localLeverage - 1) / 149) * 100}%`,
-                  transition: 'width 0.1s ease'
-                }}
-              />
+          {/* ✅ NEW: Custom Slider - PercentSlider Style */}
+          <div className="select-none mb-8 px-1">
+            {/* Slider Track */}
+            <div className="pt-2 pb-1">
+              <div
+                className="relative h-1 bg-[#2b3139] rounded-full cursor-pointer"
+                onClick={handleTrackClick}
+              >
+                {/* Progress Bar */}
+                <div
+                  className="absolute left-0 top-0 h-full bg-[#3b82f6] rounded-full transition-all duration-150"
+                  style={{ width: `${progressPercent}%` }}
+                />
 
-              {/* Markers */}
-              {sliderMarkers.map((marker) => (
-                <div 
-                  key={marker.value}
-                  className="absolute"
-                  style={{ 
-                    left: `${((marker.value - 1) / 149) * 100}%`,
-                    top: '0',
-                    transform: 'translateX(-50%)'
-                  }}
-                >
-                  {/* Marker Dot */}
-                  <div 
-                    className={`w-2 h-2 rounded-full mb-1 ${
-                      localLeverage >= marker.value ? 'bg-[#3b82f6]' : 'bg-[#474d57]'
+                {/* Dots */}
+                {SLIDER_VALUES.map((value, index) => {
+                  const dotPosition = ((value - 1) / 149) * 100;
+                  return (
+                    <div
+                      key={index}
+                      className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 rounded-full border-2 transition-all duration-150 ${
+                        localLeverage >= value
+                          ? "bg-[#3b82f6] border-[#3b82f6]"
+                          : "bg-[#1e2329] border-[#474d57]"
+                      }`}
+                      style={{ left: `${dotPosition}%` }}
+                    />
+                  );
+                })}
+
+                {/* Thumb */}
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-[#3b82f6] rounded-full cursor-grab active:cursor-grabbing transition-all duration-150 hover:scale-110 z-10 border-2 border-[#1e2329] shadow-md"
+                  style={{ left: `${progressPercent}%` }}
+                  onMouseDown={handleDrag}
+                />
+              </div>
+            </div>
+
+            {/* Leverage Labels */}
+            <div className="relative h-5 mt-2">
+              {SLIDER_VALUES.map((value, index) => {
+                const labelPosition = ((value - 1) / 149) * 100;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => handleSliderSelect(index)}
+                    className={`absolute -translate-x-1/2 text-xs font-medium px-0 py-0 rounded transition-all duration-150 ${
+                      localLeverage === value
+                        ? "text-[#3b82f6]"
+                        : "text-[#848e9c] hover:text-[#eaecef]"
                     }`}
-                  />
-                  {/* Marker Label */}
-                  <div className="text-xs text-[#848e9c] whitespace-nowrap">
-                    {marker.label}
-                  </div>
-                </div>
-              ))}
+                    style={{ left: `${labelPosition}%` }}
+                  >
+                    {SLIDER_LABELS[index]}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -211,73 +270,6 @@ const LeverageModal: React.FC<LeverageModalProps> = ({
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .leverage-slider {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 100%;
-          height: 4px;
-          background: #2b3139;
-          border-radius: 2px;
-          outline: none;
-          position: relative;
-          cursor: pointer;
-        }
-
-        .leverage-slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 4px solid #1e2329;
-          box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
-          position: relative;
-          z-index: 10;
-          transition: all 0.2s ease;
-        }
-
-        .leverage-slider::-moz-range-thumb {
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: 4px solid #1e2329;
-          box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
-          position: relative;
-          z-index: 10;
-          transition: all 0.2s ease;
-        }
-
-        .leverage-slider::-webkit-slider-thumb:hover {
-          background: #2563eb;
-          transform: scale(1.1);
-        }
-
-        .leverage-slider::-moz-range-thumb:hover {
-          background: #2563eb;
-          transform: scale(1.1);
-        }
-
-        .leverage-slider::-webkit-slider-thumb:active {
-          transform: scale(1.15);
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        .leverage-slider::-moz-range-thumb:active {
-          transform: scale(1.15);
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
-        }
-
-        /* Remove default track styling for Firefox */
-        .leverage-slider::-moz-range-track {
-          background: transparent;
-        }
-      `}</style>
     </div>
   );
 };

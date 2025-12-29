@@ -192,7 +192,7 @@ const ChartTypePanel: React.FC<Props> = ({ currentType, onTypeChange }) => {
           ref={dropdownRef}
           className="fixed w-[240px] bg-dark-800/95 
                      border border-dark-600 rounded-xl shadow-2xl backdrop-blur-md
-                     overflow-hidden z-[9999]"
+                     overflow-hidden z-[9999] "
           style={{
             top: buttonRect ? buttonRect.bottom + 4 : 0,
             left: buttonRect ? buttonRect.left : 0,

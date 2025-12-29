@@ -37,6 +37,7 @@ import { useMiniTickerStore } from "../utils/miniTickerStore";
 import { binanceWS,OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../components/binancewebsocket/BinanceWebSocketService";
 import { toast } from "react-toastify";
 import SyncDataButton from "./layout panel/SyncDataButton";
+import { useFundingRate } from "../components/common/hooks/useFundingRate";
 // ✅ Direct Binance WebSocket  (không qua server proxy)
 import { 
   useBinanceOrderbook,
@@ -277,7 +278,7 @@ const [errorPopup, setErrorPopup] = useState<{
   const [selectedInterval, setSelectedInterval] = useState(() => {
     return localStorage.getItem("selectedInterval") || "1m";
   });
-
+const { fundingData, estimatedFundingFee } = useFundingRate(selectedSymbol, selectedMarket);
   useEffect(() => {
     if (selectedInterval) {
       localStorage.setItem("selectedInterval", selectedInterval);
@@ -1007,7 +1008,43 @@ useEffect(() => {
                 <option value="spot">SPOT</option>
               </select>
             </div>
-
+{/* Funding Rate Display */}
+{fundingData && selectedMarket === 'futures' && (
+  <div className="funding-rate-group flex flex-col px-fluid-3 border-l border-dark-600">
+    {/* Label - Dynamic interval */}
+    <span className="text-fluid-xs text-dark-400">
+      Funding ({fundingData.intervalHours} giờ) / Đếm ngược
+    </span>
+    
+    {/* Rate + Countdown */}
+    <div className="flex items-center gap-2">
+      <span className={`text-fluid-sm font-medium ${
+        parseFloat(fundingData.fundingRate) >= 0 
+          ? 'text-[#0ecb81]' 
+          : 'text-[#f6465d]'
+      }`}>
+        {(parseFloat(fundingData.fundingRate) * 100).toFixed(4)}%
+      </span>
+      <span className="text-fluid-sm text-dark-300">
+        / {fundingData.countdown}
+      </span>
+    </div>
+    
+    {/* Estimated Fee */}
+    {estimatedFundingFee !== null && (
+      <div className="text-fluid-xs">
+        <span className="text-white">Ước tính </span>
+        <span className={
+          estimatedFundingFee >= 0 
+            ? 'text-[#0ecb81]'
+            : 'text-[#f6465d]'
+        }>
+          {estimatedFundingFee >= 0 ? '+' : ''}{estimatedFundingFee.toFixed(4)} USDT
+        </span>
+      </div>
+    )}
+  </div>
+)}
             {/* Price Display */}
             {tickerData && (
               <div className="price-display-group">
@@ -1042,6 +1079,7 @@ useEffect(() => {
                 </div>
               </div>
             )}
+            
           </div>
           {/* Stats Row 24h - Show only on XL */}
           <div className="stats-row-24h text-fluid-sm">
@@ -1049,13 +1087,13 @@ useEffect(() => {
               <>
                 <div className="flex flex-col ">
                   <span className="text-dark-400">24h High</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-green-400">
                     {parseFloat(tickerData.highPrice).toFixed(4)}
                   </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-dark-400">24h Low</span>
-                  <span className="font-medium">
+                  <span className="font-medium text-red-400">
                     {parseFloat(tickerData.lowPrice).toFixed(4)}
                   </span>
                 </div>
@@ -1163,7 +1201,7 @@ useEffect(() => {
                         <button
                           key={interval}
                           onClick={() => handleIntervalChange(interval)}
-                          className={`text-fluid-sm px-2 py-fluid-1 rounded hover:bg-dark-600 ${selectedInterval === interval ? "bg-dark-700" : ""
+                          className={`text-fluid-sm px-2 py-fluid-1 rounded hover:bg-blue-600 ${selectedInterval === interval ? "bg-blue-600" : ""
                             }`}
                         >
                           {interval}
@@ -1343,11 +1381,12 @@ useEffect(() => {
               }`}
           >
             <TradingForm
-              selectedSymbol={selectedSymbol}
-              price={livePrice}
-              internalBalance={availableBalance}
-              selectedMarket={selectedMarket}
-            />
+  selectedSymbol={selectedSymbol}
+  price={livePrice}
+  internalBalance={availableBalance}
+  selectedMarket={selectedMarket}
+  binanceAccountId={selectedAccount?.id ?? null}  // ← Đổi từ selectedAccountId thành binanceAccountId
+/>
           </div>
         </div>
       </div>

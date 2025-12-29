@@ -61,8 +61,8 @@ function readOpenOrdersLS(): any[] {
 }
 
 function writeOpenOrdersLS(list: any[]) {
+  console.log('💾 writeOpenOrdersLS called:', list);  // ✅ THÊM
   localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(list));
-  // Thông báo cho toàn app (OpenOrder.tsx sẽ lắng nghe)
   window.dispatchEvent(new CustomEvent('tw:open-orders-changed', { detail: { list } }));
 }
 
@@ -615,7 +615,10 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
     // remove
     currentOrders = currentOrders.filter((x, i) => i !== idx && x.orderId !== order.orderId);
   } else {
-    if (idx !== -1) currentOrders[idx] = { ...currentOrders[idx], ...order, _optimistic: undefined };
+    if (idx !== -1) {
+  currentOrders[idx] = { ...currentOrders[idx], ...order };
+  delete (currentOrders[idx] as any)._optimistic;
+}
     else currentOrders.unshift(order);
   }
 
@@ -625,7 +628,129 @@ if (data.e === 'ORDER_TRADE_UPDATE' && data.o) {
   setTimeout(() => this.getPositions(), 300);   // giữ callback cũ
   // (tiếp tục forward nếu bạn muốn)
 }
+// ===== ALGO ORDER UPDATE (TP/SL conditional orders) =====
+if (data.e === 'ALGO_UPDATE' && data.o) {
+  this.scheduleAccountRefresh(350);
 
+  const o = data.o;
+  
+  // Map từ algo format sang standard format
+  const order = {
+    orderId: o.aid,           // algoId -> orderId
+    symbol: o.s,              // symbol
+    side: o.S,                // side
+    type: o.o,                // orderType -> type
+    price: o.p,               // price
+    origQty: o.q,             // quantity
+    executedQty: '0',         // algo orders chưa khớp
+    status: o.X,              // algoStatus -> status (NEW, FILLED, CANCELLED)
+    stopPrice: o.tp,          // triggerPrice -> stopPrice
+    workingType: o.wt,        // workingType
+    time: data.T ?? Date.now(),
+    updateTime: data.E ?? data.T ?? Date.now(),
+    closePosition: o.cp,      // closePosition
+    reduceOnly: o.R,          // reduceOnly
+    positionSide: o.ps,       // positionSide
+    _isAlgo: true,            // ✅ Đánh dấu là algo order
+  };
+
+  console.log('📥 ALGO_UPDATE mapped:', order);
+
+  // Đọc LS hiện tại
+  let currentOrders: typeof order[] = readOpenOrdersLS();
+
+  // Auto-cancel lệnh đối ứng khi 1 cái FILLED
+  if (['TAKE_PROFIT_MARKET', 'STOP_MARKET'].includes(order.type) && order.status === 'FILLED') {
+    const oppositeType = order.type === 'TAKE_PROFIT_MARKET' ? 'STOP_MARKET' : 'TAKE_PROFIT_MARKET';
+    const opposite = currentOrders.find(
+      (x) => x.symbol === order.symbol && x.type === oppositeType && x.status === 'NEW'
+    );
+    if (opposite) {
+      console.log('🤖 Huỷ lệnh đối ứng TP/SL (algo):', oppositeType, 'orderId:', opposite.orderId);
+      this.sendAuthed({ action: 'cancelOrder', symbol: order.symbol, orderId: opposite.orderId, market: 'futures', isAlgo: true });
+    }
+  }
+
+  // Tìm order đã tồn tại theo algoId
+  let idx = currentOrders.findIndex((x) => String(x.orderId) === String(order.orderId));
+  
+  // Fallback: tìm theo optimistic tmp_*
+  if (idx < 0) {
+    idx = currentOrders.findIndex((x: any) =>
+      x._optimistic &&
+      x.symbol === order.symbol &&
+      x.type === order.type &&
+      x.side === order.side &&
+      Math.abs(Number(x.stopPrice) - Number(order.stopPrice)) < 0.0001
+    );
+  }
+
+  // Cập nhật danh sách theo status
+  if (['FILLED', 'CANCELLED', 'REJECTED', 'EXPIRED'].includes(order.status)) {
+    // remove
+    currentOrders = currentOrders.filter((x, i) => i !== idx && x.orderId !== order.orderId);
+  } else {
+    if (idx !== -1) {
+  currentOrders[idx] = { ...currentOrders[idx], ...order };
+  delete (currentOrders[idx] as any)._optimistic;
+}
+    else currentOrders.unshift(order);
+  }
+
+  console.log('📦 Final openOrders (with algo):', currentOrders);
+  writeOpenOrdersLS(currentOrders);
+  this.orderUpdateHandler?.(currentOrders);
+  setTimeout(() => this.getPositions(), 300);
+}
+
+// ===== ALGO ORDER RESPONSE (khi vừa đặt xong) =====
+if (data.algoId && data.algoType === 'CONDITIONAL' && data.algoStatus) {
+  console.log('📥 Algo order placed response:', data);
+  
+  const order = {
+    orderId: data.algoId,
+    symbol: data.symbol,
+    side: data.side,
+    type: data.orderType,
+    price: data.price,
+    origQty: data.quantity,
+    executedQty: '0',
+    status: data.algoStatus,
+    stopPrice: data.triggerPrice,
+    workingType: data.workingType,
+    time: data.createTime ?? Date.now(),
+    updateTime: data.updateTime ?? Date.now(),
+    closePosition: data.closePosition,
+    reduceOnly: data.reduceOnly,
+    positionSide: data.positionSide,
+    _isAlgo: true,
+  };
+
+  let currentOrders = readOpenOrdersLS();
+  
+  // Tìm và thay thế optimistic order
+  const idx = currentOrders.findIndex((x: any) =>
+    x._optimistic &&
+    x.symbol === order.symbol &&
+    x.type === order.type &&
+    x.side === order.side &&
+    Math.abs(Number(x.stopPrice) - Number(order.stopPrice)) < 0.0001
+  );
+
+  if (idx !== -1) {
+    currentOrders[idx] = { ...order, _optimistic: undefined };
+  } else {
+    // Kiểm tra xem đã có chưa
+    const exists = currentOrders.some(x => String(x.orderId) === String(order.orderId));
+    if (!exists) {
+      currentOrders.unshift(order);
+    }
+  }
+
+  console.log('📦 Final openOrders (algo placed):', currentOrders);
+  writeOpenOrdersLS(currentOrders);
+  this.orderUpdateHandler?.(currentOrders);
+}
 
         // ===== ACCOUNT UPDATE (Spot/Futures) =====
         if (data?.type === 'update' && data?.channel === 'account') {
@@ -717,11 +842,26 @@ writePositionsLS(merged);
 
          // ===== ERROR HANDLING - CHECK TRƯỚC KHI FORWARD =====
         if (data?.type === 'error' && data?.message) {
-          console.log('🚨 Error from BinanceWS:', data);
-          // Forward error để TradingTerminal bắt được
-          this.messageHandlers.forEach(h => h(data));
-          return;
-        }
+  console.log('🚨 Error from BinanceWS:', data);
+  
+  // ✅ ENHANCED: Thêm action context nếu có thể detect
+  const enhancedError = { ...data };
+  
+  // Detect order-related errors
+  if (data.message.includes('Order') || 
+      data.message.includes('order') ||
+      data.message.includes('exceeds') ||
+      data.message.includes('Insufficient') ||
+      data.message.includes('position') ||
+      data.message.includes('PRICE_FILTER') ||
+      data.message.includes('LOT_SIZE')) {
+    enhancedError.action = enhancedError.action || 'placeOrder';
+  }
+  
+  // Forward error để TradingTerminal bắt được
+  this.messageHandlers.forEach(h => h(enhancedError));
+  return;
+}
 
         // ===== Forward còn lại =====
         this.messageHandlers.forEach(h => h(data));
@@ -1012,16 +1152,89 @@ writePositionsLS(merged);
 }
 
   // ========= Orders =========
-  public placeOrder(payload: PlaceOrderPayload) {
-    // ✅ FIX: Binance rule - khi closePosition='true', KHÔNG được truyền quantity
-    const finalPayload = { ...payload };
-    if (finalPayload.closePosition === 'true') {
-      delete finalPayload.quantity;
-    }
-    
-    this.sendAuthed({ action: 'placeOrder', ...finalPayload });
-    setTimeout(() => this.getPositions(), 400);   // ⬅️ ép kéo snapshot nhẹ
+  public placeOrder(
+  payload: PlaceOrderPayload, 
+  onSuccess?: (data: any) => void, 
+  onError?: (error: { message: string; code?: number }) => void
+) {
+  // ✅ FIX: Binance rule - khi closePosition='true', KHÔNG được truyền quantity
+  const finalPayload = { ...payload };
+  if (finalPayload.closePosition === 'true') {
+    delete finalPayload.quantity;
   }
+  
+  // ✅ NEW: Setup error handler nếu có callback
+  if (onSuccess || onError) {
+    const requestId = `placeOrder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const handler = (msg: any) => {
+      // Check error response
+      if (msg?.type === 'error') {
+        // Check nếu error liên quan đến order này
+        const isOrderError = 
+          msg.action === 'placeOrder' ||
+          msg.symbol === payload.symbol ||
+          (msg.message && (
+            msg.message.includes('Order') ||
+            msg.message.includes('order') ||
+            msg.message.includes('exceeds') ||
+            msg.message.includes('Insufficient') ||
+            msg.message.includes('position')
+          ));
+        
+        if (isOrderError) {
+          console.log('🚨 placeOrder error detected:', msg);
+          onError?.({ message: msg.message || 'Order failed', code: msg.code });
+          this.removeMessageHandler(handler);
+          return;
+        }
+      }
+      
+      // Check ORDER_TRADE_UPDATE response
+      if (msg?.e === 'ORDER_TRADE_UPDATE' && msg?.o) {
+        const orderData = msg.o;
+        
+        // Check nếu là order của mình
+        if (orderData.s !== payload.symbol) return;
+        
+        const isSameOrder = 
+          orderData.S === payload.side &&
+          (payload.quantity === undefined || Math.abs(parseFloat(orderData.q) - payload.quantity) < 0.0001);
+        
+        if (!isSameOrder) return;
+        
+        const status = orderData.X;
+        
+        if (status === 'NEW' || status === 'FILLED' || status === 'PARTIALLY_FILLED') {
+          console.log('✅ placeOrder success:', status);
+          onSuccess?.({ status, orderData });
+          this.removeMessageHandler(handler);
+        } else if (status === 'REJECTED' || status === 'CANCELED' || status === 'EXPIRED') {
+          console.log('❌ placeOrder failed:', status, orderData.rj);
+          onError?.({ message: orderData.rj || `Order ${status}`, code: -1 });
+          this.removeMessageHandler(handler);
+        }
+      }
+      
+      // Check orderPlaced response từ backend
+      if (msg?.type === 'orderPlaced' && msg?.data?.symbol === payload.symbol) {
+        console.log('✅ placeOrder confirmed by backend');
+        onSuccess?.(msg.data);
+        this.removeMessageHandler(handler);
+      }
+    };
+    
+    this.onMessage(handler);
+    
+    // Timeout sau 15 giây
+    setTimeout(() => {
+      this.removeMessageHandler(handler);
+    }, 15000);
+  }
+  
+  this.sendAuthed({ action: 'placeOrder', ...finalPayload });
+  setTimeout(() => this.getPositions(), 400);
+}
 
   /** Lấy danh sách lệnh mở theo market (và optional symbol) */
   public getOpenOrders(market: 'spot' | 'futures', symbol?: string, onResult?: (orders: any[]) => void) {
@@ -1048,12 +1261,121 @@ writePositionsLS(merged);
   this.sendAuthed(payload);
 }
 
-  /** Huỷ 1 lệnh theo orderId/symbol/market */
-  public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures') {
-    const payload = { action: 'cancelOrder', symbol, orderId, market };
-    console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
-    this.sendAuthed(payload);
+public getAllOpenOrders(
+  symbol?: string, 
+  market: 'spot' | 'futures' = 'futures',
+  onResult?: (data: { regular: any[]; algo: any[]; all: any[]; total: number }) => void
+) {
+  const payload: any = { action: 'getAllOpenOrders', market };
+  if (symbol) payload.symbol = symbol;
+  
+  console.log('📤 Gửi getAllOpenOrders:', payload);
+  
+  if (onResult) {
+    const handler = (msg: any) => {
+      console.log('📥 getAllOpenOrders handler received:', msg);
+      
+      // Check nhiều format response có thể từ backend
+      const isAllOrdersResponse = 
+        msg?.type === 'getAllOpenOrders' || 
+        msg?.type === 'allOpenOrders' ||
+        (msg?.regular !== undefined && msg?.algo !== undefined);
+      
+      if (isAllOrdersResponse) {
+        const regular: any[] = Array.isArray(msg?.regular) ? msg.regular : [];
+        // ✅ Đánh dấu _isAlgo cho algo orders
+        const algo: any[] = Array.isArray(msg?.algo) 
+          ? msg.algo.map((o: any) => ({ ...o, _isAlgo: true })) 
+          : [];
+        
+        const result = {
+          regular,
+          algo,
+          all: [...regular, ...algo] as any[],
+          total: regular.length + algo.length
+        };
+        
+        console.log('✅ getAllOpenOrders parsed:', result);
+        onResult(result);
+        this.removeMessageHandler(handler);
+      }
+    };
+    
+    this.onMessage(handler);
+    
+    // Timeout cleanup handler sau 5s
+    setTimeout(() => this.removeMessageHandler(handler), 5000);
   }
+  
+  this.sendAuthed(payload);
+}
+
+/** 
+ * Cancel order thông minh - tự detect regular/algo
+ */
+public cancelOrderSmart(
+  symbol: string, 
+  orderId: number, 
+  market: 'spot' | 'futures' = 'futures',
+  isAlgo?: boolean
+) {
+  const payload: any = { 
+    action: 'cancelOrderSmart', 
+    symbol, 
+    orderId, 
+    market 
+  };
+  
+  // Nếu biết chắc là algo order
+  if (isAlgo !== undefined) {
+    payload.isAlgo = isAlgo;
+  }
+  
+  console.log('🛑 Gửi cancelOrderSmart:', payload);
+  this.sendAuthed(payload);
+}
+
+/** 
+ * Cancel TẤT CẢ orders (cả regular + algo)
+ */
+public cancelAllOrdersSmart(
+  symbol: string, 
+  market: 'spot' | 'futures' = 'futures',
+  onResult?: (result: { regularCancelled: number; algoCancelled: number }) => void
+) {
+  const payload = { action: 'cancelAllOrdersSmart', symbol, market };
+  
+  console.log('🛑 Gửi cancelAllOrdersSmart:', payload);
+  
+  if (onResult) {
+    const handler = (msg: any) => {
+      if (msg?.type === 'cancelAllOrdersSmart' || msg?.type === 'cancelAllOrdersSmartResult') {
+        onResult({
+          regularCancelled: msg?.regularCancelled ?? 0,
+          algoCancelled: msg?.algoCancelled ?? 0
+        });
+        this.removeMessageHandler(handler);
+      }
+    };
+    this.onMessage(handler);
+    setTimeout(() => this.removeMessageHandler(handler), 5000);
+  }
+  
+  this.sendAuthed(payload);
+}
+
+  /** Huỷ 1 lệnh theo orderId/symbol/market */
+ public cancelOrder(symbol: string, orderId: number, market: 'spot' | 'futures', isAlgo?: boolean) {
+  const payload: any = { action: 'cancelOrder', symbol, orderId, market };
+  
+  // ✅ Thêm flag isAlgo nếu có
+  if (isAlgo) {
+    payload.isAlgo = true;
+  }
+  
+  console.log('🛑 Gửi yêu cầu huỷ lệnh:', payload);
+  this.sendAuthed(payload);
+}
 
   public cancelAllOrders(symbol: string, market: 'spot' | 'futures') {
     const payload = { action: 'cancelAllOrders', symbol, market };
