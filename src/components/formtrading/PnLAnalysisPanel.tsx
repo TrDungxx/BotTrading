@@ -463,7 +463,7 @@ const PnLAnalysisPanel: React.FC<Props> = ({
                       const getBgColor = () => {
                         if (!day || day.pnl === 0) return "";
                         if (day.pnl > 0)
-                          return "bg-success-500/20 border-l-2 border-success-500";
+                          return "bg-success-500/20 border-l-1 border-success-500";
                         return "bg-danger-500/20 border-l-1 border-danger-500";
                       };
 

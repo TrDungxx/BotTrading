@@ -22,9 +22,11 @@ import {
   X,
   Database,
   Menu,
+  Shield,
 } from "lucide-react";
 import TradingBinance from "../components/common/TradingBinance";
 import MaintenanceModal from "../components/common/popuptradingterminal/MaintenanceModal";
+import RiskConfigViewModal from "./layout panel/RiskConfigViewModal";
 import TickerCarousel from "./carouseldecor/TickerCarousel";
 import { ErrorPopup } from "../components/common/popuptradingterminal/ErrorPopup";
 import { fetchHistoricalKlines } from "../utils/fetchKline";
@@ -37,6 +39,7 @@ import { useMiniTickerStore } from "../utils/miniTickerStore";
 import { binanceWS,OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from "../components/binancewebsocket/BinanceWebSocketService";
 import { toast } from "react-toastify";
 import SyncDataButton from "./layout panel/SyncDataButton";
+import TradingFooter from "./layout panel/TradingFooter";
 import { useFundingRate } from "../components/common/hooks/useFundingRate";
 // ✅ Direct Binance WebSocket  (không qua server proxy)
 import { 
@@ -63,6 +66,7 @@ import "../../src/style/trading/position-mobile-layout.css"
 import "../style/trading/trading-layout.css";
 import "../style/trading/trading-form.css";
 import "../style/trading/sidebar.css";
+import "../style/trading/trading-footer.css"
 
 import ChartTypePanel, {
   ChartType,
@@ -335,6 +339,36 @@ useEffect(() => {
   };
 
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+
+  // ✅ State cho Risk Config từ WebSocket
+  const [riskConfig, setRiskConfig] = useState<any>(null);
+  const [showRiskConfigModal, setShowRiskConfigModal] = useState(false);
+
+  // ✅ Lắng nghe riskConfigLoaded từ WS (riêng biệt để tránh closure issue)
+  useEffect(() => {
+  const handleRiskConfig = (msg: any) => {
+    if (msg?.type === 'riskConfigLoaded' && msg.riskConfig) {
+      console.log("🛡️ Risk Config Loaded (listener):", msg.riskConfig);
+      
+      const riskData = {
+        ...msg.riskConfig,
+        dailyStartBalance: msg.dailyStartBalance,
+        currentBalance: msg.currentBalance,
+        timestamp: msg.timestamp,
+      };
+      
+      setRiskConfig(riskData);
+      
+      // ✅ THÊM: Dispatch custom event để các component khác có thể lắng nghe
+      window.dispatchEvent(new CustomEvent('riskConfigLoaded', { 
+        detail: riskData
+      }));
+    }
+  };
+
+  binanceWS.onMessage(handleRiskConfig);
+  return () => binanceWS.removeMessageHandler(handleRiskConfig);
+}, []);
 
 // ========== DIRECT BINANCE STREAMS (không qua server proxy) ==========
 // ✅ Orderbook
@@ -652,10 +686,11 @@ const handleRefreshConnection = () => {
   }, []);
   useEffect(() => {
     const checkShowTab = () => {
-      const shouldShowTab = window.innerWidth < 1200; // < 1200px = show tab
+      // ✅ CHỈ hiện tab header trên mobile thực sự (< 768px)
+      const shouldShowTab = window.innerWidth < 768;
       setShowPositionTab(shouldShowTab);
 
-      // Desktop: auto open
+      // Desktop/Tablet: auto open position panel
       if (!shouldShowTab) {
         setIsPositionPanelOpen(true);
       }
@@ -729,6 +764,7 @@ useEffect(() => {
         if (usdt) setAvailableBalance(parseFloat(usdt.availableBalance || "0"));
         break;
       }
+      
       default:
         break;
     }
@@ -824,19 +860,92 @@ useEffect(() => {
 
   // ✅ FIX: Dùng async và chờ selectAccount xong
   const init = async () => {
-    // 1) Chọn account và chờ server xử lý xong
-    await binanceWS.selectAccountAndWait(id, 500);
+  await binanceWS.selectAccountAndWait(id, 500);
+  binanceWS.getPositions(id);
+  
+  // Regular orders
+  binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
+    console.log('📥 Initial getOpenOrders:', orders);
+    const regularOrders = orders.map((o: any) => ({ ...o, _isAlgo: false }));
+    localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(regularOrders));
+    window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: regularOrders } }));
+  });
 
-    // 2) Sau khi select xong mới gọi các API khác
-    binanceWS.getPositions(id);
-    binanceWS.getOpenOrders(selectedMarket, undefined, (orders) => {
-      console.log('📥 Initial getOpenOrders:', orders);
-      localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(orders));
-      window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: orders } }));
-    });
-  };
+  // ✅ Algo orders - đợi positions load xong
+  setTimeout(() => {
+    const positions = JSON.parse(localStorage.getItem('positions') || '[]');
+    const activeSymbols = positions
+      .filter((p: any) => Math.abs(parseFloat(p.positionAmt || 0)) > 0)
+      .map((p: any) => p.symbol);
 
-  init();
+    if (activeSymbols.length > 0) {
+      console.log('📊 [TradingTerminal] Loading algo orders for:', activeSymbols);
+      
+      // ✅ Setup handler để nhận algo orders
+      const algoHandler = (msg: any) => {
+        // Check nếu là algo orders response (array với algoId)
+        if (Array.isArray(msg) && msg.length > 0 && msg[0]?.algoId) {
+          console.log('📥 [TradingTerminal] Algo orders received:', msg.length, msg[0]?.symbol);
+          
+          // Map algo orders
+          const algoOrders = msg
+            .filter((o: any) => o.algoStatus === 'NEW')
+            .map((o: any) => ({
+              orderId: o.algoId,
+              algoId: o.algoId,
+              symbol: o.symbol,
+              side: o.side,
+              type: o.orderType,
+              price: o.price,
+              origQty: o.quantity,
+              executedQty: '0',
+              status: o.algoStatus || 'NEW',
+              stopPrice: o.triggerPrice,
+              workingType: o.workingType,
+              time: o.createTime,
+              updateTime: o.updateTime,
+              closePosition: o.closePosition,
+              reduceOnly: o.reduceOnly,
+              positionSide: o.positionSide,
+              _isAlgo: true,
+            }));
+          
+          // Merge với existing orders
+          const existingOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
+          const regularOrders = existingOrders.filter((o: any) => !o._isAlgo);
+          const existingAlgo = existingOrders.filter((o: any) => o._isAlgo);
+          
+          // Thêm algo mới (không duplicate)
+          const existingAlgoIds = new Set(existingAlgo.map((o: any) => o.algoId));
+          const newAlgo = algoOrders.filter((o: any) => !existingAlgoIds.has(o.algoId));
+          
+          const merged = [...regularOrders, ...existingAlgo, ...newAlgo];
+          console.log('📦 [TradingTerminal] Merged orders - Regular:', regularOrders.length, '| Algo:', existingAlgo.length + newAlgo.length);
+          
+          localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(merged));
+          window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: merged } }));
+        }
+      };
+      
+      binanceWS.onMessage(algoHandler);
+      
+      // Gửi requests
+      activeSymbols.forEach((symbol: string) => {
+        (binanceWS as any).sendAuthed({
+          action: 'getOpenFuturesAlgoOrders',
+          symbol: symbol
+        });
+      });
+      
+      // Cleanup handler sau 5s
+      setTimeout(() => {
+        binanceWS.removeMessageHandler(algoHandler);
+      }, 5000);
+    }
+  }, 1500);
+};
+
+init();
 
   // 3) Set position update handler
   binanceWS.setPositionUpdateHandler((rawPositions: any[]) => {
@@ -1174,8 +1283,12 @@ useEffect(() => {
 
            
 
-            <button className="p-1 hover:bg-dark-700 rounded">
-              <Settings className="h-4 w-4 text-dark-400" />
+            <button 
+              onClick={() => setShowRiskConfigModal(true)}
+              className="p-1 hover:bg-dark-700 rounded"
+              title="Xem Risk Config"
+            >
+              <Shield className={`h-4 w-4 ${riskConfig ? 'text-[#f0b90b]' : 'text-dark-400'}`} />
             </button>
             
           </div>
@@ -1343,6 +1456,8 @@ useEffect(() => {
   orderBook={orderBook}
   positions={positions}
   onFloatingInfoChange={setFloatingInfo}
+  binanceAccountId={selectedAccount?.id ?? null}  // ✅ THÊM DÒNG NÀY
+  onSymbolClick={(symbol) => setSelectedSymbol(symbol)}  // ✅ THÊM để click symbol switch chart
 />
             </div>
           </div>
@@ -1355,7 +1470,7 @@ useEffect(() => {
           {/* Mobile Header */}
           {isMobile && (
             <div
-              className="trading-form-mobile-header flex items-center justify-between p-fluid-3.5 bg-dark-700/80 backdrop-blur cursor-pointer border-b border-dark-600 hover:bg-dark-700 active:bg-dark-700/95 transition-colors"
+              className="trading-form-mobile-header flex items-center justify-between p-fluid-3 bg-dark-700/80 backdrop-blur cursor-pointer border-b border-dark-600 hover:bg-dark-700 active:bg-dark-700/95 transition-colors"
               onClick={() => setIsTradingFormOpen(!isTradingFormOpen)}
             >
               <div className="flex items-center gap-fluid-2.5">
@@ -1388,7 +1503,9 @@ useEffect(() => {
   binanceAccountId={selectedAccount?.id ?? null}  // ← Đổi từ selectedAccountId thành binanceAccountId
 />
           </div>
+          
         </div>
+      
       </div>
 
       {/* Timeframe Modal */}
@@ -1412,7 +1529,20 @@ useEffect(() => {
 
       
     )}
-    
+
+    {/* Risk Config Modal */}
+    {showRiskConfigModal && (
+      <RiskConfigViewModal
+        isOpen={showRiskConfigModal}
+        onClose={() => setShowRiskConfigModal(false)}
+        riskConfig={riskConfig}
+      />
+    )}
+      <TradingFooter 
+  connectionStatus={connectionStatus}
+  serverUrl="139.180.128.183"
+  version="1.0.0"
+/>
     </div>
      
    

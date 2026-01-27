@@ -137,7 +137,7 @@
   font-weight: 500;
 }
 
-/* ==================== COIN ICON ==================== */
+/* ==================== COIN ICON (Legacy - div) ==================== */
 .coin-icon {
   width: clamp(20px, 1.25vw, 32px);
   height: clamp(20px, 1.25vw, 32px);
@@ -162,6 +162,41 @@
 }
 
 .coin-icon.volume {
+  background: rgba(240, 185, 11, 0.15);
+  color: #f0b90b;
+}
+
+/* ==================== COIN ICON (New - img) ==================== */
+.coin-icon-img {
+  width: clamp(20px, 1.25vw, 32px);
+  height: clamp(20px, 1.25vw, 32px);
+  min-width: clamp(20px, 1.25vw, 32px);
+  border-radius: 50%;
+  object-fit: cover;
+  background: #2b3139;
+}
+
+.coin-icon-letter {
+  width: clamp(20px, 1.25vw, 32px);
+  height: clamp(20px, 1.25vw, 32px);
+  min-width: clamp(20px, 1.25vw, 32px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(7px, 0.417vw, 10px);
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(14, 203, 129, 0.15);
+  color: #0ecb81;
+}
+
+.coin-icon-letter.loser {
+  background: rgba(246, 70, 93, 0.15);
+  color: #f6465d;
+}
+
+.coin-icon-letter.volume {
   background: rgba(240, 185, 11, 0.15);
   color: #f0b90b;
 }
@@ -324,7 +359,9 @@
     max-height: 44px;
   }
 
-  .coin-icon {
+  .coin-icon,
+  .coin-icon-img,
+  .coin-icon-letter {
     width: 20px;
     height: 20px;
     min-width: 20px;
@@ -393,7 +430,9 @@
     gap: 10px;
   }
   
-  .coin-icon {
+  .coin-icon,
+  .coin-icon-img,
+  .coin-icon-letter {
     width: 28px;
     height: 28px;
     min-width: 28px;
@@ -433,7 +472,9 @@
     gap: 12px;
   }
   
-  .coin-icon {
+  .coin-icon,
+  .coin-icon-img,
+  .coin-icon-letter {
     width: 36px;
     height: 36px;
     min-width: 36px;

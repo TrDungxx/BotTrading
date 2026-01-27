@@ -1,4 +1,3 @@
-
 import { CandlestickData } from 'lightweight-charts';
 
 export interface ExtendedCandle extends CandlestickData {
@@ -35,7 +34,7 @@ export interface User {
   email: string;
   type: number;
   status?: number;
-  binanceAccountId?: number; // ✅ thêm dòng này
+  binanceAccountId?: number;
   internalAccountId: number;
 }
 
@@ -54,3 +53,77 @@ export type FloatingInfo = {
   price: number;
   positionAmt: number;
 };
+
+// ==================== PnL Types ====================
+
+export interface DailyPnLResponse {
+  binanceAccountId: number;
+  date: string;
+  dailyStartBalance: number;
+  currentBalance: number;
+  dailyPnl: number;
+  dailyPnlPercent: number;
+  isProfit: boolean;
+  peakBalance: number;
+  minBalance: number;
+  drawdown: number;
+  drawdownPercent: number;
+  snapshotCount: number;
+  lastUpdate: string;
+}
+
+export interface WeeklyPnLSummary {
+  binanceAccountId: number;
+  startDate: string;
+  endDate: string;
+  startBalance: number;
+  endBalance: number;
+  weeklyPnl: number;
+  weeklyPnlPercent: number;
+  totalDays: number;
+  profitDays: number;
+  lossDays: number;
+  avgDailyPnl: number;
+  bestDay: { date: string; pnl: number; pnlPercent: number };
+  worstDay: { date: string; pnl: number; pnlPercent: number };
+  maxDrawdown: number;
+  maxDrawdownPercent: number;
+  totalSnapshots: number;
+}
+
+export interface WeeklyPnLDaily {
+  date: string;
+  startBalance: number;
+  endBalance: number;
+  dailyPnl: number;
+  dailyPnlPercent: number;
+  peakBalance: number;
+  minBalance: number;
+  snapshotCount: number;
+}
+
+export interface WeeklyPnLResponse {
+  summary: WeeklyPnLSummary;
+  daily: WeeklyPnLDaily[];
+}
+
+export interface SymbolHistory {
+  symbol: string;
+  orderCount: number;
+  buyCount: number;
+  sellCount: number;
+  longCount: number;
+  shortCount: number;
+  firstTrade: string;
+  lastTrade: string;
+}
+
+export interface SymbolsHistoryResponse {
+  symbols: SymbolHistory[];
+  totalOrders: number;
+  uniqueSymbols: number;
+  dateRange: {
+    start: string | null;
+    end: string | null;
+  };
+}

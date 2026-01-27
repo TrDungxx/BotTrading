@@ -271,15 +271,15 @@ const ConfirmPlaceOrderModal: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60" 
+        className="absolute inset-0 bg-black/60 z-[90]" 
         onClick={handleClose} 
       />
       {/* modal */}
       <div
-        className="relative z-10 w-[420px] rounded-2xl bg-dark-800 border border-dark-600 p-fluid-16 shadow-xl"
+        className="relative z-[100] w-[420px] max-w-[90vw] rounded-2xl bg-dark-800 border border-dark-600 p-fluid-16 shadow-xl"
         role="dialog"
         aria-modal="true"
       >

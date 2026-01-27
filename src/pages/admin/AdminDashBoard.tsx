@@ -332,7 +332,7 @@ export default function AdminSystem() {
 
   return (
 
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-4">
       <div>
         <h1 className="text-2xl font-bold">Admin System</h1>
         <p className="text-dark-400">Manage users, permissions, and monitor system performance</p>

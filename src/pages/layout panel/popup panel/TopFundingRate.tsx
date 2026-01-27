@@ -1,6 +1,33 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import "../../../style/trading/top-funding-rate.css";
 
+// Binance Icons CDN
+const getBinanceIconUrl = (base: string) => {
+  return `https://cdn.jsdelivr.net/gh/vadimmalykhin/binance-icons/crypto/${base.toLowerCase()}.svg`;
+};
+
+// CoinIcon component with fallback
+const CoinIcon: React.FC<{ base: string; className?: string }> = ({ base, className = "" }) => {
+  const [showLetter, setShowLetter] = useState(false);
+
+  if (showLetter) {
+    return (
+      <div className={`funding-icon-letter ${className}`}>
+        {base.substring(0, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={getBinanceIconUrl(base)}
+      alt={base}
+      className={`funding-icon-img ${className}`}
+      onError={() => setShowLetter(true)}
+    />
+  );
+};
+
 interface FundingRateData {
   symbol: string;
   fundingRate: string;
@@ -188,10 +215,8 @@ const TopFundingRate: React.FC<TopFundingRateProps> = ({ onSymbolClick }) => {
               {/* 1. Rank */}
               <span className="funding-rank">{index + 1}</span>
 
-              {/* 2. Icon */}
-              <div className={`funding-icon ${iconClass}`}>
-                {displaySymbol.substring(0, 2)}
-              </div>
+              {/* 2. Icon - Using CoinIcon component */}
+              <CoinIcon base={displaySymbol} className={iconClass} />
 
               {/* 3. Symbol + Interval */}
               <div className="funding-info">

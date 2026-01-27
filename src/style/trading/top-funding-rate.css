@@ -90,7 +90,16 @@
 }
 
 /* ==================== FUNDING ICON ==================== */
-.funding-icon {
+.funding-icon-img {
+  width: clamp(20px, 1.25vw, 32px);
+  height: clamp(20px, 1.25vw, 32px);
+  min-width: clamp(20px, 1.25vw, 32px);
+  border-radius: 50%;
+  object-fit: cover;
+  background: #2b3139;
+}
+
+.funding-icon-letter {
   width: clamp(20px, 1.25vw, 32px);
   height: clamp(20px, 1.25vw, 32px);
   min-width: clamp(20px, 1.25vw, 32px);
@@ -101,14 +110,11 @@
   font-size: clamp(7px, 0.417vw, 10px);
   font-weight: 700;
   text-transform: uppercase;
-}
-
-.funding-icon.positive {
   background: rgba(14, 203, 129, 0.15);
   color: #0ecb81;
 }
 
-.funding-icon.negative {
+.funding-icon-letter.negative {
   background: rgba(246, 70, 93, 0.15);
   color: #f6465d;
 }

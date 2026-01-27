@@ -1,0 +1,258 @@
+/* ============================================
+   TRADING FOOTER - STICKY BOTTOM BAR
+   ============================================ */
+
+.trading-footer {
+  flex-shrink: 0;
+  width: 100%;
+  height: var(--footer-height, 20px);
+  min-height: 17px;
+  max-height: 24px;
+  background: linear-gradient(
+    180deg,
+    #1e293b 25%,
+    #0a0f1efa 75%
+  );
+  border-top: 1px solid rgba(51, 65, 85, 0.4);
+  z-index: var(--z-footer, 50);
+  font-size: clamp(6px, 0.52vw, 9px);
+}
+
+.trading-footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0 clamp(5px, 0.5vw, 10px);
+  gap: clamp(5px, 0.625vw, 12px);
+}
+
+/* Footer Sections */
+.footer-section {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 0.375vw, 8px);
+}
+
+.footer-left {
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.footer-center {
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.footer-right {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+/* Footer Items */
+.footer-item {
+  display: flex;
+  align-items: center;
+  gap: clamp(2px, 0.19vw, 4px);
+  white-space: nowrap;
+}
+
+.footer-item svg {
+  flex-shrink: 0;
+  width: clamp(8px, 0.5vw, 10px);
+  height: clamp(8px, 0.5vw, 10px);
+}
+
+.footer-label {
+  color: var(--text-muted, #64748b);
+  font-size: inherit;
+}
+
+.footer-value {
+  color: var(--text-secondary, #94a3b8);
+  font-size: inherit;
+  font-weight: 500;
+}
+
+/* Status Badge */
+.footer-status {
+  padding: clamp(1px, 0.125vw, 2px) clamp(4px, 0.31vw, 6px);
+  border-radius: clamp(2px, 0.16vw, 3px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Divider */
+.footer-divider {
+  width: 1px;
+  height: 9px;
+  background: rgba(71, 85, 105, 0.5);
+  margin: 0 clamp(2px, 0.25vw, 5px);
+}
+
+/* Binance Badge */
+.footer-binance {
+  padding: clamp(1px, 0.125vw, 2px) clamp(4px, 0.31vw, 6px);
+  background: rgba(240, 185, 11, 0.08);
+  border: 1px solid rgba(240, 185, 11, 0.2);
+  border-radius: clamp(2px, 0.16vw, 3px);
+}
+
+.footer-binance span:first-child {
+  font-size: 8px;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+/* Mobile (< 768px) */
+@media (max-width: 767px) {
+  .trading-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 20px;
+    z-index: 100;
+    background: rgba(10, 15, 30, 0.98);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .trading-footer-content {
+    padding: 0 6px;
+  }
+
+  /* Hide center section on mobile */
+  .footer-center {
+    display: none;
+  }
+
+  .footer-left,
+  .footer-right {
+    flex: 1;
+  }
+
+  /* Simplify items */
+  .footer-item .footer-label {
+    display: none;
+  }
+
+  .footer-status .footer-label {
+    display: inline;
+  }
+
+  .footer-binance {
+    display: none;
+  }
+
+  /* Adjust padding bottom của trading-terminal để không bị footer che */
+  /* Đã xử lý trong trading-layout.css */
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .trading-footer {
+    height: 18px;
+  }
+
+  .footer-center {
+    display: none;
+  }
+
+  .footer-binance .footer-label {
+    display: none;
+  }
+}
+
+/* Desktop Small (1024px - 1279px) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .trading-footer {
+    height: 20px;
+  }
+
+  /* Show center but condensed */
+  .footer-center .footer-label {
+    display: none;
+  }
+}
+
+/* Desktop Medium+ (1280px+) */
+@media (min-width: 1280px) {
+  .trading-footer {
+    height: 20px;
+  }
+}
+
+/* 2K+ (2400px+) */
+@media (min-width: 2400px) {
+  .trading-footer {
+    height: 22px;
+  }
+
+  .footer-item svg {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* 4K (3200px+) */
+@media (min-width: 3200px) {
+  .trading-footer {
+    height: 24px;
+  }
+
+  .footer-item svg {
+    width: 11px;
+    height: 11px;
+  }
+}
+
+/* ============================================
+   DARK MODE ENHANCEMENTS
+   ============================================ */
+
+.trading-footer:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 28, 50, 0.98) 0%,
+    rgba(15, 20, 35, 1) 100%
+  );
+}
+
+/* Hover effects on items */
+.footer-item:hover .footer-value {
+  color: var(--text-primary, #e2e8f0);
+}
+
+.footer-status:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.footer-binance:hover {
+  background: rgba(240, 185, 11, 0.12);
+  border-color: rgba(240, 185, 11, 0.3);
+}
+
+/* ============================================
+   ANIMATION FOR CONNECTING STATE
+   ============================================ */
+
+.footer-status.bg-yellow-500\/10 {
+  animation: connecting-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes connecting-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(234, 179, 8, 0);
+  }
+}

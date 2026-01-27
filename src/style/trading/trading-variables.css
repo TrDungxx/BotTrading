@@ -3,6 +3,8 @@
    Baseline: 1920px = 1x scale
    
    Range: 1280px (0.67x) → 3840px (2x)
+   
+   ✅ UPDATED: Font size giảm 35% cho màn hình lớn
    ============================================ */
 
 :root {
@@ -93,17 +95,20 @@
   --trading-gap-xl: clamp(16px, 1.042vw, 32px);
   
   /* ===== FLUID TYPOGRAPHY (Trading specific) ===== */
+  /* ✅ GIẢM 35% - max value giảm từ 36→23, 32→21, 28→18, 24→16 */
+  
   /* Price display - larger, prominent */
-  --price-font-xl: clamp(18px, 1.25vw, 36px);
-  --price-font-lg: clamp(16px, 1.042vw, 32px);
-  --price-font-md: clamp(14px, 0.833vw, 28px);
-  --price-font-sm: clamp(12px, 0.729vw, 24px);
+  --price-font-xl: clamp(18px, 0.813vw, 23px);   /* Was: 36px max */
+  --price-font-lg: clamp(16px, 0.677vw, 21px);   /* Was: 32px max */
+  --price-font-md: clamp(14px, 0.542vw, 18px);   /* Was: 28px max */
+  --price-font-sm: clamp(12px, 0.474vw, 16px);   /* Was: 24px max */
   
   /* Stats/labels - smaller */
-  --stats-font-lg: clamp(11px, 0.625vw, 18px);
-  --stats-font-md: clamp(10px, 0.573vw, 16px);
-  --stats-font-sm: clamp(9px, 0.521vw, 14px);
-  --stats-font-xs: clamp(8px, 0.469vw, 12px);
+  /* ✅ GIẢM 35% - max value giảm từ 18→12, 16→10, 14→9, 12→8 */
+  --stats-font-lg: clamp(11px, 0.406vw, 12px);   /* Was: 18px max */
+  --stats-font-md: clamp(10px, 0.373vw, 10px);   /* Was: 16px max */
+  --stats-font-sm: clamp(9px, 0.339vw, 9px);     /* Was: 14px max */
+  --stats-font-xs: clamp(8px, 0.305vw, 8px);     /* Was: 12px max */
   
   /* ===== FLUID BORDER RADIUS (Trading specific) ===== */
   --trading-radius-sm: clamp(2px, 0.156vw, 6px);
@@ -111,19 +116,22 @@
   --trading-radius-lg: clamp(6px, 0.365vw, 14px);
   
   /* ===== FLUID INPUT HEIGHTS ===== */
-  --input-height-sm: clamp(28px, 1.823vw, 44px);
-  --input-height-md: clamp(32px, 2.083vw, 52px);
-  --input-height-lg: clamp(40px, 2.604vw, 64px);
+  /* ✅ GIẢM 35% cho màn hình lớn */
+  --input-height-sm: clamp(28px, 1.185vw, 29px);  /* Was: 44px max */
+  --input-height-md: clamp(32px, 1.354vw, 34px);  /* Was: 52px max */
+  --input-height-lg: clamp(40px, 1.693vw, 42px);  /* Was: 64px max */
   
   /* ===== FLUID BUTTON HEIGHTS ===== */
-  --btn-height-sm: clamp(24px, 1.563vw, 40px);
-  --btn-height-md: clamp(32px, 2.083vw, 52px);
-  --btn-height-lg: clamp(40px, 2.604vw, 64px);
+  /* ✅ GIẢM 35% cho màn hình lớn */
+  --btn-height-sm: clamp(24px, 1.016vw, 26px);   /* Was: 40px max */
+  --btn-height-md: clamp(32px, 1.354vw, 34px);   /* Was: 52px max */
+  --btn-height-lg: clamp(40px, 1.693vw, 42px);   /* Was: 64px max */
   
   /* ===== ORDERBOOK SPECIFIC ===== */
-  --orderbook-row-height: clamp(18px, 1.146vw, 32px);
-  --orderbook-price-width: clamp(70px, 4.688vw, 120px);
-  --orderbook-size-width: clamp(60px, 3.906vw, 100px);
+  /* ✅ GIẢM 35% row height cho màn hình lớn */
+  --orderbook-row-height: clamp(18px, 0.745vw, 21px);  /* Was: 32px max */
+  --orderbook-price-width: clamp(70px, 3.047vw, 78px); /* Was: 120px max */
+  --orderbook-size-width: clamp(60px, 2.539vw, 65px);  /* Was: 100px max */
   
   /* ===== SCROLLBAR ===== */
   --scrollbar-width: clamp(4px, 0.313vw, 10px);
@@ -138,24 +146,73 @@
     --orderbook-row-height: 18px;
     --input-height-md: 32px;
     --btn-height-md: 32px;
+    
+    /* Font giữ nguyên cho HD */
+    --price-font-xl: 18px;
+    --price-font-lg: 16px;
+    --price-font-md: 14px;
+    --price-font-sm: 12px;
+    --stats-font-lg: 11px;
+    --stats-font-md: 10px;
+    --stats-font-sm: 9px;
+    --stats-font-xs: 8px;
   }
 }
 
-/* 2K (2560×1440) - Comfortable */
+/* 2K (2560×1440) - Comfortable but smaller */
 @media (min-width: 2400px) {
   :root {
-    --orderbook-row-height: 26px;
-    --input-height-md: 44px;
-    --btn-height-md: 44px;
+    --orderbook-row-height: 20px;  /* Was: 26px, giảm 23% */
+    --input-height-md: 36px;       /* Was: 44px, giảm 18% */
+    --btn-height-md: 36px;
+    
+    /* ✅ Font giảm 35% cho 2K */
+    --price-font-xl: 19px;   /* Was ~24px */
+    --price-font-lg: 17px;
+    --price-font-md: 15px;
+    --price-font-sm: 13px;
+    --stats-font-lg: 11px;   /* Was ~14px */
+    --stats-font-md: 10px;
+    --stats-font-sm: 9px;
+    --stats-font-xs: 8px;
   }
 }
 
-/* 4K (3840×2160) - Larger targets */
+/* 4K (3840×2160) - ✅ GIẢM 35% */
 @media (min-width: 3200px) {
   :root {
-    --orderbook-row-height: 32px;
-    --input-height-md: 52px;
-    --btn-height-md: 52px;
-    --scrollbar-width: 10px;
+    --orderbook-row-height: 21px;  /* Was: 32px, giảm 35% */
+    --input-height-md: 34px;       /* Was: 52px, giảm 35% */
+    --btn-height-md: 34px;
+    --scrollbar-width: 7px;        /* Was: 10px, giảm 30% */
+    
+    /* ✅ Font cố định nhỏ cho 4K */
+    --price-font-xl: 20px;   /* Was: 36px */
+    --price-font-lg: 18px;   /* Was: 32px */
+    --price-font-md: 16px;   /* Was: 28px */
+    --price-font-sm: 14px;   /* Was: 24px */
+    --stats-font-lg: 11px;   /* Was: 18px */
+    --stats-font-md: 10px;   /* Was: 16px */
+    --stats-font-sm: 9px;    /* Was: 14px */
+    --stats-font-xs: 8px;    /* Was: 12px */
+  }
+}
+
+/* 5K+ (3840px+) - ✅ GIẢM THÊM */
+@media (min-width: 3840px) {
+  :root {
+    --orderbook-row-height: 22px;
+    --input-height-md: 36px;
+    --btn-height-md: 36px;
+    
+    /* Font nhỏ hơn nữa cho 5K */
+    --price-font-xl: 21px;
+    --price-font-lg: 19px;
+    --price-font-md: 17px;
+    --price-font-sm: 15px;
+    --stats-font-lg: 12px;
+    --stats-font-md: 11px;
+    --stats-font-sm: 10px;
+    --stats-font-xs: 9px;
   }
 }

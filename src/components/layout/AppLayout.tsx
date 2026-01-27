@@ -3,6 +3,7 @@ import { Outlet, Navigate } from "react-router-dom";
 import Sidebar, { SIDEBAR_WIDTH } from "./Sidebar";
 import Header from "./Header";
 import { useAuth } from "../../context/AuthContext";
+
 import { cn } from "../../utils/cn";
 
 export default function AppLayout() {
@@ -41,13 +42,13 @@ export default function AppLayout() {
     const calculateMargin = () => {
       const width = window.innerWidth;
       
-      // Mobile (< 1024px): no margin, sidebar is overlay
-      if (width < 1024) {
+      // Mobile (< 768px): no margin, sidebar is hidden
+      if (width < 768) {
         setSidebarMargin(0);
         return;
       }
       
-      // Tablet/Small Desktop (1024px - 1279px): always collapsed (60px)
+      // ✅ FIX: Tablet (768px - 1279px): sidebar collapsed (60px)
       if (width < 1280) {
         setSidebarMargin(60);
         return;

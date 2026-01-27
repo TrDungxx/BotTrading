@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { binanceWS, OPEN_ORDERS_LS_KEY, OPEN_ORDERS_EVENT } from '../binancewebsocket/BinanceWebSocketService';
 import { Trash2, ChevronDown } from 'lucide-react';
 
@@ -7,6 +7,7 @@ type OrderTab = 'regular' | 'conditional';
 
 interface Order {
   orderId: number | string;
+  algoId?: number | string;
   symbol: string;
   side: 'BUY' | 'SELL';
   type:
@@ -28,42 +29,24 @@ interface Order {
   updateTime?: number;
   closePosition?: boolean;
   reduceOnly?: boolean;
+  positionSide?: 'LONG' | 'SHORT' | 'BOTH';
   _optimistic?: boolean;
-  _isAlgo?: boolean; // ✅ THÊM: Đánh dấu order từ algo API
-  
+  _isAlgo?: boolean;
 }
 
 interface OpenOrderProps {
   selectedSymbol: string;
   market: Market;
   onPendingCountChange?: (n: number) => void;
+  hideOtherSymbols?: boolean;
 }
 
 const dash = '—';
 
-// ---- helpers LS + event ----
+// ---- helpers ----
 function readOrdersLS(): Order[] {
   try { return JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]'); }
   catch { return []; }
-}
-function writeOrdersLS(list: Order[]) {
-  const realOrders = list.filter(o => !o._optimistic);
-  const optimisticOrders = list.filter(o => o._optimistic);
-  
-  const pendingOptimistic = optimisticOrders.filter(opt => {
-    const hasReal = realOrders.some(real =>
-      real.symbol === opt.symbol &&
-      real.side === opt.side &&
-      real.type === opt.type &&
-      Math.abs(Number(real.stopPrice) - Number(opt.stopPrice)) < 0.001
-    );
-    return !hasReal;
-  });
-  
-  const finalList = [...realOrders, ...pendingOptimistic];
-  
-  localStorage.setItem(OPEN_ORDERS_LS_KEY, JSON.stringify(finalList));
-  window.dispatchEvent(new CustomEvent(OPEN_ORDERS_EVENT, { detail: { list: finalList } }));
 }
 
 function toNumber(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -79,7 +62,7 @@ function mapWorkingType(w?: Order['workingType']): string {
   }
 }
 
-// ✅ THÊM: Helper để phân loại order
+// Helper để phân loại order
 const CONDITIONAL_TYPES = [
   'STOP_MARKET',
   'TAKE_PROFIT_MARKET',
@@ -89,7 +72,6 @@ const CONDITIONAL_TYPES = [
 ];
 
 const isConditionalOrder = (order: Order): boolean => {
-  // Chỉ dựa vào flag _isAlgo - KHÔNG fallback theo type
   return order._isAlgo === true;
 };
 
@@ -100,31 +82,46 @@ const isRegularOrder = (order: Order): boolean => {
 const isTriggerMarket = (t: Order['type']) => t === 'STOP_MARKET' || t === 'TAKE_PROFIT_MARKET';
 const isStopOrTpLimit = (t: Order['type']) => t === 'STOP' || t === 'TAKE_PROFIT';
 
-const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPendingCountChange }) => {
+const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPendingCountChange, hideOtherSymbols = false }) => {
   const [openOrders, setOpenOrders] = useState<Order[]>([]);
   const [showCancelMenu, setShowCancelMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<OrderTab>('regular'); // ✅ THÊM: Tab state
+  const [activeTab, setActiveTab] = useState<OrderTab>('regular');
 
-  // ✅ THÊM: Tính count cho mỗi tab
+  // Handler để đổi symbol khi click vào cặp tiền (giống Position)
+  const handleSymbolClick = (symbol: string) => {
+    window.dispatchEvent(
+      new CustomEvent("chart-symbol-change-request", {
+        detail: { symbol },
+      })
+    );
+    try {
+      localStorage.setItem("selectedSymbol", symbol);
+    } catch {}
+  };
+
+  // Tính count cho mỗi tab
   const regularOrders = openOrders.filter(isRegularOrder);
   const conditionalOrders = openOrders.filter(isConditionalOrder);
   
-  // Orders hiển thị theo tab đang chọn
-  const displayOrders = activeTab === 'regular' ? regularOrders : conditionalOrders;
+  // Filter theo symbol nếu hideOtherSymbols = true
+  const filterSymbol = localStorage.getItem('selectedSymbol') || selectedSymbol;
+  
+  const filteredRegularOrders = hideOtherSymbols && filterSymbol
+    ? regularOrders.filter(o => o.symbol === filterSymbol)
+    : regularOrders;
+    
+  const filteredConditionalOrders = hideOtherSymbols && filterSymbol
+    ? conditionalOrders.filter(o => o.symbol === filterSymbol)
+    : conditionalOrders;
+
+  // Orders hiển thị theo tab đang chọn (đã filter)
+  const displayOrders = activeTab === 'regular' ? filteredRegularOrders : filteredConditionalOrders;
 
   // ========== SUBSCRIBE REALTIME (event-bus + storage) ==========
+  // TradingTerminal đã load data, ở đây chỉ lắng nghe updates
   useEffect(() => {
-    const initAll = readOrdersLS();
-    const initFiltered = initAll.filter(o =>
-      o.status === 'NEW' &&
-      !o._optimistic &&
-      !String(o.orderId || '').startsWith('tmp_')
-    );
-    setOpenOrders(initFiltered);
-    onPendingCountChange?.(initFiltered.length);
-
-    const onBus = (e: any) => {
-      const list: Order[] = e?.detail?.list ?? readOrdersLS();
+    const loadOrders = () => {
+      const list = readOrdersLS();
       const filtered = list.filter(o =>
         o.status === 'NEW' &&
         !o._optimistic &&
@@ -134,125 +131,75 @@ const OpenOrder: React.FC<OpenOrderProps> = ({ selectedSymbol, market, onPending
       onPendingCountChange?.(filtered.length);
     };
 
+    // Load initial
+    loadOrders();
+
+    // Listen for updates from event bus
+    const onBus = (e: any) => {
+      loadOrders();
+    };
+
+    // Listen for storage changes (cross-tab)
     const onStorage = (ev: StorageEvent) => {
       if (ev.key === OPEN_ORDERS_LS_KEY) {
-        const list = readOrdersLS();
-        const filtered = list.filter(o =>
-          o.status === 'NEW' &&
-          !o._optimistic &&
-          !String(o.orderId || '').startsWith('tmp_')
-        );
-        setOpenOrders(filtered);
-        onPendingCountChange?.(filtered.length);
+        loadOrders();
       }
     };
 
     window.addEventListener(OPEN_ORDERS_EVENT, onBus as any);
     window.addEventListener('storage', onStorage);
+    
     return () => {
       window.removeEventListener(OPEN_ORDERS_EVENT, onBus as any);
       window.removeEventListener('storage', onStorage);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSymbol]);
-
-  // ========== WS callback (server push) ==========
-  useEffect(() => {
-    binanceWS.setOrderUpdateHandler((orders: any[]) => {
-      if (!Array.isArray(orders)) return;
-      writeOrdersLS(orders as Order[]);
-    });
-    return () => { binanceWS.setOrderUpdateHandler?.(null); };
-  }, []);
-
- // ========== Pull open orders khi market đổi ==========
-const debounceTimer = useRef<number | null>(null);
-useEffect(() => {
-  if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
-  debounceTimer.current = window.setTimeout(() => {
-    
-    // ✅ Lấy positions đang có vị thế
-    const positions = JSON.parse(localStorage.getItem('positions') || '[]');
-    const activeSymbols = positions
-      .filter((p: any) => Math.abs(parseFloat(p.positionAmt || 0)) > 0)
-      .map((p: any) => p.symbol);
-    
-    console.log('📊 Active positions symbols:', activeSymbols);
-    
-    if (activeSymbols.length === 0) {
-      // Không có vị thế → chỉ lấy regular orders cho symbol hiện tại
-      binanceWS.getOpenOrders(market, selectedSymbol, (orders: Order[]) => {
-        const regularWithFlag = orders.map(o => ({ ...o, _isAlgo: false }));
-        writeOrdersLS(regularWithFlag as Order[]);
-      });
-      return;
-    }
-    
-    // ✅ Gọi getAllOpenOrders cho từng symbol có vị thế
-    let allRegular: Order[] = [];
-    let allAlgo: Order[] = [];
-    let completed = 0;
-    
-    activeSymbols.forEach((symbol: string) => {
-      (binanceWS as any).getAllOpenOrders(symbol, market, (data: { regular: Order[]; algo: Order[] }) => {
-        console.log(`📥 ${symbol} - Regular: ${data.regular?.length || 0}, Algo: ${data.algo?.length || 0}`);
-        
-        allRegular = [...allRegular, ...(data.regular || []).map(o => ({ ...o, _isAlgo: false }))];
-        allAlgo = [...allAlgo, ...(data.algo || []).map(o => ({ ...o, _isAlgo: true }))];
-        
-        completed++;
-        
-        // Khi tất cả đã xong → merge và save
-        if (completed === activeSymbols.length) {
-          const merged = [...allRegular, ...allAlgo];
-          console.log('📥 Final merged - Regular:', allRegular.length, '| Algo:', allAlgo.length);
-          writeOrdersLS(merged as Order[]);
-        }
-      });
-    });
-
-  }, 250);
-
-  return () => {
-    if (debounceTimer.current) {
-      window.clearTimeout(debounceTimer.current);
-      debounceTimer.current = null;
-    }
-  };
-}, [market, selectedSymbol]);
+  }, [selectedSymbol, onPendingCountChange]);
 
   // ========== Cancel ==========
   const cancelOrder = (order: Order) => {
-  const orderId = order.orderId;
-
-  if (orderId == null || orderId === '' || orderId === 0) {
-    console.error('[OpenOrder] Cannot cancel: orderId is missing', order);
+  if (order._optimistic || String(order.orderId).startsWith('tmp_')) {
+    console.warn('[OpenOrder] Cannot cancel optimistic order');
     return;
   }
 
-  if (String(orderId).startsWith('tmp_')) {
-    console.warn('[OpenOrder] Cannot cancel optimistic order:', orderId);
+  // ✅ Chỉ là algo order khi:
+  // 1. Có _isAlgo flag = true
+  // 2. HOẶC có algoId riêng (khác orderId)
+  const isAlgoOrder = !!(
+    order._isAlgo === true || 
+    (order.algoId && order.algoId !== order.orderId)
+  );
+
+  if (isAlgoOrder) {
+    const algoId = order.algoId || order.orderId;
+    console.log('[OpenOrder] Canceling ALGO order:', {
+      symbol: order.symbol,
+      algoId: algoId,
+    });
+    
+    (binanceWS as any).sendAuthed({
+      action: 'cancelFuturesAlgoOrder',
+      symbol: order.symbol,
+      algoId: Number(algoId)
+    });
     return;
   }
 
-  const numericOrderId = Number(orderId);
+  // Regular order hoặc Conditional order (STOP_MARKET, TAKE_PROFIT_MARKET, etc.)
+  // Đều dùng cancelOrder thường
+  const numericOrderId = Number(order.orderId);
   if (!Number.isFinite(numericOrderId) || numericOrderId <= 0) {
-    console.error('[OpenOrder] Cannot cancel: invalid orderId', orderId);
+    console.error('[OpenOrder] Cannot cancel: invalid orderId', order.orderId);
     return;
   }
-
-  // ✅ Check nếu là algo order
-  const isAlgo = order._isAlgo === true || !!(order as any).algoId;
 
   console.log('[OpenOrder] Canceling order:', {
     symbol: order.symbol,
     orderId: numericOrderId,
-    market,
-    isAlgo,
+    type: order.type,
   });
 
-  // ✅ Gửi flag isAlgo để backend biết gọi đúng API
-  (binanceWS as any).cancelOrder(order.symbol, numericOrderId, market, isAlgo);
+  binanceWS.cancelOrder(order.symbol, numericOrderId, market, false);
 };
 
   const cancelFilteredOrders = (filterFn: (o: Order) => boolean) => {
@@ -260,9 +207,9 @@ useEffect(() => {
   };
 
   return (
-    <div className="card">
-      {/* ✅ THÊM: Tab Header */}
-      <div className="flex items-center gap-2 px-fluid-4 py-2 border-b border-dark-700">
+    <div className="open-orders h-full flex flex-col overflow-hidden">
+      {/* Tab Header */}
+      <div className="flex-shrink-0 flex items-center gap-2 px-fluid-4 py-2 border-b border-dark-700">
         <button
           type="button"
           onClick={() => setActiveTab('regular')}
@@ -272,7 +219,7 @@ useEffect(() => {
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          Cơ bản({regularOrders.length})
+          Cơ bản({filteredRegularOrders.length})
         </button>
         <button
           type="button"
@@ -283,15 +230,24 @@ useEffect(() => {
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          Có điều kiện({conditionalOrders.length})
+          Có điều kiện({filteredConditionalOrders.length})
           <span className="text-gray-500 text-xs">ⓘ</span>
         </button>
+        
+        {/* Indicator khi đang filter theo symbol */}
+        {hideOtherSymbols && filterSymbol && (
+          <span className="ml-auto text-xs text-yellow-500 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+            Đang lọc: {filterSymbol}
+          </span>
+        )}
       </div>
 
-      <div className="card-body overflow-x-auto">
+      {/* Table container */}
+      <div className="open-orders-table-container flex-1 min-h-0 overflow-x-auto overflow-y-auto">
         <table className="min-w-full text-left text-fluid-sm leading-[16px] font-sans">
           <thead>
-            <tr className="text-gray-400 border-b border-dark-700">
+            <tr className="text-gray-400 border-b border-dark-700" style={{ background: 'var(--bg-panel, #1e293b)' }}>
               <th className="px-fluid-4 py-2">Thời gian</th>
               <th className="px-fluid-4 py-2">Cặp</th>
               <th className="px-fluid-4 py-2">Loại</th>
@@ -374,7 +330,16 @@ useEffect(() => {
               return (
                 <tr className="border-b border-dark-700" key={String(order.orderId)}>
                   <td className="px-fluid-4 py-fluid-3 text-white">{timeStr}</td>
-                  <td className="px-fluid-4 py-fluid-3 text-white">{order.symbol}</td>
+                  <td className="px-fluid-4 py-fluid-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSymbolClick(order.symbol)}
+                      className="text-yellow-500 hover:text-yellow-400 hover:underline cursor-pointer font-medium"
+                      title={`Chuyển chart sang ${order.symbol}`}
+                    >
+                      {order.symbol}
+                    </button>
+                  </td>
                   <td className={`px-fluid-4 py-fluid-3 font-medium ${order.side === 'BUY' ? 'text-green-500' : 'text-red-500'}`}>
                     {order.side === 'BUY' ? 'Mua' : 'Bán'}
                   </td>

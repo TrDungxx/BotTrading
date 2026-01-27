@@ -1,10 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Edit, Trash2, Save, XCircle, AlertTriangle, CheckCircle, Building2 } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Save, XCircle, AlertTriangle, CheckCircle, Building2, Shield, Eye } from 'lucide-react';
 import { FormattedDate, FormattedTime } from 'react-intl';
-import { binanceAccountApi } from '../../utils/api';
+import { binanceAccountApi, riskConfigApi } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import RiskConfigModal from '../../components/tabposition/dropdownfilter/RiskConfigModal';
 
+// ==================== INTERFACES ====================
+interface TradingHours {
+  enabled: boolean;
+  timezone: string;
+  allowedHours: {
+    start: string;
+    end: string;
+  };
+  allowWeekends: boolean;
+}
+
+interface StopLossConfig {
+  enabled: boolean;
+  type: 'PERCENTAGE' | 'FIXED';
+  value: number;
+  orderType: 'STOP_MARKET' | 'STOP_LIMIT';
+}
+
+interface TakeProfitConfig {
+  enabled: boolean;
+  type: 'PERCENTAGE' | 'FIXED';
+  value: number;
+}
+
+interface RiskConfig {
+  id: number;
+  name: string;
+  description?: string;
+  maxOpenPositions: number;
+  maxPositionSizePercent: string;
+  existingPositionSize: string;
+  dailyLossLimit: string;
+  maxDrawdownPercent: string;
+  leverageLimit: number;
+  tradingHours: TradingHours;
+  stopLossConfig: StopLossConfig;
+  takeProfitConfig: TakeProfitConfig;
+  isActive: boolean;
+  isDefault: boolean;
+}
 
 interface BinanceAccount {
   id: number;
@@ -16,8 +56,10 @@ interface BinanceAccount {
   Description: string | null;
   create_time: string;
   update_time: string;
+  RiskId?: number; // ✅ Field từ backend là RiskId, không phải risk_id
+  riskConfigName?: string;
+  isCustomRisk?: boolean;
 }
-
 
 interface BinanceAccountForm {
   Status: number;
@@ -30,7 +72,12 @@ interface BinanceAccountForm {
   SecretKey: string;
 }
 
+// ==================== COMPONENT ====================
 export default function BinanceAccounts() {
+  const { user } = useAuth();
+  const canEditRisk = user?.role === 'admin' || user?.role === 'superadmin';
+  
+  // Account States
   const [accounts, setAccounts] = useState<BinanceAccount[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,7 +85,7 @@ export default function BinanceAccounts() {
   const [deletingAccount, setDeletingAccount] = useState<BinanceAccount | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10); // số dòng mỗi trang
+  const [limit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
@@ -46,17 +93,15 @@ export default function BinanceAccounts() {
   const [hasUserChangedSecretKey, setHasUserChangedSecretKey] = useState(false);
   const [selectedAccountStatus, setSelectedAccountStatus] = useState<'all' | 1 | 0>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const { user } = useAuth(); // lấy thông tin user hiện tại
-  const getAccounts = (params: { page: number; limit: number }) => {
-    if (user?.role === 'admin' || user?.role === 'superadmin') {
-      return binanceAccountApi.getListAccounts(params); // ✅ truyền đúng
-    } else {
-      return binanceAccountApi.getMyAccounts(params);
-    }
-  };
-  const handleAccountStatusCardClick = (status: 'all' | 1 | 0) => {
-    setSelectedAccountStatus(status);
-  };
+
+  // Risk Config States
+  const [availableRiskConfigs, setAvailableRiskConfigs] = useState<RiskConfig[]>([]);
+  const [selectedRiskConfigId, setSelectedRiskConfigId] = useState<number | null>(null);
+  const [loadingRiskConfigs, setLoadingRiskConfigs] = useState(false);
+
+  // Risk Config Modal States (để xem chi tiết)
+  const [showRiskConfigModal, setShowRiskConfigModal] = useState(false);
+  const [viewingRiskConfigAccount, setViewingRiskConfigAccount] = useState<BinanceAccount | null>(null);
 
   const [formData, setFormData] = useState<BinanceAccountForm>({
     Name: '',
@@ -69,27 +114,79 @@ export default function BinanceAccounts() {
     Description: ''
   });
 
+  // ==================== FETCH DATA ====================
+  useEffect(() => {
+    fetchAccounts();
+    fetchAvailableRiskConfigs();
+  }, []);
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
+  }, [page]);
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  const getAccounts = (params: { page: number; limit: number }) => {
+    if (user?.role === 'admin' || user?.role === 'superadmin') {
+      return binanceAccountApi.getListAccounts(params);
+    } else {
+      return binanceAccountApi.getMyAccounts(params);
+    }
+  };
 
   const fetchAccounts = async () => {
     setIsLoading(true);
     try {
-      const response = await getAccounts({ page, limit }); // ✅ truyền page + limit
-
-      console.log('🟢 Kết quả trả về:', response?.Data?.accounts);
-      console.log('📦 Pagination:', response?.Data?.pagination);
-
+      const response = await getAccounts({ page, limit });
       const raw = response?.Data?.accounts || [];
-      setAccounts(raw);
+      
+      console.log('📦 Raw accounts:', raw);
+      
+      // Fetch risk config names for each account
+      const accountsWithRiskInfo = await Promise.all(
+        raw.map(async (account: BinanceAccount) => {
+          if (account.RiskId) { // ✅ Đổi risk_id thành RiskId
+            try {
+              const riskResponse = await riskConfigApi.getRiskConfigById(account.RiskId);
+              console.log(`🔍 Risk response for account ${account.id}:`, riskResponse);
+              
+              // Parse response - có thể là Data.data hoặc Data hoặc data
+              let riskData = null;
+              if (riskResponse?.Data?.data) {
+                riskData = riskResponse.Data.data;
+              } else if (riskResponse?.Data) {
+                riskData = riskResponse.Data;
+              } else if (riskResponse?.data) {
+                riskData = riskResponse.data;
+              }
+              
+              console.log(`✅ Parsed risk data:`, riskData);
+              
+              return {
+                ...account,
+                riskConfigName: riskData?.name || `Risk #${account.RiskId}`,
+                isCustomRisk: riskData?.name?.toLowerCase().includes('custom') || false
+              };
+            } catch (error) {
+              console.error(`❌ Failed to fetch risk config for account ${account.id}:`, error);
+              return { ...account, riskConfigName: `Risk #${account.RiskId}` };
+            }
+          }
+          return { ...account, riskConfigName: 'No Risk Config' };
+        })
+      );
+
+      setAccounts(accountsWithRiskInfo);
 
       const pagination = response?.Data?.pagination;
       if (pagination?.totalPages) {
         setTotalPages(pagination.totalPages);
       } else {
-        // fallback nếu backend không trả
         setTotalPages(Math.ceil(raw.length / limit));
       }
     } catch (error) {
@@ -100,43 +197,83 @@ export default function BinanceAccounts() {
     }
   };
 
-  useEffect(() => {
-    fetchAccounts(); // page và limit đúng sẽ được truyền
-  }, [page]);
-
-
-
-
-
-  useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(null), 5000);
-      return () => clearTimeout(timer);
+  const fetchAvailableRiskConfigs = async () => {
+    setLoadingRiskConfigs(true);
+    try {
+      const response = await riskConfigApi.getAllRiskConfigs();
+      const data = response?.Data?.data || response?.Data || response?.data?.data || [];
+      const activeConfigs = Array.isArray(data) ? data.filter((c: RiskConfig) => c.isActive) : [];
+      setAvailableRiskConfigs(activeConfigs);
+    } catch (error) {
+      console.error('Failed to fetch risk configs:', error);
+    } finally {
+      setLoadingRiskConfigs(false);
     }
-  }, [message]);
+  };
 
-  const query = searchQuery.trim().toLowerCase();
+  // ==================== RISK CONFIG HANDLERS ====================
+  // (Không cần custom mode - chỉ dùng dropdown)
 
-  const filteredAccounts = accounts
-    .filter(account => {
-      if (selectedAccountStatus === 'all') return true;
-      return account.Status === selectedAccountStatus;
-    })
-    .filter(account =>
-      (account.Name ?? '').toLowerCase().includes(query) ||
-      (account.Email ?? '').toLowerCase().includes(query) ||
-      (account.BinanceId ?? '').toLowerCase().includes(query) ||
-      (account.Description ?? '').toLowerCase().includes(query)
-    );
+  // ==================== ACCOUNT HANDLERS ====================
+  const handleAccountStatusCardClick = (status: 'all' | 1 | 0) => {
+    setSelectedAccountStatus(status);
+  };
 
+  const resetForm = () => {
+    setFormData({
+      Name: '',
+      Email: '',
+      ApiKey: '',
+      SecretKey: '',
+      Status: 1,
+      internalAccountId: user?.internalAccountId || 1,
+      BinanceId: '',
+      Description: ''
+    });
+    setHasUserChangedApiKey(false);
+    setHasUserChangedSecretKey(false);
+    setSelectedRiskConfigId(null);
+  };
 
+  const handleEditAccount = (account: BinanceAccount) => {
+    setEditingAccount(account);
+    setFormData({
+      Name: account.Name,
+      Email: account.Email,
+      ApiKey: '********',
+      SecretKey: '********',
+      Status: account.Status,
+      internalAccountId: account.internalAccountId,
+      BinanceId: account.BinanceId || '',
+      Description: account.Description || ''
+    });
+    setSelectedRiskConfigId(account.RiskId || null); // ✅ Đổi risk_id thành RiskId
+    setHasUserChangedApiKey(false);
+    setHasUserChangedSecretKey(false);
+    setIsFormOpen(true);
+  };
 
+  const handleDeleteAccount = (account: BinanceAccount) => {
+    setDeletingAccount(account);
+  };
 
+  const confirmDelete = async () => {
+    if (!deletingAccount) return;
 
-
-
-
-
+    try {
+      if (user?.role === 'user') {
+        await binanceAccountApi.deleteMyAccount(deletingAccount.id);
+      } else {
+        await binanceAccountApi.deleteAccount(deletingAccount.id);
+      }
+      fetchAccounts();
+      setMessage({ type: 'success', text: 'Xóa tài khoản Binance thành công' });
+      setDeletingAccount(null);
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+      setMessage({ type: 'error', text: 'Lỗi khi xóa tài khoản Binance' });
+    }
+  };
 
   const handleCreateAccount = async () => {
     const payload = {
@@ -146,11 +283,10 @@ export default function BinanceAccounts() {
       SecretKey: formData.SecretKey?.trim(),
       Status: Number(formData.Status),
       internalAccountId: user?.internalAccountId || 0,
-
       BinanceId: formData.BinanceId?.trim() || undefined,
       Description: formData.Description?.toString().trim() || undefined,
+      RiskId: selectedRiskConfigId || undefined, // ✅ Đổi risk_id thành RiskId
     };
-
 
     if (!payload.Name || !payload.Email || !payload.ApiKey || !payload.SecretKey) {
       setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ các trường bắt buộc' });
@@ -158,9 +294,7 @@ export default function BinanceAccounts() {
     }
 
     try {
-      console.log('📤 Payload gửi đi:', payload);
-
-      if (user?.role === 'admin') {
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
         await binanceAccountApi.createAccount(payload);
       } else {
         await binanceAccountApi.createMyAccount(payload);
@@ -171,442 +305,344 @@ export default function BinanceAccounts() {
       setIsFormOpen(false);
       resetForm();
     } catch (error) {
-      console.error('❌ Submit failed:', error);
-      console.log('📥 Server message:', error?.response?.data);
-      console.error('❌ Lỗi khi tạo account:', error);
+      console.error('Failed to create account:', error);
       setMessage({ type: 'error', text: 'Tạo tài khoản Binance thất bại' });
     }
   };
-
-
-
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (editingAccount) {
-      setShowUpdateConfirm(true); // ✅ Hiện popup xác nhận
+      setShowUpdateConfirm(true);
     } else {
       handleCreateAccount();
     }
   };
 
-
   const handleUpdateAccount = async () => {
-  if (!editingAccount?.id) return;
-  setIsSaving(true);
-
-  try {
-    const payload: any = {
-      Name: formData.Name,
-      Email: formData.Email,
-      Status: Number(formData.Status),
-      internalAccountId: Number(formData.internalAccountId),
-      BinanceId: formData.BinanceId || null,
-      Description: formData.Description || null
-    };
-
-    // ✅ Gửi ApiKey/SecretKey chỉ khi user sửa
-    if (hasUserChangedApiKey && formData.ApiKey && formData.ApiKey !== '********') {
-  payload.ApiKey = formData.ApiKey.trim();
-}
-
-if (hasUserChangedSecretKey && formData.SecretKey && formData.SecretKey !== '********') {
-  payload.SecretKey = formData.SecretKey.trim();
-}
-
-    // ✅ Gửi API
-    if (user?.role === 'user') {
-      await binanceAccountApi.updateMyAccount(editingAccount.id, payload);
-    } else {
-      await binanceAccountApi.updateAccount(editingAccount.id, payload);
-    }
-setHasUserChangedApiKey(false);
-setHasUserChangedSecretKey(false);
-    setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
-    fetchAccounts();
-    setIsFormOpen(false);
-    setEditingAccount(null);
-    resetForm();
-  } catch (error: any) {
-    console.error('❌ Lỗi khi cập nhật account:', error);
-
-    if (error?.response?.status === 401) {
-      setMessage({ type: 'error', text: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' });
-      logout();
-      return;
-    }
-
-    setMessage({ type: 'error', text: 'Cập nhật tài khoản thất bại' });
-  } finally {
-    setIsSaving(false);
-  }
-};
-
-
-
-
-
-
-  const handleEdit = (account: BinanceAccount) => {
-    setEditingAccount(account);
-    setFormData({
-      Status: account.Status,
-      internalAccountId: account.internalAccountId,
-      Email: account.Email,
-      Name: account.Name,
-      BinanceId: account.BinanceId || '',
-      Description: account.Description || '',
-      ApiKey: '********',
-      SecretKey: '********'
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (account: BinanceAccount) => {
-    setDeletingAccount(account); // ✅ chỉ mở modal
-  };
-
-
-  const resetForm = () => {
-    setFormData({
-      Status: 1,
-      internalAccountId: user?.internalAccountId || 0,
-      Email: '',
-      Name: '',
-      BinanceId: '',
-      Description: '',
-      ApiKey: '',
-      SecretKey: ''
-    });
-  }
-
-  const getStatusBadgeColor = (status: number) => {
-    return status === 1
-      ? 'bg-success-500/10 text-success-500'
-      : 'bg-danger-500/10 text-danger-500';
-  };
-
-  const getStatusLabel = (status: number) => {
-    return status === 1 ? 'Active' : 'Inactive';
-  };
-  const confirmDelete = async () => {
-    if (!deletingAccount) return;
+    if (!editingAccount?.id) return;
+    setIsSaving(true);
 
     try {
-      await binanceAccountApi.deleteAccount(deletingAccount.id);
-      setMessage({ type: 'success', text: 'Binance account deleted successfully' });
-      await fetchAccounts(); // refresh lại danh sách
+      const payload: any = {
+        Name: formData.Name,
+        Email: formData.Email,
+        Status: Number(formData.Status),
+        internalAccountId: Number(formData.internalAccountId),
+        BinanceId: formData.BinanceId || null,
+        Description: formData.Description || null,
+        RiskId: selectedRiskConfigId || null, // ✅ Đổi risk_id thành RiskId
+      };
+
+      if (hasUserChangedApiKey && formData.ApiKey && formData.ApiKey !== '********') {
+        payload.ApiKey = formData.ApiKey.trim();
+      }
+
+      if (hasUserChangedSecretKey && formData.SecretKey && formData.SecretKey !== '********') {
+        payload.SecretKey = formData.SecretKey.trim();
+      }
+
+      console.log('🚀 Update Account Payload:', payload);
+      console.log('📌 Selected RiskConfigId:', selectedRiskConfigId);
+
+      if (user?.role === 'user') {
+        await binanceAccountApi.updateMyAccount(editingAccount.id, payload);
+      } else {
+        await binanceAccountApi.updateAccount(editingAccount.id, payload);
+      }
+
+      // Refresh accounts và đợi xong
+      await fetchAccounts();
+      
+      setMessage({ type: 'success', text: 'Cập nhật tài khoản Binance thành công' });
+      setIsFormOpen(false);
+      setEditingAccount(null);
+      resetForm();
     } catch (error) {
-      console.error('Failed to delete account:', error);
-      setMessage({ type: 'error', text: 'Failed to delete Binance account' });
+      console.error('Failed to update account:', error);
+      setMessage({ type: 'error', text: 'Cập nhật tài khoản Binance thất bại' });
     } finally {
-      setDeletingAccount(null); // đóng modal
+      setIsSaving(false);
     }
   };
 
+  // ==================== FILTERS ====================
+  const query = searchQuery.trim().toLowerCase();
+  const filteredAccounts = accounts
+    .filter(account => {
+      if (selectedAccountStatus === 'all') return true;
+      return account.Status === selectedAccountStatus;
+    })
+    .filter(account =>
+      (account.Name ?? '').toLowerCase().includes(query) ||
+      (account.Email ?? '').toLowerCase().includes(query) ||
+      (account.BinanceId ?? '').toLowerCase().includes(query) ||
+      (account.Description ?? '').toLowerCase().includes(query) ||
+      (account.riskConfigName ?? '').toLowerCase().includes(query)
+    );
 
+  const activeCount = accounts.filter(a => a.Status === 1).length;
+  const inactiveCount = accounts.filter(a => a.Status === 0).length;
 
-
-
-
-
+  // ==================== RENDER ====================
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Binance Accounts</h1>
-          <p className="text-dark-400">Manage Binance trading accounts and connections</p>
+          <h1 className="text-2xl font-bold text-gray-100">Binance Accounts</h1>
+          <p className="text-sm text-gray-400 mt-1">Manage Binance trading accounts and connections</p>
         </div>
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setEditingAccount(null);
-            resetForm();
-            setIsFormOpen(true);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Binance Account
-        </button>
+        {(user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'user') && (
+          <button
+            onClick={() => {
+              setEditingAccount(null);
+              resetForm();
+              setIsFormOpen(true);
+            }}
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Binance Account
+          </button>
+        )}
       </div>
 
-      {/* Global message */}
+      {/* Message Toast */}
       {message && (
-        <div className={`flex items-center gap-fluid-3 p-fluid-4 rounded-lg ${message.type === 'success'
-          ? 'bg-success-500/10 border border-success-500/20'
-          : 'bg-danger-500/10 border border-danger-500/20'
-          }`}>
-          {message.type === 'success' ? (
-            <CheckCircle className="h-5 w-5 text-success-500 flex-shrink-0" />
-          ) : (
-            <AlertTriangle className="h-5 w-5 text-danger-500 flex-shrink-0" />
-          )}
-          <p className={`text-fluid-sm ${message.type === 'success' ? 'text-success-500' : 'text-danger-500'}`}>
-            {message.text}
-          </p>
+        <div className={`p-4 rounded-lg ${
+          message.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'
+        }`}>
+          <div className="flex items-center gap-2">
+            {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+            <span>{message.text}</span>
+          </div>
         </div>
       )}
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 gap-fluid-4 sm:grid-cols-4">
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div
-          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 'all' ? 'ring-2 ring-primary-500' : ''
-            }`}
           onClick={() => handleAccountStatusCardClick('all')}
+          className={`card p-4 cursor-pointer transition-colors ${
+            selectedAccountStatus === 'all' ? 'border-primary-500 bg-primary-500/10' : 'hover:border-dark-400'
+          }`}
         >
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-primary-500/10">
-                <Building2 className="h-4 w-4 text-primary-500" />
-              </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-dark-400">Total Accounts</p>
+              <p className="text-2xl font-bold text-gray-100">{accounts.length}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-fluid-sm font-medium text-dark-400">Total Accounts</p>
-              <p className="text-lg font-semibold">{accounts.length}</p>
-            </div>
+            <Building2 className="w-8 h-8 text-primary-500" />
           </div>
         </div>
 
         <div
-          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 1 ? 'ring-2 ring-success-500' : ''
-            }`}
           onClick={() => handleAccountStatusCardClick(1)}
+          className={`card p-4 cursor-pointer transition-colors ${
+            selectedAccountStatus === 1 ? 'border-green-500 bg-green-500/10' : 'hover:border-dark-400'
+          }`}
         >
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-success-500/10">
-                <CheckCircle className="h-4 w-4 text-success-500" />
-              </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-dark-400">Active</p>
+              <p className="text-2xl font-bold text-green-400">{activeCount}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-fluid-sm font-medium text-dark-400">Active</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 1).length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-fluid-4">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-warning-300/10">
-                <Building2 className="h-4 w-4 text-warning-300" />
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-fluid-sm font-medium text-dark-400">Connected</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.BinanceId).length}</p>
-            </div>
+            <CheckCircle className="w-8 h-8 text-green-400" />
           </div>
         </div>
 
         <div
-          className={`card p-fluid-4 cursor-pointer transition ${selectedAccountStatus === 0 ? 'ring-2 ring-danger-500' : ''
-            }`}
           onClick={() => handleAccountStatusCardClick(0)}
+          className={`card p-4 cursor-pointer transition-colors ${
+            selectedAccountStatus === 0 ? 'border-red-500 bg-red-500/10' : 'hover:border-dark-400'
+          }`}
         >
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex h-fluid-input-sm w-8 items-center justify-center rounded-fluid-md bg-danger-500/10">
-                <XCircle className="h-4 w-4 text-danger-500" />
-              </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-dark-400">Inactive</p>
+              <p className="text-2xl font-bold text-red-400">{inactiveCount}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-fluid-sm font-medium text-dark-400">Inactive</p>
-              <p className="text-lg font-semibold">{accounts.filter(a => a.Status === 0).length}</p>
-            </div>
+            <XCircle className="w-8 h-8 text-red-400" />
           </div>
         </div>
       </div>
 
-      {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row gap-fluid-4">
+      {/* Search Bar */}
+      <div className="flex items-center gap-4">
         <div className="relative flex-1">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-            <Search className="h-4 w-4 text-dark-400" />
-          </div>
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-dark-400" />
           <input
             type="text"
-            className="form-input pl-10"
-            placeholder="Search accounts..."
+            placeholder="Search by name, email, Binance ID, or risk config..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-600 rounded-lg text-gray-100 placeholder-dark-400 focus:outline-none focus:border-primary-500"
           />
-        </div>
-        <div className="flex">
-          <button className="btn btn-outline inline-flex items-center">
-            <Filter className="mr-2 h-4 w-4" />
-            Filter
-          </button>
         </div>
       </div>
 
-      {/* Accounts table */}
+      {/* Accounts Table */}
       <div className="card overflow-hidden">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-fluid-12">
-            <div className="w-8 h-fluid-input-sm border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-dark-700">
-              <thead>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-dark-700">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Account Info</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Binance ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Risk Config</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Created</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-300 uppercase tracking-wider">Last Updated</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-dark-300 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-700">
+              {isLoading ? (
                 <tr>
-                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">ID</th>
-                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Account Info</th>
-                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Binance ID</th>
-                  <th className="px-6 py-fluid-3 text-center text-xs font-medium text-dark-400">Status</th>
-                  <th className="px-6 py-fluid-3 text-left text-xs font-medium text-dark-400">Description</th>
-                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Created</th>
-                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Last Updated</th>
-                  <th className="px-6 py-fluid-3 text-right text-xs font-medium text-dark-400">Actions</th>
+                  <td colSpan={8} className="px-4 py-8 text-center text-dark-400">
+                    Loading accounts...
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-700">
-                {filteredAccounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-dark-700/40">
-                    <td className="px-6 py-fluid-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="h-fluid-input w-10 flex-shrink-0 rounded-full bg-primary-500/10 flex items-center justify-center">
-                          <Building2 className="h-5 w-5 text-primary-500" />
-                        </div>
-                        <div className="ml-3">
-                          <div className="text-fluid-sm font-medium">#{account.id}</div>
-                          <div className="text-xs text-dark-400">Internal: {account.internalAccountId}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap">
+              ) : filteredAccounts.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-dark-400">
+                    No accounts found
+                  </td>
+                </tr>
+              ) : (
+                filteredAccounts.map((account) => (
+                  <tr key={account.id} className="hover:bg-dark-700/50 transition-colors">
+                    <td className="px-4 py-3 text-sm text-gray-100">#{account.internalAccountId}</td>
+                    <td className="px-4 py-3">
                       <div>
-                        <div className="text-fluid-sm font-medium">{account.Name}</div>
-                        <div className="text-xs text-dark-400">{account.Email}</div>
+                        <p className="text-sm font-medium text-gray-100">{account.Name}</p>
+                        <p className="text-xs text-dark-400">{account.Email}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap">
+                    <td className="px-4 py-3">
                       {account.BinanceId ? (
-                        <span className="inline-flex items-center rounded-full bg-warning-300/10 px-2.5 py-0.5 text-xs font-medium text-warning-300">
-                          {account.BinanceId}
-                        </span>
+                        <span className="text-sm text-yellow-400 font-mono">{account.BinanceId}</span>
                       ) : (
                         <span className="text-xs text-dark-500">Not connected</span>
                       )}
                     </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap text-center">
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(account.Status)}`}>
-                        {account.Status === 1 ? (
-                          <CheckCircle className="mr-1 h-3 w-3" />
-                        ) : (
-                          <XCircle className="mr-1 h-3 w-3" />
-                        )}
-                        {getStatusLabel(account.Status)}
+                    <td className="px-4 py-3">
+                      {account.riskConfigName && account.riskConfigName !== 'No Risk Config' ? (
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-yellow-400" />
+                          <span className="text-sm text-gray-100">{account.riskConfigName}</span>
+                          {account.isCustomRisk && (
+                            <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">Custom</span>
+                          )}
+                          {/* View Button */}
+                          <button
+                            onClick={() => {
+                              setViewingRiskConfigAccount(account);
+                              setShowRiskConfigModal(true);
+                            }}
+                            className="p-1 hover:bg-yellow-500/20 rounded transition-colors text-yellow-400 hover:text-yellow-300"
+                            title="View Risk Config Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-dark-500">No Risk Config</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        account.Status === 1
+                          ? 'bg-green-500/10 text-green-400'
+                          : 'bg-red-500/10 text-red-400'
+                      }`}>
+                        {account.Status === 1 ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-fluid-4">
-                      <div className="text-fluid-sm text-dark-300 max-w-xs truncate">
-                        {account.Description || '-'}
-                      </div>
+                    <td className="px-4 py-3 text-sm text-dark-400">
+                      <FormattedDate value={new Date(account.create_time)} />
                     </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
-                      <div>
-                        <FormattedDate
-                          value={account.create_time}
-                          day="2-digit"
-                          month="2-digit"
-                          year="numeric"
-                        />
-                      </div>
-                      <div className="text-xs">
-                        <FormattedTime
-                          value={account.create_time}
-                          hour="2-digit"
-                          minute="2-digit"
-                        />
-                      </div>
+                    <td className="px-4 py-3 text-sm text-dark-400">
+                      <FormattedDate value={new Date(account.update_time)} />
                     </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm text-dark-400">
-                      <div>
-                        <FormattedDate
-                          value={account.update_time}
-                          day="2-digit"
-                          month="2-digit"
-                          year="numeric"
-                        />
-                      </div>
-                      <div className="text-xs">
-                        <FormattedTime
-                          value={account.update_time}
-                          hour="2-digit"
-                          minute="2-digit"
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-fluid-4 whitespace-nowrap text-right text-fluid-sm">
-                      <div className="flex justify-end gap-fluid-2">
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          className="text-dark-400 hover:text-primary-500"
-                          onClick={() => handleEdit(account)}
-                          title="Edit Account"
+                          onClick={() => handleEditAccount(account)}
+                          className="p-2 hover:bg-dark-600 rounded-lg transition-colors text-primary-400 hover:text-primary-300"
+                          title="Edit"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="w-4 h-4" />
                         </button>
-                        <button
-                          className="text-dark-400 hover:text-danger-500"
-                          onClick={() => handleDelete(account)}
-                          title="Delete Account"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {(user?.role === 'admin' || user?.role === 'superadmin') && (
+                          <button
+                            onClick={() => handleDeleteAccount(account)}
+                            className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-red-400"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700">
+            <p className="text-sm text-dark-400">
+              Showing page {page} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 bg-dark-700 hover:bg-dark-600 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const pageNum = i + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      page === pageNum
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-dark-700 hover:bg-dark-600'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1 bg-dark-700 hover:bg-dark-600 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
-      {!isLoading && accounts.length > 0 && (
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-fluid-sm text-dark-400">
-            Showing page {page} of {totalPages}
-          </div>
-          <div className="flex gap-fluid-2">
-            <button
-              onClick={() => setPage(page - 1)}
-              disabled={page === 1}
-              className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
 
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => setPage(i + 1)}
-                className={`px-fluid-3 py-2 text-fluid-sm rounded-fluid-md ${i + 1 === page
-                  ? 'bg-primary-500 text-white'
-                  : 'text-dark-400 hover:text-dark-200 hover:bg-dark-700'
-                  }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-
-            <button
-              onClick={() => setPage(page + 1)}
-              disabled={page === totalPages}
-              className="btn btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Form Modal */}
+      {/* CREATE/EDIT MODAL - PART 1 */}
       {isFormOpen && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
-          <div className="card w-full max-w-2xl">
-            <div className="card-header flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-800 border border-dark-600 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-dark-600">
               <h2 className="text-lg font-medium">
                 {editingAccount ? 'Edit Binance Account' : 'Add New Binance Account'}
               </h2>
@@ -621,8 +657,11 @@ setHasUserChangedSecretKey(false);
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-fluid-4">
+
+            {/* Modal Body */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* Basic Account Info */}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="name" className="form-label">Account Name *</label>
                   <input
@@ -649,7 +688,8 @@ setHasUserChangedSecretKey(false);
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-fluid-4">
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="apiKey" className="form-label">API Key *</label>
                   <input
@@ -659,9 +699,9 @@ setHasUserChangedSecretKey(false);
                     value={formData.ApiKey}
                     onChange={(e) => {
                       setFormData({ ...formData, ApiKey: e.target.value });
-                      setHasUserChangedApiKey(true); // ✅ đánh dấu user đã sửa
+                      setHasUserChangedApiKey(true);
                     }}
-                    placeholder="Nhập Binance API Key"
+                    placeholder="Enter Binance API Key"
                   />
                 </div>
 
@@ -674,14 +714,14 @@ setHasUserChangedSecretKey(false);
                     value={formData.SecretKey}
                     onChange={(e) => {
                       setFormData({ ...formData, SecretKey: e.target.value });
-                      setHasUserChangedSecretKey(true); // ✅ đánh dấu user đã sửa
+                      setHasUserChangedSecretKey(true);
                     }}
-                    placeholder="Nhập Binance Secret Key"
+                    placeholder="Enter Binance Secret Key"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-fluid-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="internalAccountId" className="form-label">Internal Account ID</label>
                   <input
@@ -707,21 +747,6 @@ setHasUserChangedSecretKey(false);
                 </div>
               </div>
 
-              {/*  <div>
-                <label htmlFor="binanceId" className="form-label">Binance ID</label>
-                <input
-                  type="text"
-                  id="binanceId"
-                  className="form-input"
-                  value={formData.BinanceId}
-                  onChange={(e) => setFormData({ ...formData, BinanceId: e.target.value })}
-                  placeholder="BINANCE_123456 (optional)"
-                />
-                <p className="mt-1 text-xs text-dark-400">
-                  Leave empty if not connected to Binance yet
-                </p>
-              </div>*/}
-
               <div>
                 <label htmlFor="description" className="form-label">Description</label>
                 <textarea
@@ -734,19 +759,52 @@ setHasUserChangedSecretKey(false);
                 />
               </div>
 
-              <div className="flex justify-end gap-fluid-2 pt-4">
+              {/* RISK CONFIGURATION SECTION - Chỉ hiển thị cho Admin/SuperAdmin */}
+              {canEditRisk && (
+                <div className="bg-dark-700 rounded-xl p-5 border border-dark-600">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Shield className="w-5 h-5 text-yellow-400" />
+                    <h3 className="text-lg font-semibold text-gray-100">Risk Configuration</h3>
+                  </div>
+
+                  {/* Dropdown chọn Risk Config */}
+                  <div>
+                    <label className="form-label">Select Risk Config</label>
+                    <select
+                      className="form-select"
+                      value={selectedRiskConfigId || ''}
+                      onChange={(e) => setSelectedRiskConfigId(e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">No Risk Config</option>
+                      {loadingRiskConfigs ? (
+                        <option disabled>Loading...</option>
+                      ) : (
+                        availableRiskConfigs.map(config => (
+                          <option key={config.id} value={config.id}>
+                            {config.name} {config.isDefault ? '(Default)' : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    {selectedRiskConfigId && (
+                      <p className="text-xs text-dark-400 mt-2">
+                        Selected risk config will be applied to this account.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Form Actions */}
+              <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
                   className="btn btn-outline"
                   onClick={() => {
+                    setIsFormOpen(false);
                     setEditingAccount(null);
-                    setFormData((prev) => ({
-                      ...prev,
-                      internalAccountId: user?.internalAccountId || 0
-                    }));
-                    setIsFormOpen(true);
+                    resetForm();
                   }}
-
                 >
                   Cancel
                 </button>
@@ -768,55 +826,57 @@ setHasUserChangedSecretKey(false);
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* DELETE CONFIRMATION MODAL */}
       {deletingAccount && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-dark-800 rounded-lg shadow-lg w-full max-w-md p-6">
+          <div className="bg-dark-800 rounded-lg shadow-lg w-full max-w-md p-6 border border-dark-600">
             <div className="text-center">
-              <AlertTriangle className="w-10 h-fluid-input text-danger-500 mx-auto mb-4" />
+              <AlertTriangle className="w-10 h-10 text-red-500 mx-auto mb-4" />
               <h2 className="text-lg font-semibold mb-2">Delete Binance Account</h2>
               <p className="text-dark-400 mb-6">
-                Are you sure you want to delete <strong>{deletingAccount.Name}</strong>? This action cannot be undone.
+                Are you sure you want to delete <strong className="text-white">{deletingAccount.Name}</strong>? This action cannot be undone.
               </p>
             </div>
 
-            <div className="flex justify-center gap-fluid-4">
+            <div className="flex justify-center gap-4">
               <button className="btn btn-outline" onClick={() => setDeletingAccount(null)}>
                 Cancel
               </button>
-              <button className="btn bg-danger-500 hover:bg-danger-600 text-white" onClick={confirmDelete}>
+              <button className="btn bg-red-500 hover:bg-red-600 text-white" onClick={confirmDelete}>
                 Confirm Delete
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* UPDATE CONFIRMATION MODAL */}
       {showUpdateConfirm && (
-        <div className="fixed inset-0 bg-dark-900/80 flex items-center justify-center p-fluid-4 z-50">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="card w-full max-w-md">
             <div className="p-6">
-              <div className="flex items-center justify-center w-12 h-fluid-input-lg rounded-full bg-warning-500/10 mx-auto mb-4">
-                <AlertTriangle className="h-6 w-6 text-warning-500" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500/10 mx-auto mb-4">
+                <AlertTriangle className="h-6 w-6 text-yellow-500" />
               </div>
-              <h3 className="text-lg font-medium text-center text-danger-600 mb-2">Xác nhận cập nhật Binance</h3>
+              <h3 className="text-lg font-medium text-center text-white mb-2">Confirm Update</h3>
               <p className="text-dark-400 text-center mb-6">
-                Bạn có chắc chắn muốn <span className="text-warning-300 font-semibold">cập nhật</span> Binance?
+                Are you sure you want to <span className="text-yellow-300 font-semibold">update</span> this Binance account?
               </p>
               <div className="flex justify-center space-x-3">
                 <button
                   className="btn btn-outline"
                   onClick={() => setShowUpdateConfirm(false)}
                 >
-                  Hủy
+                  Cancel
                 </button>
                 <button
-                  className="btn bg-primary-500 hover:bg-danger-900 text-white"
+                  className="btn bg-primary-500 hover:bg-primary-600 text-white"
                   onClick={() => {
-                    setShowUpdateConfirm(false); // đóng modal
-                    handleUpdateAccount();        // ✅ chỉ gọi sau xác nhận
+                    setShowUpdateConfirm(false);
+                    handleUpdateAccount();
                   }}
                 >
-                  Xác nhận cập nhật
+                  Confirm Update
                 </button>
               </div>
             </div>
@@ -824,9 +884,20 @@ setHasUserChangedSecretKey(false);
         </div>
       )}
 
-
-
-
+      {/* RISK CONFIG MODAL */}
+      {showRiskConfigModal && viewingRiskConfigAccount && (
+        <RiskConfigModal
+          isOpen={showRiskConfigModal}
+          onClose={() => {
+            setShowRiskConfigModal(false);
+            setViewingRiskConfigAccount(null);
+          }}
+          accountId={viewingRiskConfigAccount.id}
+          accountName={viewingRiskConfigAccount.Name}
+          accountEmail={viewingRiskConfigAccount.Email}
+          riskConfigId={viewingRiskConfigAccount.RiskId} // ✅ Đổi risk_id thành RiskId
+        />
+      )}
     </div>
   );
 }

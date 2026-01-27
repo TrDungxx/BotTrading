@@ -87,7 +87,7 @@ export default function MonitoringSystem() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Monitoring System</h1>
         <button onClick={loadMonitoringData} className="btn btn-outline">

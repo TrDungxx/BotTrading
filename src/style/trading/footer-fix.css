@@ -1,0 +1,31 @@
+/* ============================================
+   FOOTER FIX - POSITION FIXED
+   Copy nội dung này vào cuối trading-layout.css
+   hoặc import riêng SAU tất cả CSS khác
+   ============================================ */
+
+/* Footer fixed ở bottom màn hình */
+.trading-footer {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 20px !important;
+  z-index: 100 !important;
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.98) 0%,
+    rgba(10, 15, 30, 1) 100%
+  ) !important;
+  border-top: 1px solid rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Thêm padding-bottom cho positions panel để không bị footer che */
+.positions-panel {
+  padding-bottom: 24px !important; /* footer height + 4px buffer */
+}
+
+/* Hoặc nếu bạn có sidebar, cần left offset */
+/* .trading-footer {
+  left: var(--sidebar-width, 60px) !important;
+} */

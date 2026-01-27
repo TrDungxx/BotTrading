@@ -14,6 +14,7 @@ import {
   Building2,
   Atom,
   Cpu,
+  ShieldAlert,
   ChevronLeft,
   ChevronRight,
   Menu,
@@ -21,7 +22,7 @@ import {
 import { cn } from '../../utils/cn';
 import { FormattedMessage } from 'react-intl';
 import { useAuth } from '../../context/AuthContext';
-
+import "../../style/trading/sidebar.css"
 interface SidebarProps {
   open: boolean;
   setOpen: (open: boolean) => void;
@@ -47,6 +48,7 @@ const adminNavigation = [
   { name: "Terminal Indicator", href: '/admin/terminalindicator', icon: Atom },
   { name: "Monitoring", href: '/admin/monitoring', icon: Activity },
   { name: "System Stats", href: '/admin/system', icon: Cpu },
+  { name: "Risk Config", href: '/admin/risk-config', icon: ShieldAlert },
 ];
 
 // Export để các component khác có thể dùng

@@ -40,7 +40,14 @@ type OrderAction = "open" | "close";
 type TpSlMode = "price" | "pnl" | "roi";
 
 // ===== Helpers =====
-const roundStep = (v: number, step: number) => Math.floor(v / step) * step;
+const roundStep = (v: number, step: number) => {
+  if (step <= 0) return v;
+  const decimals = step.toString().includes('.') 
+    ? step.toString().split('.')[1].length 
+    : 0;
+  const result = Math.floor(v / step) * step;
+  return Number(result.toFixed(decimals));
+};
 const roundTick = (v: number, tick: number) => Math.round(v / tick) * tick;
 const decimalsFromTick = (tick: number) => {
   if (!Number.isFinite(tick)) return 2;
@@ -125,6 +132,20 @@ const roundStepUp = (v: number, step: number) =>
   Math.ceil((v + 1e-12) / step) * step;
 
 const qtyDecimals = (step: number) => decimalsFromTick(step);
+
+// ===== Smart Rounding Helper =====
+// Làm tròn lên nếu qty >= 10, giữ nguyên nếu < 10
+const smartRoundQty = (qty: number, stepSize: number): number => {
+  if (qty >= 10) {
+    // Làm tròn lên
+    return Math.ceil(qty);
+  }
+  // Dưới 10 thì giữ nguyên (chỉ round theo stepSize)
+  if (stepSize > 0) {
+    return Math.floor(qty / stepSize) * stepSize;
+  }
+  return qty;
+};
 
 const clampQtyToMax = ({
   qty,
@@ -659,7 +680,9 @@ const [totalUnrealizedProfit, setTotalUnrealizedProfit] = useState<number>(0);
     
     // ✅ Long: Tính qty cơ bản
     const rawQty = notional / priceNum;
-    return Math.floor(rawQty / stepSize) * stepSize;
+    const flooredQty = Math.floor(rawQty / stepSize) * stepSize;
+    // ✅ Áp dụng smart rounding: làm tròn lên nếu >= 10
+    return smartRoundQty(flooredQty, stepSize);
   }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize,selectedSymbol]);
 
   const sellQty = useMemo(() => {
@@ -679,7 +702,9 @@ const [totalUnrealizedProfit, setTotalUnrealizedProfit] = useState<number>(0);
     const adjustedNotional = notional * shortFactor;
     
     const rawQty = adjustedNotional / priceNum;
-    return Math.floor(rawQty / stepSize) * stepSize;
+    const flooredQty = Math.floor(rawQty / stepSize) * stepSize;
+    // ✅ Áp dụng smart rounding: làm tròn lên nếu >= 10
+    return smartRoundQty(flooredQty, stepSize);
   }, [percent, priceNum, internalBalance, leverage, selectedMarket, stepSize,selectedSymbol]);
 
   // ✅ FIX: Dùng buyQty cho estimate (Long side là default)
@@ -947,10 +972,10 @@ useEffect(() => {
   }, [selectedSymbol]);
 
   useEffect(() => {
-    // ✅ Chỉ xử lý khi user KÉO SLIDER (percent > 0)
+    // ✅ Khi slider = 0%, clear amount nếu đang dùng slider
     if (percent === 0) {
       setSliderQty(0);
-      return; // ✅ KHÔNG clear amount
+      return;
     }
 
     if (price <= 0) return;
@@ -972,8 +997,18 @@ useEffect(() => {
       step: stepSize,
     });
 
-    // ✅ CHỈ set sliderQty, KHÔNG set amount
+    // ✅ Áp dụng smart rounding
+    qty = smartRoundQty(qty, stepSize);
+
     setSliderQty(qty);
+    
+    // ✅ SET AMOUNT TRỰC TIẾP khi kéo slider
+    if (qty > 0) {
+      const formatted = stepSize >= 1 
+        ? String(Math.round(qty)) 
+        : qty.toFixed(qtyDecimals(stepSize));
+      setAmount(formatted);
+    }
   }, [percent, price, internalBalance, selectedMarket, leverage, stepSize]);
 
   const handleChangeMode = (newMode: boolean) => {
@@ -1495,19 +1530,20 @@ reduceOnly: true,
           ))}
         </div>
 
-        <div className="pl-12 text-fluid-sm space-y-0.5">
-       {/*   <div className="text-dark-400">
+        <div className="pl-12 text-fluid-xs space-y-0.5">
+         <div className="text-dark-400">
     Tổng số dư ví:{" "}
-    <span className="text-dark-300 font-medium">
+    <span className="text-white font-medium">
       {Number(totalWalletBalance).toFixed(2)} USDT
     </span>
-  </div>*/}
+  </div>
+  {/*
   <div className="text-dark-400">
     Số dư khả dụng:{" "}
     <span className="text-white font-medium">
       {Number(internalBalance).toFixed(2)} USDT
     </span>
-  </div>
+  </div>*/}
   
 </div>
 
@@ -1559,7 +1595,7 @@ reduceOnly: true,
           <div className="relative">
             <input
               type="text"
-              className="form-input w-full pl-16 pr-20"
+              className="form-input w-full pr-20"
               value={amount}
               onChange={(e) => {
                 const value = e.target.value.replace(/[^\d.]/g, "");
@@ -1570,14 +1606,8 @@ reduceOnly: true,
                     : value;
                 handleAmountChange(filtered);
               }}
+              placeholder="0"
             />
-
-            {/* Badge % - Trái */}
-            {percent > 0 && (
-              <div className="absolute left-2 top-1/2 -translate-y-1/2 px-2.5 py-0.5 text-dark-300 text-fluid-sm font-medium">
-                {percent}%
-              </div>
-            )}
 
             {/* Unit button - Phải */}
             <button

@@ -1,106 +1,104 @@
 /* ============================================
-   TRADING POSITIONS - FLUID RESPONSIVE
-   With internal scroll support
+   TRADING POSITIONS - SCROLL FIX VERSION
+   ✅ UPDATED: Fix font cho portrait, giảm 35%
    ============================================ */
 
+/* ===== CRITICAL: Position Function Wrapper ===== */
+.position-function-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+.position-function-content {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ===== TRADING POSITIONS CONTAINER ===== */
 .trading-positions {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
+  flex-direction: column !important;
   width: 100%;
+  height: 100% !important;
+  max-height: 100% !important;
   background: var(--bg-panel, #1e293b);
-  overflow: hidden;
+  overflow: hidden !important;
 }
 
-/* ===== POSITIONS HEADER ===== */
-.trading-positions-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--trading-gap-sm) var(--trading-gap-lg);
-  border-bottom: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-  min-height: clamp(36px, 2.292vw, 56px);
-}
-
-.trading-positions-title {
-  font-size: var(--stats-font-lg);
-  font-weight: 600;
-  color: rgba(226, 232, 240, 0.95);
-}
-
-.trading-positions-count {
-  font-size: var(--stats-font-sm);
-  color: rgba(148, 163, 184, 0.7);
-  margin-left: var(--trading-gap-sm);
-}
-
-/* Tab switcher (Positions / Orders / History) */
-.positions-tabs {
-  display: flex;
-  gap: var(--trading-gap-sm);
-}
-
-.positions-tab {
-  padding: var(--trading-gap-sm) var(--trading-gap-md);
-  font-size: var(--stats-font-sm);
-  font-weight: 500;
-  color: rgba(148, 163, 184, 0.7);
-  border-radius: var(--trading-radius-sm);
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.positions-tab:hover {
-  color: rgba(226, 232, 240, 0.9);
-  background: rgba(71, 85, 105, 0.3);
-}
-
-.positions-tab.active {
-  color: rgba(59, 130, 246, 0.95);
-  background: rgba(59, 130, 246, 0.1);
-}
-
-/* Controls (close all, etc) */
-.positions-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--trading-gap-sm);
-}
-
-.positions-controls button {
-  padding: var(--trading-gap-xs) var(--trading-gap-sm);
-  font-size: var(--stats-font-xs);
-  border-radius: var(--trading-radius-sm);
-  transition: all var(--transition-fast);
-}
-
-/* ===== TABLE CONTAINER - SCROLL ===== */
+/* ===== TABLE CONTAINER - SCROLL AREA ===== */
 .trading-positions-table-container {
   width: 100%;
-  flex: 1;
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: clamp(200px, 18.75vw, 400px);
-  min-height: 0;
+  flex: 1 1 0% !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  position: relative;
+  isolation: isolate;
+}
+
+/* ===== OPEN ORDERS - SAME STRUCTURE ===== */
+.open-orders {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100%;
+  height: 100% !important;
+  max-height: 100% !important;
+  background: var(--bg-panel, #1e293b);
+  overflow: hidden !important;
+}
+
+.open-orders-table-container {
+  width: 100%;
+  flex: 1 1 0% !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  position: relative;
+  isolation: isolate;
+}
+
+/* ✅ Sticky header cho open orders */
+.open-orders table thead,
+.open-orders-table-container table thead {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel, #1e293b);
+  z-index: 10;
+}
+
+.open-orders table thead tr,
+.open-orders-table-container table thead tr {
+  background: var(--bg-panel, #1e293b);
+}
+
+.open-orders table thead th,
+.open-orders-table-container table thead th {
+  background: var(--bg-panel, #1e293b);
+  position: relative;
 }
 
 /* Custom scrollbar */
 .trading-positions-table-container::-webkit-scrollbar {
-  width: var(--scrollbar-width-thin, 6px);
-  height: var(--scrollbar-width-thin, 6px);
+  width: 8px !important;
+  height: 8px !important;
 }
 
 .trading-positions-table-container::-webkit-scrollbar-track {
-  background: rgba(30, 41, 59, 0.3);
+  background: rgba(30, 41, 59, 0.5);
 }
 
 .trading-positions-table-container::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.5);
-  border-radius: var(--trading-radius-sm, 3px);
+  background: rgba(71, 85, 105, 0.7);
+  border-radius: 4px;
 }
 
 .trading-positions-table-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: rgba(100, 116, 139, 0.9);
 }
 
 /* ===== TABLE ===== */
@@ -120,25 +118,35 @@
   z-index: 10;
 }
 
-/* Table header */
+.trading-positions table thead tr,
+.position-table thead tr {
+  background: var(--bg-panel, #1e293b);
+}
+
 .trading-positions table thead th,
 .position-table thead th {
   background: var(--bg-panel, #1e293b);
-  font-size: var(--stats-font-xs);
+  position: relative;
+}
+
+/* Table header cells - BASE */
+.trading-positions table thead th,
+.position-table thead th {
+  font-size: 10px;
   font-weight: 500;
   color: rgba(148, 163, 184, 0.7);
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  padding: var(--trading-gap-sm) var(--trading-gap-md);
+  padding: 8px 10px;
   text-align: left;
   white-space: nowrap;
   border-bottom: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
 }
 
-/* Table body */
+/* Table body - BASE */
 .trading-positions table tbody tr,
 .position-table tbody tr {
-  border-bottom: 2px solid rgba(51, 65, 85, 1);
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
   transition: background-color var(--transition-fast);
 }
 
@@ -149,8 +157,8 @@
 
 .trading-positions table tbody td,
 .position-table tbody td {
-  padding: var(--trading-gap-md) var(--trading-gap-md);
-  font-size: var(--stats-font-sm);
+  padding: 10px;
+  font-size: 12px;
   vertical-align: middle;
 }
 
@@ -160,23 +168,23 @@
 .position-table tbody td:first-child,
 .trading-positions table tbody td:first-child {
   font-weight: 600;
-  font-size: var(--stats-font-md);
+  font-size: 12px;
 }
 
 .position-symbol {
   display: flex;
   flex-direction: column;
-  gap: var(--trading-gap-xs);
+  gap: 2px;
 }
 
 .position-symbol-name {
   font-weight: 600;
-  font-size: var(--stats-font-md);
+  font-size: 12px;
   color: rgba(226, 232, 240, 0.95);
 }
 
 .position-symbol-leverage {
-  font-size: var(--stats-font-xs);
+  font-size: 9px;
   color: rgba(148, 163, 184, 0.7);
 }
 
@@ -184,9 +192,9 @@
 .position-side {
   display: inline-flex;
   align-items: center;
-  padding: var(--trading-gap-xs) var(--trading-gap-sm);
-  border-radius: var(--trading-radius-sm);
-  font-size: var(--stats-font-xs);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -201,7 +209,7 @@
   color: #ef4444;
 }
 
-/* Numeric columns (Size, Entry, Mark, PnL) */
+/* Numeric columns */
 .position-table tbody td:nth-child(2),
 .position-table tbody td:nth-child(3),
 .position-table tbody td:nth-child(4),
@@ -214,7 +222,7 @@
 .trading-positions table tbody td:nth-child(6) {
   font-family: 'IBM Plex Mono', 'Roboto Mono', monospace;
   font-weight: 500;
-  font-size: var(--font-mono-base);
+  font-size: 11px;
   letter-spacing: -0.2px;
 }
 
@@ -222,13 +230,13 @@
 .position-pnl {
   display: flex;
   flex-direction: column;
-  gap: var(--trading-gap-xs);
+  gap: 2px;
 }
 
 .position-pnl-value {
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
-  font-size: var(--font-mono-md);
+  font-size: 12px;
 }
 
 .position-pnl-value.positive {
@@ -240,7 +248,7 @@
 }
 
 .position-pnl-percent {
-  font-size: var(--stats-font-xs);
+  font-size: 9px;
   opacity: 0.8;
 }
 
@@ -249,14 +257,14 @@
 .trading-positions table tbody td:nth-child(7) {
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 500;
-  font-size: var(--font-mono-sm);
+  font-size: 10px;
 }
 
 .position-tpsl {
   display: flex;
   flex-direction: column;
-  gap: var(--trading-gap-xs);
-  font-size: var(--stats-font-xs);
+  gap: 2px;
+  font-size: 9px;
 }
 
 .position-tpsl .tp {
@@ -271,13 +279,13 @@
 .position-actions {
   display: flex;
   align-items: center;
-  gap: var(--trading-gap-sm);
+  gap: 4px;
 }
 
 .position-actions button {
-  padding: var(--trading-gap-xs) var(--trading-gap-sm);
-  font-size: var(--stats-font-xs);
-  border-radius: var(--trading-radius-sm);
+  padding: 4px 8px;
+  font-size: 10px;
+  border-radius: 3px;
   transition: all var(--transition-fast);
 }
 
@@ -305,24 +313,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--trading-gap-xl);
+  padding: 24px;
   color: rgba(148, 163, 184, 0.6);
 }
 
 .positions-empty-icon {
-  width: clamp(40px, 2.604vw, 64px);
-  height: clamp(40px, 2.604vw, 64px);
-  margin-bottom: var(--trading-gap-md);
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
   opacity: 0.4;
 }
 
 .positions-empty-title {
-  font-size: var(--stats-font-lg);
-  margin-bottom: var(--trading-gap-xs);
+  font-size: 13px;
+  margin-bottom: 4px;
 }
 
 .positions-empty-subtitle {
-  font-size: var(--stats-font-sm);
+  font-size: 11px;
   opacity: 0.7;
 }
 
@@ -331,12 +339,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--trading-gap-xl);
+  padding: 24px;
 }
 
 .positions-loading-spinner {
-  width: clamp(24px, 1.563vw, 40px);
-  height: clamp(24px, 1.563vw, 40px);
+  width: 24px;
+  height: 24px;
   border: 2px solid rgba(59, 130, 246, 0.2);
   border-top-color: rgba(59, 130, 246, 0.8);
   border-radius: 50%;
@@ -348,15 +356,11 @@
 }
 
 /* ============================================
-   RESPONSIVE ADJUSTMENTS
+   ✅ RESPONSIVE ADJUSTMENTS - REFACTORED
    ============================================ */
 
 /* Mobile (< 768px) */
 @media (max-width: 767px) {
-  .trading-positions-table-container {
-    max-height: 200px;
-  }
-  
   .trading-positions table thead th,
   .position-table thead th {
     padding: 6px 8px;
@@ -381,12 +385,120 @@
   }
 }
 
-/* Tablet (768px - 1023px) */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .trading-positions-table-container {
-    max-height: 250px;
+/* ✅ PORTRAIT MODE - Màn hình dọc (height > width) */
+@media (orientation: portrait) and (min-width: 768px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 5px 6px !important;
+    font-size: 9px !important;
+    letter-spacing: 0.1px;
   }
   
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+  }
+  
+  .position-symbol-name {
+    font-size: 11px !important;
+  }
+  
+  .position-symbol-leverage {
+    font-size: 8px !important;
+  }
+  
+  .position-side {
+    padding: 2px 4px !important;
+    font-size: 8px !important;
+  }
+  
+  .position-pnl-value {
+    font-size: 11px !important;
+  }
+  
+  .position-pnl-percent {
+    font-size: 9px !important;
+  }
+  
+  .position-actions button {
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+  
+  /* ✅ Numeric columns - tăng lên 11px */
+  .position-table tbody td:nth-child(2),
+  .position-table tbody td:nth-child(3),
+  .position-table tbody td:nth-child(4),
+  .position-table tbody td:nth-child(5),
+  .position-table tbody td:nth-child(6),
+  .trading-positions table tbody td:nth-child(2),
+  .trading-positions table tbody td:nth-child(3),
+  .trading-positions table tbody td:nth-child(4),
+  .trading-positions table tbody td:nth-child(5),
+  .trading-positions table tbody td:nth-child(6) {
+    font-size: 11px !important;
+  }
+}
+
+/* ✅ NARROW SCREENS - Width 768px - 1200px (bất kể orientation) */
+@media (min-width: 768px) and (max-width: 1200px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 5px 6px !important;
+    font-size: 9px !important;
+    letter-spacing: 0px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 5px 6px !important;
+    font-size: 11px !important;
+  }
+  
+  .position-symbol-name {
+    font-size: 11px !important;
+  }
+  
+  .position-symbol-leverage {
+    font-size: 8px !important;
+  }
+  
+  .position-side {
+    padding: 2px 4px !important;
+    font-size: 8px !important;
+  }
+  
+  .position-pnl-value {
+    font-size: 11px !important;
+  }
+  
+  .position-pnl-percent {
+    font-size: 9px !important;
+  }
+  
+  .position-actions button {
+    padding: 3px 6px !important;
+    font-size: 9px !important;
+  }
+  
+  /* ✅ Numeric columns - tăng lên 11px */
+  .position-table tbody td:nth-child(2),
+  .position-table tbody td:nth-child(3),
+  .position-table tbody td:nth-child(4),
+  .position-table tbody td:nth-child(5),
+  .position-table tbody td:nth-child(6),
+  .trading-positions table tbody td:nth-child(2),
+  .trading-positions table tbody td:nth-child(3),
+  .trading-positions table tbody td:nth-child(4),
+  .trading-positions table tbody td:nth-child(5),
+  .trading-positions table tbody td:nth-child(6) {
+    font-size: 11px !important;
+  }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: landscape) {
   .trading-positions table thead th,
   .position-table thead th {
     padding: 8px 10px;
@@ -395,103 +507,133 @@
   
   .trading-positions table tbody td,
   .position-table tbody td {
-    padding: 10px;
-    font-size: 12px;
+    padding: 8px 10px;
+    font-size: 11px;
   }
 }
 
-/* Desktop (1024px - 1535px) */
-@media (min-width: 1024px) and (max-width: 1535px) {
-  .trading-positions-table-container {
-    max-height: 280px;
+/* Desktop Small (1024px - 1199px) */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+}
+
+/* Desktop Medium (1200px - 1535px) */
+@media (min-width: 1200px) and (max-width: 1535px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 8px 12px;
+    font-size: 10px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 10px 12px;
+    font-size: 12px;
   }
 }
 
 /* Large Desktop (1536px - 2399px) */
 @media (min-width: 1536px) and (max-width: 2399px) {
-  .trading-positions-table-container {
-    max-height: 320px;
-  }
-  
   .trading-positions table thead th,
   .position-table thead th {
-    padding: 12px 14px;
+    padding: 8px 12px;
+    font-size: 10px;
   }
   
   .trading-positions table tbody td,
   .position-table tbody td {
-    padding: 14px;
+    padding: 10px 12px;
+    font-size: 12px;
   }
 }
 
-/* 2K (2400px - 3199px) */
+/* 2K (2400px - 3199px) - ✅ GIẢM 35% */
 @media (min-width: 2400px) and (max-width: 3199px) {
-  .trading-positions-table-container {
-    max-height: 400px;
-  }
-  
-  .trading-positions-header {
-    padding: 14px 24px;
-    min-height: 52px;
-  }
-  
   .trading-positions table thead th,
   .position-table thead th {
-    padding: 14px 18px;
-    font-size: 12px;
+    padding: 8px 12px;
+    font-size: 10px; /* Was: 12px */
   }
   
   .trading-positions table tbody td,
   .position-table tbody td {
-    padding: 16px 18px;
-    font-size: 15px;
+    padding: 10px 12px;
+    font-size: 11px; /* Was: 15px */
   }
   
-  .position-actions button {
-    padding: 8px 14px;
-    font-size: 12px;
-  }
-}
-
-/* 4K (3200px+) */
-@media (min-width: 3200px) {
-  .trading-positions-table-container {
-    max-height: 500px;
-  }
-  
-  .trading-positions-header {
-    padding: 18px 32px;
-    min-height: 64px;
-  }
-  
-  .trading-positions-title {
-    font-size: 18px;
-  }
-  
-  .trading-positions table thead th,
-  .position-table thead th {
-    padding: 18px 24px;
-    font-size: 14px;
-  }
-  
-  .trading-positions table tbody td,
-  .position-table tbody td {
-    padding: 20px 24px;
-    font-size: 18px;
+  .position-symbol-name {
+    font-size: 11px;
   }
   
   .position-pnl-value {
-    font-size: 20px;
+    font-size: 12px;
   }
   
   .position-actions button {
-    padding: 10px 18px;
+    padding: 5px 10px;
+    font-size: 10px; /* Was: 12px */
+  }
+}
+
+/* 4K (3200px+) - ✅ GIẢM 35% */
+@media (min-width: 3200px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 10px 14px;
+    font-size: 10px; /* Was: 14px */
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 12px 14px;
+    font-size: 12px; /* Was: 18px */
+  }
+  
+  .position-symbol-name {
+    font-size: 12px;
+  }
+  
+  .position-pnl-value {
+    font-size: 13px; /* Was: 20px */
+  }
+  
+  .position-actions button {
+    padding: 6px 12px;
+    font-size: 10px; /* Was: 14px */
+  }
+}
+
+/* 5K+ (3840px+) */
+@media (min-width: 3840px) {
+  .trading-positions table thead th,
+  .position-table thead th {
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+  
+  .trading-positions table tbody td,
+  .position-table tbody td {
+    padding: 12px 16px;
+    font-size: 13px;
+  }
+  
+  .position-pnl-value {
     font-size: 14px;
   }
   
-  .positions-tab {
-    padding: 12px 20px;
-    font-size: 15px;
+  .position-actions button {
+    padding: 6px 14px;
+    font-size: 11px;
   }
 }
 
@@ -512,4 +654,18 @@
 @keyframes flashRed {
   0%, 100% { background: transparent; }
   50% { background: rgba(239, 68, 68, 0.2); }
+}
+
+/* ============================================
+   ✅ POSITION PANEL HEADER - ONLY MOBILE
+   ============================================ */
+.position-panel-header {
+  display: none !important; /* ✅ Ẩn mặc định */
+}
+
+/* Chỉ hiện trên mobile thực sự (< 768px) */
+@media (max-width: 767px) {
+  .position-panel-header {
+    display: flex !important;
+  }
 }

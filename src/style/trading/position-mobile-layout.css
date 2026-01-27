@@ -1,459 +1,324 @@
 /* ============================================
-   POSITION MOBILE LAYOUT - FLUID RESPONSIVE
-   Bottom sheet style for mobile devices
+   POSITION MOBILE LAYOUT - SCROLL FIX
    ============================================ */
 
-/* ===== MOBILE POSITION PANEL - BOTTOM SHEET ===== */
+/* ===== CRITICAL: Make position panel scrollable ===== */
+
+/* Parent container in TradingTerminal */
 @media (max-width: 767px) {
-  .position-panel-mobile {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 75vh;
-    background: linear-gradient(to top, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.96));
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(51, 65, 85, 0.4);
-    border-radius: 16px 16px 0 0;
-    z-index: var(--z-position-tab, 70);
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4);
-    transform: translateY(calc(100% - 48px));
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-  }
-  
-  .position-panel-mobile.is-open {
-    transform: translateY(0);
-  }
-  
-  /* ===== DRAG HANDLE ===== */
-  .position-panel-drag-handle {
-    width: 36px;
-    height: 4px;
-    background: rgba(148, 163, 184, 0.4);
-    border-radius: 2px;
-    margin: 8px auto;
-  }
-  
-  /* ===== PANEL HEADER ===== */
-  .position-panel-header {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background: rgba(30, 41, 59, 0.95);
-    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
-    cursor: pointer;
-    user-select: none;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    min-height: 48px;
-    -webkit-tap-highlight-color: transparent;
-  }
-  
-  .position-panel-header:hover {
-    background: rgba(30, 41, 59, 1);
-  }
-  
-  .position-panel-header:active {
-    background: rgba(51, 65, 85, 0.8);
-  }
-  
-  .position-panel-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    color: rgba(226, 232, 240, 0.95);
-  }
-  
-  .position-panel-count {
-    background: rgba(59, 130, 246, 0.2);
-    color: rgba(96, 165, 250, 1);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  
-  .position-panel-pnl {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  
-  .position-panel-pnl.positive {
-    color: #10b981;
-  }
-  
-  .position-panel-pnl.negative {
-    color: #ef4444;
-  }
-  
-  .position-panel-toggle-icon {
-    width: 20px;
-    height: 20px;
-    transition: transform 0.25s ease;
-    color: rgba(148, 163, 184, 0.8);
-  }
-  
-  .position-panel-mobile.is-open .position-panel-toggle-icon {
-    transform: rotate(180deg);
-  }
-  
-  /* ===== PANEL CONTENT ===== */
-  .position-panel-content {
-    overflow-y: auto;
-    max-height: calc(75vh - 48px);
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* Scrollbar */
-  .position-panel-content::-webkit-scrollbar {
-    width: 4px;
-  }
-  
-  .position-panel-content::-webkit-scrollbar-track {
-    background: rgba(30, 41, 59, 0.5);
-  }
-  
-  .position-panel-content::-webkit-scrollbar-thumb {
-    background: rgba(71, 85, 105, 0.8);
-    border-radius: 2px;
-  }
-  
-  /* ===== POSITION CARDS (Mobile view) ===== */
-  .position-card {
-    padding: 12px 16px;
-    border-bottom: 1px solid rgba(51, 65, 85, 0.3);
-    background: transparent;
-    transition: background 0.15s ease;
-  }
-  
-  .position-card:active {
-    background: rgba(71, 85, 105, 0.2);
-  }
-  
-  .position-card:last-child {
-    border-bottom: none;
-  }
-  
-  /* Card header: Symbol + Side */
-  .position-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-  }
-  
-  .position-card-symbol {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .position-card-symbol-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: rgba(226, 232, 240, 0.95);
-  }
-  
-  .position-card-leverage {
-    font-size: 11px;
-    color: rgba(148, 163, 184, 0.7);
-    background: rgba(71, 85, 105, 0.3);
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  
-  .position-card-side {
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  
-  .position-card-side.long {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-  }
-  
-  .position-card-side.short {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-  }
-  
-  /* Card body: Info grid */
-  .position-card-body {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-  }
-  
-  .position-card-item {
+  .positions-panel {
+    flex: 1 1 auto;
+    min-height: 120px;
+    max-height: 50vh !important; /* Limit to 50% viewport */
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    overflow: hidden !important;
   }
-  
-  .position-card-label {
-    font-size: 10px;
-    color: rgba(148, 163, 184, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+
+  .positions-panel.is-open {
+    max-height: 55vh !important;
   }
-  
-  .position-card-value {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(226, 232, 240, 0.9);
-  }
-  
-  .position-card-value.positive {
-    color: #10b981;
-  }
-  
-  .position-card-value.negative {
-    color: #ef4444;
-  }
-  
-  /* PnL highlight */
-  .position-card-pnl {
-    grid-column: span 2;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    margin-top: 8px;
-    background: rgba(15, 23, 42, 0.5);
-    border-radius: 8px;
-  }
-  
-  .position-card-pnl-label {
-    font-size: 12px;
-    color: rgba(148, 163, 184, 0.8);
-  }
-  
-  .position-card-pnl-value {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 16px;
-    font-weight: 700;
-  }
-  
-  .position-card-pnl-value.positive {
-    color: #10b981;
-  }
-  
-  .position-card-pnl-value.negative {
-    color: #ef4444;
-  }
-  
-  .position-card-pnl-percent {
-    font-size: 12px;
-    margin-left: 8px;
-    opacity: 0.8;
-  }
-  
-  /* Card actions */
-  .position-card-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  
-  .position-card-actions button {
-    flex: 1;
-    padding: 10px;
-    font-size: 13px;
-    font-weight: 500;
-    border-radius: 8px;
-    transition: all 0.15s ease;
-  }
-  
-  .position-card-actions .close-btn {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-  }
-  
-  .position-card-actions .close-btn:active {
-    background: rgba(239, 68, 68, 0.25);
-  }
-  
-  .position-card-actions .edit-btn {
-    background: rgba(71, 85, 105, 0.2);
-    color: rgba(226, 232, 240, 0.9);
-    border: 1px solid rgba(71, 85, 105, 0.3);
-  }
-  
-  .position-card-actions .edit-btn:active {
-    background: rgba(71, 85, 105, 0.4);
-  }
-  
-  /* ===== EMPTY STATE ===== */
-  .position-panel-empty {
+
+  .position-panel-content {
+    flex: 1 1 auto;
+    min-height: 0 !important; /* Critical for nested flex scroll */
+    max-height: 100%;
+    overflow: hidden !important;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 20px;
-    text-align: center;
   }
-  
-  .position-panel-empty-icon {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 12px;
-    opacity: 0.4;
-    color: rgba(148, 163, 184, 0.6);
+}
+
+/* ===== Wrapper - flex container ===== */
+.position-mobile-wrapper {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ===== Tabs - sticky at top ===== */
+.position-mobile-tabs {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0f172a;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.position-mobile-tabs button {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* ===== Content - SCROLLABLE ===== */
+.position-mobile-content {
+  flex: 1 1 auto;
+  min-height: 0 !important; /* KEY: allows flex child to scroll */
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* ===== Container inside content ===== */
+.position-mobile-container {
+  width: 100%;
+  padding: 10px;
+  padding-bottom: 30px; /* Extra space at bottom for last card */
+}
+
+/* ===== Action buttons (Đóng tất cả / Đóng theo PnL) ===== */
+.position-mobile-container > .flex.gap-2:first-child {
+  margin-bottom: 8px;
+}
+
+.position-mobile-container > .flex.gap-2:first-child button {
+  padding: 8px 10px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+
+/* ===== Summary bar ===== */
+.position-mobile-container > .flex.items-center.justify-between.px-3 {
+  padding: 6px 10px !important;
+  margin-bottom: 8px;
+  font-size: 10px;
+  border-radius: 8px;
+}
+
+/* ===== Position Cards ===== */
+.position-mobile-container .bg-slate-800\/80.rounded-xl {
+  margin-bottom: 8px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Card sections - compact */
+.position-mobile-container .bg-slate-800\/80 .px-3.py-2\.5 {
+  padding: 8px 10px !important;
+}
+
+.position-mobile-container .bg-slate-800\/80 .px-3.py-2 {
+  padding: 6px 10px !important;
+}
+
+/* Symbol text */
+.position-mobile-container .bg-slate-800\/80 .font-semibold.text-sm {
+  font-size: 13px;
+}
+
+/* Info grid */
+.position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4 {
+  gap: 4px;
+}
+
+.position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4 .text-\[11px\] {
+  font-size: 10px;
+}
+
+/* ===== Action Buttons Grid ===== */
+.position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 {
+  gap: 4px !important;
+}
+
+.position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 button {
+  padding: 7px 3px !important;
+  font-size: 10px !important;
+  min-height: 32px;
+  border-radius: 6px;
+}
+
+.position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 button svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* Market button (red) */
+.position-mobile-container .bg-slate-800\/80 button.bg-red-500 {
+  font-weight: 600;
+}
+
+/* ===== Expand toggle ===== */
+.position-mobile-container .bg-slate-800\/80 > .flex.items-center.justify-center.py-1\.5 {
+  padding: 4px 0 !important;
+}
+
+/* ===== Expanded details ===== */
+.position-mobile-container .bg-slate-800\/80 .bg-slate-900\/50 {
+  padding: 6px 10px !important;
+}
+
+.position-mobile-container .bg-slate-800\/80 .bg-slate-900\/50 .grid {
+  gap: 8px;
+}
+
+/* ===== Empty state ===== */
+.position-mobile-container .py-12 {
+  padding: 40px 20px;
+}
+
+/* ===== Scrollbar (subtle) ===== */
+.position-mobile-content::-webkit-scrollbar {
+  width: 3px;
+}
+
+.position-mobile-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.position-mobile-content::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 2px;
+}
+
+.position-mobile-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* ===== Very small phones (< 360px) ===== */
+@media (max-width: 359px) {
+  .position-mobile-container {
+    padding: 6px;
   }
-  
-  .position-panel-empty-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: rgba(226, 232, 240, 0.8);
-    margin-bottom: 4px;
+
+  .position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 button {
+    padding: 5px 2px !important;
+    font-size: 9px !important;
+    min-height: 28px;
   }
-  
-  .position-panel-empty-subtitle {
+
+  .position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 button svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .position-mobile-container .bg-slate-800\/80 .font-semibold.text-sm {
     font-size: 12px;
-    color: rgba(148, 163, 184, 0.6);
-  }
-  
-  /* ===== SWIPE INDICATOR ===== */
-  .position-card-swipe-hint {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 10px;
-    color: rgba(148, 163, 184, 0.4);
-    opacity: 0;
-    transition: opacity 0.15s ease;
-  }
-  
-  .position-card:first-child .position-card-swipe-hint {
-    opacity: 1;
   }
 }
 
-/* ===== TABLET ADJUSTMENTS ===== */
-@media (min-width: 480px) and (max-width: 767px) {
-  .position-card-body {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  .position-card-pnl {
-    grid-column: span 3;
-  }
-  
-  .position-card-header {
-    margin-bottom: 12px;
-  }
-  
-  .position-card-symbol-name {
-    font-size: 16px;
-  }
-  
-  .position-card-pnl-value {
-    font-size: 18px;
-  }
-}
-
-/* ===== LANDSCAPE MOBILE ===== */
-@media (max-width: 767px) and (orientation: landscape) {
-  .position-panel-mobile {
-    max-height: 60vh;
-  }
-  
-  .position-panel-content {
-    max-height: calc(60vh - 48px);
-  }
-  
-  .position-card {
-    padding: 10px 16px;
-  }
-  
-  .position-card-body {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  
-  .position-card-pnl {
-    grid-column: span 4;
-    padding: 8px 12px;
-    margin-top: 6px;
-  }
-  
-  .position-card-actions {
-    margin-top: 10px;
-  }
-  
-  .position-card-actions button {
-    padding: 8px;
-    font-size: 12px;
-  }
-}
-
-/* ===== SAFE AREA INSETS (iPhone X+) ===== */
+/* ===== iPhone safe area ===== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-  @media (max-width: 767px) {
-    .position-panel-mobile {
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-    
-    .position-panel-mobile.is-open {
-      padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
-    }
+  .position-mobile-container {
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
   }
 }
 
-/* ===== ANIMATIONS ===== */
-@keyframes slideUp {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
+/* ===== Touch interactions ===== */
+.position-mobile-container button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.position-mobile-container button:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* ===== Landscape mode ===== */
+@media (max-width: 767px) and (orientation: landscape) {
+  .positions-panel {
+    max-height: 70vh !important;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+
+  .position-mobile-container .bg-slate-800\/80 .px-3.py-2\.5,
+  .position-mobile-container .bg-slate-800\/80 .px-3.py-2 {
+    padding: 5px 8px !important;
   }
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+/* ============================================
+   SMALL SCREENS FIX (iPhone SE, small phones)
+   Height <= 700px
+   ============================================ */
+@media (max-width: 767px) and (max-height: 700px) {
+  /* Giảm chiều cao chart để có chỗ cho positions */
+  .workspace-chart-orderbook-row {
+    height: 45vh !important;
+    min-height: 250px !important;
+    max-height: 300px !important;
   }
-  to {
-    opacity: 1;
+
+  /* Positions panel chiếm phần còn lại */
+  .positions-panel {
+    flex: 1 1 auto !important;
+    min-height: 180px !important;
+    max-height: none !important; /* Bỏ giới hạn max */
+  }
+
+  .positions-panel.is-open {
+    min-height: 200px !important;
+  }
+
+  /* Tabs compact hơn */
+  .position-mobile-tabs button {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Content area */
+  .position-mobile-content {
+    min-height: 120px !important;
+  }
+
+  /* Cards compact */
+  .position-mobile-container {
+    padding: 8px !important;
+  }
+
+  .position-mobile-container .bg-slate-800\/80.rounded-xl {
+    margin-bottom: 6px;
+  }
+
+  .position-mobile-container .bg-slate-800\/80 .px-3.py-2\.5 {
+    padding: 6px 8px !important;
+  }
+
+  .position-mobile-container .bg-slate-800\/80 .px-3.py-2 {
+    padding: 5px 8px !important;
+  }
+
+  /* Buttons smaller */
+  .position-mobile-container .bg-slate-800\/80 .grid.grid-cols-4.gap-2 button {
+    padding: 5px 2px !important;
+    font-size: 9px !important;
+    min-height: 28px;
+  }
+
+  /* Action buttons row */
+  .position-mobile-container > .flex.gap-2:first-child button {
+    padding: 6px 8px !important;
+    font-size: 10px !important;
+  }
+
+  /* Summary bar */
+  .position-mobile-container > .flex.items-center.justify-between.px-3 {
+    padding: 4px 8px !important;
+    font-size: 9px !important;
   }
 }
 
-.position-card {
-  animation: fadeIn 0.2s ease-out;
-}
+/* ============================================
+   VERY SMALL SCREENS (iPhone SE 1st gen, etc)
+   Height <= 600px
+   ============================================ */
+@media (max-width: 767px) and (max-height: 600px) {
+  .workspace-chart-orderbook-row {
+    height: 40vh !important;
+    min-height: 200px !important;
+    max-height: 250px !important;
+  }
 
-/* ===== FLASH ANIMATIONS FOR PNL UPDATES ===== */
-.position-card-pnl-value.flash-green {
-  animation: flashGreen 0.4s ease;
-}
+  .positions-panel {
+    min-height: 150px !important;
+  }
 
-.position-card-pnl-value.flash-red {
-  animation: flashRed 0.4s ease;
-}
-
-@keyframes flashGreen {
-  0%, 100% { background: transparent; }
-  50% { background: rgba(16, 185, 129, 0.3); }
-}
-
-@keyframes flashRed {
-  0%, 100% { background: transparent; }
-  50% { background: rgba(239, 68, 68, 0.3); }
+  .position-mobile-tabs button {
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+  }
 }

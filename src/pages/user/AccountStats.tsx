@@ -201,8 +201,8 @@ export default function AccountStats() {
 
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
+    <div className='space-y-6 px-4 sm:px-4'>
+      <div className="flex justify-between items-center mb-4 ">
         <h2 className="text-xl font-semibold text-white">Account Statistics</h2>
 
         {user?.type === 0 && (

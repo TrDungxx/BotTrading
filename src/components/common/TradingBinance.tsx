@@ -24,6 +24,9 @@ import { useDynamicIndicators } from './hooks/useDynamicIndicators';
 import { DynamicIndicatorConfig, IndicatorLine, BollConfig } from './hooks/indicatorTypes';
 import LineIndicatorHeader, { IndicatorValue } from './popupchart/LineIndicatorHeader';
 import LineIndicatorSettings from './popupchart/LineIndicatorSettings';
+// Component path - nếu để trong thư mục popupchart thì giữ nguyên
+// Nếu để ở thư mục khác thì sửa đường dẫn import
+import HighLowMarkers from '../layoutchart/HighLowMarkers';
 
 export type ChartType =
   | 'Bars'
@@ -218,6 +221,9 @@ const TradingBinance: React.FC<Props> = ({
   const [showVolumeSettings, setShowVolumeSettings] = useState(false);
 
   const [volumeData, setVolumeData] = useState<VolumeBar[]>([]);
+
+  // ✅ High/Low markers visibility state
+  const [showHighLowMarkers, setShowHighLowMarkers] = useState(true);
 
   const wsRef = useRef<WebSocket | null>(null);
   const sessionRef = useRef(0);
@@ -466,7 +472,7 @@ const TradingBinance: React.FC<Props> = ({
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 6,
-        barSpacing: 10,
+        barSpacing: 7,
         minBarSpacing: 4,
         fixLeftEdge: false,
         fixRightEdge: false,
@@ -544,7 +550,7 @@ const TradingBinance: React.FC<Props> = ({
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 6,
-        barSpacing: 10,
+        barSpacing: 7,
         minBarSpacing: 4,
         fixLeftEdge: false,
         fixRightEdge: false,
@@ -891,17 +897,17 @@ useEffect(() => {
 
           try {
             const containerWidth = mainChartContainerRef.current?.clientWidth || 800;
-            const minBarWidth = 8;
-            const maxBarWidth = 16;
+            const minBarWidth = 6;
+            const maxBarWidth = 12;
             const maxCandles = Math.floor(containerWidth / minBarWidth);
             const minCandles = Math.floor(containerWidth / maxBarWidth);
-            let targetVisible = Math.max(50, Math.min(100, Math.floor((minCandles + maxCandles) / 2)));
+            let targetVisible = Math.max(50, Math.min(120, Math.floor((minCandles + maxCandles) / 2)));
             const visibleCount = Math.min(targetVisible, cs.length);
             const startIdx = Math.max(0, cs.length - visibleCount);
 
             const range = { from: cs[startIdx].time, to: cs[cs.length - 1].time };
-            const optimalBarSpacing = Math.max(8, Math.min(16, Math.floor(containerWidth / visibleCount * 0.85)));
-            const spacingOptions = { rightOffset: 16, barSpacing: optimalBarSpacing, minBarSpacing: 6 };
+            const optimalBarSpacing = Math.max(6, Math.min(10, Math.floor(containerWidth / visibleCount * 0.85)));
+            const spacingOptions = { rightOffset: 16, barSpacing: optimalBarSpacing, minBarSpacing: 4 };
 
             isSyncingRef.current = true;
             chartRef.current.timeScale().setVisibleRange(range);
@@ -1425,6 +1431,43 @@ useEffect(() => {
       />
 
       <div className="relative w-full h-full flex flex-col">
+        {/* ✅ Watermark Logo - đặt NGOÀI container, overlay lên chart 
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+          style={{ zIndex: 10, top: '35%', transform: 'translateY(-50%)' }}
+        >
+          <div 
+            className="flex items-center gap-3"
+            style={{ opacity: 0.07 }}
+          >
+            
+            <svg 
+              width="60" 
+              height="60" 
+              viewBox="0 0 40 40" 
+              fill="none"
+            >
+              <path
+                d="M20 4L6 12V28L20 36L34 28V12L20 4Z"
+                stroke="#636166ff"
+                strokeWidth="2"
+                fill="none"
+              />
+              <path
+                d="M20 10L12 15V25L20 30L28 25V15L20 10Z"
+                fill="#636166ff"
+              />
+            </svg>
+            
+            <span 
+              className="font-bold tracking-wider"
+              style={{ color: '#636166ff', fontSize: '72px' }}
+            >
+              TW
+            </span>
+          </div>
+        </div>
+*/}
         <div
           ref={mainChartContainerRef}
           className="relative w-full"
@@ -1437,6 +1480,18 @@ useEffect(() => {
   series={candleSeries.current}
   isUp={(candles.at(-1)?.close ?? 0) >= (candles.at(-1)?.open ?? 0)}
 />
+        {/* ✅ High/Low Markers - Binance style */}
+        <HighLowMarkers
+          chartRef={chartRef}
+          candleSeries={candleSeries.current}
+          containerRef={mainChartContainerRef}
+          candles={candles}
+          precision={
+            symbolMetaCache.get(`${market}:${selectedSymbol.toUpperCase()}`)?.precision 
+            ?? heuristicMetaFromPrice(candles.at(-1)?.close).precision
+          }
+          visible={showHighLowMarkers}
+        />
         <div
           className="w-full h-[2px] bg-[#2b3139] shrink-0 relative z-10"
           style={{ boxShadow: '0 0 3px rgba(80, 77, 77, 0.4)' }}

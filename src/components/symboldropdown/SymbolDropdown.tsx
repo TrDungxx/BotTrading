@@ -1,7 +1,112 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Star } from "lucide-react";
-import coinIcons from "../../utils/coinIcons";
 import { useAuth } from "../../context/AuthContext";
+
+// Icon cache - will be populated from API
+const iconCache: Record<string, string> = {};
+let iconCacheLoaded = false;
+let iconCacheLoading = false;
+
+// Load icon mapping from CoinGecko (free, no API key needed)
+async function loadIconCache() {
+  if (iconCacheLoaded || iconCacheLoading) return;
+  iconCacheLoading = true;
+  
+  try {
+    // Check localStorage first
+    const cached = localStorage.getItem('coin_icon_cache');
+    const cacheTime = localStorage.getItem('coin_icon_cache_time');
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    
+    if (cached && cacheTime && Date.now() - Number(cacheTime) < ONE_DAY) {
+      const parsed = JSON.parse(cached);
+      Object.assign(iconCache, parsed);
+      iconCacheLoaded = true;
+      iconCacheLoading = false;
+      return;
+    }
+    
+    // Fetch from CoinGecko - get coins list with images
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false'
+    );
+    const data = await response.json();
+    
+    // Build symbol -> image URL mapping
+    data.forEach((coin: { symbol: string; image: string }) => {
+      iconCache[coin.symbol.toUpperCase()] = coin.image;
+    });
+    
+    // Cache to localStorage
+    localStorage.setItem('coin_icon_cache', JSON.stringify(iconCache));
+    localStorage.setItem('coin_icon_cache_time', String(Date.now()));
+    
+    iconCacheLoaded = true;
+  } catch (e) {
+    console.warn('Failed to load icon cache:', e);
+  }
+  iconCacheLoading = false;
+}
+
+// Fallback CDN sources
+const FALLBACK_CDNS = [
+  (base: string) => `https://cdn.jsdelivr.net/gh/vadimmalykhin/binance-icons/crypto/${base.toLowerCase()}.svg`,
+  (base: string) => `https://cdn.jsdelivr.net/npm/cryptocurrency-icons@latest/svg/color/${base.toLowerCase()}.svg`,
+];
+
+// Get icon URL for a symbol
+const getIconUrl = (base: string): string => {
+  // First check cache from CoinGecko
+  if (iconCache[base.toUpperCase()]) {
+    return iconCache[base.toUpperCase()];
+  }
+  // Fallback to Binance Icons CDN
+  return FALLBACK_CDNS[0](base);
+};
+
+// CoinIcon component with fallback
+const CoinIcon: React.FC<{ base: string }> = ({ base }) => {
+  const [imgSrc, setImgSrc] = useState(() => getIconUrl(base));
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [showLetter, setShowLetter] = useState(false);
+
+  // Update src when cache loads
+  useEffect(() => {
+    const newSrc = getIconUrl(base);
+    if (newSrc !== imgSrc) {
+      setImgSrc(newSrc);
+      setFallbackIndex(0);
+      setShowLetter(false);
+    }
+  }, [base, iconCacheLoaded]);
+
+  const handleError = () => {
+    // Try fallback CDNs
+    if (fallbackIndex < FALLBACK_CDNS.length - 1) {
+      setFallbackIndex(fallbackIndex + 1);
+      setImgSrc(FALLBACK_CDNS[fallbackIndex + 1](base));
+    } else {
+      setShowLetter(true);
+    }
+  };
+
+  if (showLetter) {
+    return (
+      <div className="w-6 h-6 rounded-full bg-[#fcd535] text-[#1e293b] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+        {base[0]}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={base}
+      className="w-6 h-6 rounded-full flex-shrink-0 bg-[#2b3139] object-cover"
+      onError={handleError}
+    />
+  );
+};
 
 type Market = "spot" | "futures";
 
@@ -126,6 +231,15 @@ const SymbolDropdown: React.FC<Props> = ({
   const buttonRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dropdownPosition, setDropdownPosition] = useState<'bottom' | 'top'>('bottom');
+  const [dropdownTop, setDropdownTop] = useState<number>(0);
+  const [, forceUpdate] = useState(0); // For re-render when icons load
+
+  // Load icon cache on mount
+  useEffect(() => {
+    loadIconCache().then(() => {
+      forceUpdate(n => n + 1); // Trigger re-render when icons are loaded
+    });
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(favoriteKey, JSON.stringify(favoriteSymbols));
@@ -135,26 +249,38 @@ const SymbolDropdown: React.FC<Props> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // ✅ Detect dropdown position when opened
+  // ✅ Calculate dropdown position when opened
   useEffect(() => {
     if (isOpen && dropdownRef.current) {
-      // Use setTimeout to ensure DOM is ready
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         if (!dropdownRef.current) return;
-        
         const rect = dropdownRef.current.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.top;
-        const spaceAbove = rect.top;
-        const dropdownHeight = 600; // approximate total height
-        
-        // If not enough space below and more space above, position upward
-        if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-          setDropdownPosition('top');
-        } else {
-          setDropdownPosition('bottom');
-        }
-      }, 0);
+        setDropdownTop(rect.top);
+        setDropdownPosition('bottom');
+      });
     }
+  }, [isOpen]);
+
+  // ✅ Update position on window resize or orientation change
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const updatePosition = () => {
+      if (!dropdownRef.current) return;
+      const rect = dropdownRef.current.getBoundingClientRect();
+      setDropdownTop(rect.top);
+    };
+    
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('orientationchange', updatePosition);
+    
+    const timer = setTimeout(updatePosition, 100);
+    
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('orientationchange', updatePosition);
+      clearTimeout(timer);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -236,7 +362,7 @@ const SymbolDropdown: React.FC<Props> = ({
 
   if ((!symbols || symbols.length === 0) && loading) {
     return (
-      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl p-fluid-4">
+      <div className="symbol-dropdown w-[460px] bg-[#1e293b] border border-[#2b3139] rounded-lg shadow-2xl p-fluid-4">
         <div className="flex items-center justify-center py-8 text-[#848e9c] text-fluid-sm">
           <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#fcd535] border-t-transparent mr-3"></div>
           Đang tải...
@@ -247,7 +373,7 @@ const SymbolDropdown: React.FC<Props> = ({
   
   if ((!symbols || symbols.length === 0) && err) {
     return (
-      <div className="symbol-dropdown w-[460px] bg-[#1e2329] border border-[#cf304a] rounded-lg shadow-2xl p-fluid-4">
+      <div className="symbol-dropdown w-[460px] bg-[#1e293b] border border-[#cf304a] rounded-lg shadow-2xl p-fluid-4">
         <div className="text-[#f6465d] text-fluid-sm py-fluid-4 text-center">Lỗi: {err}</div>
       </div>
     );
@@ -264,7 +390,7 @@ const SymbolDropdown: React.FC<Props> = ({
   return (
     <div
       ref={dropdownRef}
-      className={`symbol-dropdown w-[460px] bg-[#1e2329] border border-[#2b3139] rounded-lg shadow-2xl overflow-hidden ${
+      className={`symbol-dropdown w-[460px] bg-[#1e293b] border border-[#2b3139] rounded-lg shadow-2xl overflow-hidden ${
         dropdownPosition === 'top' ? 'origin-bottom' : 'origin-top'
       }`}
       style={{ 
@@ -326,7 +452,7 @@ const SymbolDropdown: React.FC<Props> = ({
       </div>
 
       {/* Column Headers */}
-      <div className="sticky top-0 z-10 bg-[#1e2329] px-fluid-4 py-2 border-b border-[#2b3139]">
+      <div className="sticky top-0 z-10 bg-[#1e293b] px-fluid-4 py-2 border-b border-[#1e293b]">
         <div className="grid grid-cols-[32px_minmax(140px,1fr)_100px_100px] gap-fluid-3 text-xs text-[#848e9c]">
           <div></div>
           <div>Hợp đồng</div>
@@ -335,8 +461,15 @@ const SymbolDropdown: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Symbol List */}
-      <div className="max-h-[440px] overflow-y-auto">
+      {/* Symbol List - Dynamic height based on viewport */}
+      <div 
+        className="overflow-y-auto"
+        style={{ 
+          maxHeight: dropdownTop > 0 
+            ? `calc(100vh - ${dropdownTop + 130}px)` // 130 = header inside dropdown + bottom padding
+            : 'calc(100vh - 200px)' // fallback
+        }}
+      >
         <style>{`
           .symbol-dropdown ::-webkit-scrollbar {
             width: 6px;
@@ -398,25 +531,14 @@ const SymbolDropdown: React.FC<Props> = ({
 
                 {/* Symbol & Volume */}
                 <div className="flex items-center gap-fluid-2.5 min-w-0">
-                  {coinIcons[base] ? (
-                    <img 
-                      src={coinIcons[base]} 
-                      alt={base} 
-                      className="w-6 h-6 rounded-full flex-shrink-0" 
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-[#fcd535] text-[#1e2329] text-fluid-2xs font-bold 
-                                  flex items-center justify-center flex-shrink-0">
-                      {base[0]}
-                    </div>
-                  )}
+                  <CoinIcon base={base} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-fluid-1.5">
                       <span className="text-[#eaecef] font-medium text-fluid-sm truncate">
                         {item.symbol}
                       </span>
                       {market === "futures" && (
-                        <span className="px-1 py-0.5 text-[9px] leading-none bg-[#2b3139] text-[#848e9c] rounded flex-shrink-0">
+                        <span className="px-1 py-0.5 text-[9px] leading-none bg-[#1e293b] text-[#848e9c] rounded flex-shrink-0">
                           Vĩnh cửu
                         </span>
                       )}

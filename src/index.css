@@ -612,3 +612,142 @@ html, body, #root {
   10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
   20%, 40%, 60%, 80% { transform: translateX(5px); }
 }
+
+@media (max-width: 767px) {
+  /* ===== FIX MAIN OVERFLOW-HIDDEN ===== */
+  main {
+    overflow: visible !important;
+    overflow-y: auto !important;
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  /* ===== BỎ HEIGHT 100% - Cho phép scroll tổng ===== */
+  html {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  #root {
+    height: auto !important;
+    min-height: 100dvh !important;
+    overflow: visible !important;
+  }
+
+  /* ===== Position panel content - bỏ max-height ===== */
+  .position-panel-content {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* ===== Trading terminal ===== */
+  .trading-terminal {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .trading-workspace {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .workspace-left-columns {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Chart - tăng height để Volume không bị cắt */
+  /* Dùng px cố định để đảm bảo hoạt động trên mọi browser */
+  .workspace-chart-orderbook-row {
+    flex-shrink: 0 !important;
+    height: 420px !important;
+    min-height: 420px !important;
+    max-height: 550px !important;
+  }
+
+  /* Chart panel bên trong */
+  .chart-panel,
+  .trading-chart-container,
+  .chart-container {
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+
+  /* Đảm bảo chart và volume đều hiển thị */
+  .tv-lightweight-charts,
+  [class*="chart"] {
+    min-height: 0 !important;
+  }
+
+  /* Positions panel - auto height */
+  .positions-panel,
+  .positions-panel.is-open {
+    flex: none !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Mobile wrappers */
+  .position-mobile-wrapper,
+  .position-mobile-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .position-mobile-container {
+    padding-bottom: 160px !important;
+  }
+}
+
+/* iOS Safari */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 767px) {
+    html {
+      min-height: -webkit-fill-available !important;
+    }
+    body {
+      min-height: -webkit-fill-available !important;
+    }
+    
+    /* Chart height cho Safari iOS - TĂNG LÊN */
+    .workspace-chart-orderbook-row {
+      height: 450px !important; /* Fixed px cho Safari */
+      min-height: 450px !important;
+      max-height: 600px !important;
+    }
+  }
+}
+
+/* Safe area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  @media (max-width: 767px) {
+    .position-mobile-container {
+      padding-bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}

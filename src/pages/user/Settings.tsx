@@ -392,7 +392,7 @@ export default function Settings() {
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-4">
       <div>
         <h1 className="text-2xl font-bold">
           <FormattedMessage id="settings.title" />

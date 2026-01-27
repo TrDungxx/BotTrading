@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
+import { binanceSymbolInfo } from "../../../utils/BinanceSymbolInfo";
 
 // ===== Types =====
 interface PlaceOrderParams {
@@ -30,6 +31,7 @@ interface Props {
   onClose?: () => void;
   availableBalance?: number;
   leverage?: number;
+  marginMode?: "cross" | "isolated";
   onPlaceOrder?: (params: PlaceOrderParams) => void;
   symbolInfo?: SymbolInfo;
 }
@@ -53,9 +55,43 @@ const getFeeRate = (orderType: OrderTypeBin) =>
 
 const DEFAULT_LEVERAGE = 10;
 
+// Smart decimals để tránh floating point precision errors
+// Phù hợp với Binance tickSize rules
+const getSmartDecimals = (price: number): number => {
+  if (price >= 10000) return 1;  // BTC ~100k → 1 decimal
+  if (price >= 1000) return 2;   // ETH ~3k → 2 decimals
+  if (price >= 100) return 2;    // SOL, BNB ~200-600 → 2 decimals
+  if (price >= 10) return 2;     // DASH ~70, LINK ~15 → 2 decimals
+  if (price >= 1) return 4;      // XRP ~2, ADA ~0.8 → 4 decimals
+  if (price >= 0.1) return 5;    // DOGE ~0.3 → 5 decimals
+  if (price >= 0.01) return 6;   // → 6 decimals
+  if (price >= 0.0001) return 7; // → 7 decimals
+  return 8;
+};
+
+// Format price với smart decimals để tránh 0.10481000000000001
+const formatPrice = (price: number): number => {
+  const decimals = getSmartDecimals(price);
+  return parseFloat(price.toFixed(decimals));
+};
+
 // Slider percentages và mapping
-const ALLOWED_PERCENTAGES = [0, 0.5, 1, 2, 3, 4];
+const ALLOWED_PERCENTAGES = [0, 0.1, 0.2, 0.5, 1];
 const SLIDER_MAX = ALLOWED_PERCENTAGES.length - 1;
+
+// ===== Smart Rounding Helper =====
+// Làm tròn lên nếu qty >= 10, giữ nguyên nếu < 10
+const smartRoundQty = (qty: number, stepSize: number): number => {
+  if (qty >= 10) {
+    // Làm tròn lên
+    return Math.ceil(qty);
+  }
+  // Dưới 10 thì giữ nguyên (chỉ round theo stepSize)
+  if (stepSize > 0) {
+    return Math.floor(qty / stepSize) * stepSize;
+  }
+  return qty;
+};
 
 // ===== Component =====
 const ChartOrderForm: React.FC<Props> = ({
@@ -66,6 +102,7 @@ const ChartOrderForm: React.FC<Props> = ({
   onClose,
   availableBalance: propBalance = 0,
   leverage: propLeverage = DEFAULT_LEVERAGE,
+  marginMode: propMarginMode = "cross",
   onPlaceOrder,
   symbolInfo: propSymbolInfo,
 }) => {
@@ -109,6 +146,7 @@ const ChartOrderForm: React.FC<Props> = ({
 
   const availableBalance = propBalance;
   const leverage = propLeverage;
+  const marginMode = propMarginMode;
   const coinName = selectedSymbol.replace("USDT", "").replace("BUSD", "");
 
   const priceDecimals = useMemo(() => {
@@ -139,6 +177,15 @@ const ChartOrderForm: React.FC<Props> = ({
   };
 
   const formatQty = (qty: number): string => {
+    // Áp dụng smart rounding: làm tròn lên nếu >= 10
+    const smartRounded = smartRoundQty(qty, stepSize);
+    
+    if (smartRounded >= 10) {
+      // Đã làm tròn lên, trả về số nguyên
+      return String(Math.round(smartRounded));
+    }
+    
+    // Dưới 10, giữ nguyên logic cũ
     const rounded = roundQty(qty);
     if (stepSize >= 1) {
       return String(Math.round(rounded));
@@ -180,24 +227,37 @@ const ChartOrderForm: React.FC<Props> = ({
 
   const priceNum = parseFloat(priceValue) || propPrice || 0;
 
+  // Tính min quantity từ binanceSymbolInfo (giống TradingForm)
   const minQuantity = useMemo(() => {
+    // Ưu tiên lấy từ binanceSymbolInfo API
+    const info = binanceSymbolInfo.getSymbolInfo(selectedSymbol);
+    if (info && priceNum > 0) {
+      const minQtyFromNotional = info.minNotional / priceNum;
+      return Math.ceil(minQtyFromNotional / stepSize) * stepSize;
+    }
+    
+    // Fallback: dùng props symbolInfo
     if (!minNotional || !priceNum || priceNum <= 0) return minQty;
     const minQtyFromNotional = minNotional / priceNum;
     return Math.max(minQty, Math.ceil(minQtyFromNotional / stepSize) * stepSize);
-  }, [minNotional, priceNum, minQty, stepSize]);
+  }, [selectedSymbol, priceNum, stepSize, minNotional, minQty]);
 
   const buyQty = useMemo(() => {
     if (percent === 0 || !priceNum || priceNum <= 0) return 0;
     const buyingPower = selectedMarket === "futures" ? availableBalance * leverage : availableBalance;
     const notional = (buyingPower * percent) / 100;
-    return Math.floor((notional / priceNum) / stepSize) * stepSize;
+    const rawQty = Math.floor((notional / priceNum) / stepSize) * stepSize;
+    // Áp dụng smart rounding
+    return smartRoundQty(rawQty, stepSize);
   }, [percent, priceNum, availableBalance, leverage, selectedMarket, stepSize]);
 
   const sellQty = useMemo(() => {
     if (percent === 0 || !priceNum || priceNum <= 0) return 0;
     const buyingPower = selectedMarket === "futures" ? availableBalance * leverage : availableBalance;
     const notional = (buyingPower * percent) / 100 * 1.015;
-    return Math.floor((notional / priceNum) / stepSize) * stepSize;
+    const rawQty = Math.floor((notional / priceNum) / stepSize) * stepSize;
+    // Áp dụng smart rounding
+    return smartRoundQty(rawQty, stepSize);
   }, [percent, priceNum, availableBalance, leverage, selectedMarket, stepSize]);
 
   const qtyNum = useMemo(() => {
@@ -217,9 +277,20 @@ const ChartOrderForm: React.FC<Props> = ({
   }, [maxBuyQty, stepSize]);
 
   const est = useMemo(() => {
-    const notional = priceNum * qtyNum;
+    // Position value = giá trị thực của position
+    const positionValue = priceNum * qtyNum;
+    
+    // Margin required = position value / leverage (số tiền cần đặt cọc)
+    const marginRequired = selectedMarket === "futures" && leverage > 0 
+      ? positionValue / leverage 
+      : positionValue;
+    
     const feeRate = getFeeRate(orderType);
-    const fee = notional * feeRate;
+    // Trading fee tính trên position value
+    const fee = positionValue * feeRate;
+    
+    // Tổng chi phí = margin + fee (đây là "Chi phí" hiển thị giống TradingForm)
+    const totalCost = marginRequired + fee;
 
     let liqPriceLong: number | undefined;
     let liqPriceShort: number | undefined;
@@ -230,13 +301,34 @@ const ChartOrderForm: React.FC<Props> = ({
       liqPriceShort = priceNum * (1 + 1 / leverage - mmr);
     }
 
-    return { notional, fee, maxBuyQty, maxSellQty, liqPriceLong, liqPriceShort };
+    return { 
+      notional: positionValue,
+      marginRequired,
+      fee,
+      totalCost,
+      maxBuyQty, 
+      maxSellQty, 
+      liqPriceLong, 
+      liqPriceShort 
+    };
   }, [priceNum, qtyNum, orderType, selectedMarket, leverage, maxBuyQty, maxSellQty]);
 
   useEffect(() => {
     if (percent > 0 && maxBuyQty > 0) {
-      const qty = roundQty(maxBuyQty * percent / 100);
-      const formatted = stepSize >= 1 ? String(Math.round(qty)) : qty.toFixed(qtyDecimals);
+      const rawQty = roundQty(maxBuyQty * percent / 100);
+      // Áp dụng smart rounding khi set amount từ slider
+      const qty = smartRoundQty(rawQty, stepSize);
+      
+      let formatted: string;
+      if (qty >= 10) {
+        // Đã làm tròn lên, hiển thị số nguyên
+        formatted = String(Math.round(qty));
+      } else if (stepSize >= 1) {
+        formatted = String(Math.round(qty));
+      } else {
+        formatted = qty.toFixed(qtyDecimals);
+      }
+      
       setAmount(qty > 0 ? formatted : "");
     }
   }, [percent, maxBuyQty, stepSize, qtyDecimals]);
@@ -252,7 +344,7 @@ const ChartOrderForm: React.FC<Props> = ({
         else if (p < 100) effectiveTickSize = 0.01;
         else effectiveTickSize = 0.1;
       }
-      p = Math.round(p / effectiveTickSize) * effectiveTickSize;
+      p = formatPrice(Math.round(p / effectiveTickSize) * effectiveTickSize);
     }
 
     let q: number;
@@ -294,7 +386,7 @@ const ChartOrderForm: React.FC<Props> = ({
         else if (sp < 100) effectiveTickSize = 0.01;
         else effectiveTickSize = 0.1;
       }
-      sp = Math.round(sp / effectiveTickSize) * effectiveTickSize;
+      sp = formatPrice(Math.round(sp / effectiveTickSize) * effectiveTickSize);
 
       onPlaceOrder?.({
         market: selectedMarket,
@@ -323,6 +415,21 @@ const ChartOrderForm: React.FC<Props> = ({
   // ===== RENDER =====
   return (
     <div className="p-4 space-y-4 bg-[#1e293b]">
+      {/* Leverage Badge - giống TradingForm */}
+      {selectedMarket === "futures" && (
+        <div className="flex items-center justify-center gap-2">
+          <span className="px-3 py-1.5 text-xs font-medium text-[#f0b90b] bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded">
+            {marginMode === "cross" ? "Cross" : "Isolated"}
+          </span>
+          <span className="px-3 py-1.5 text-xs font-medium text-[#f0b90b] bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded">
+            {leverage}x
+          </span>
+          <span className="px-2 py-1.5 text-xs font-medium text-[#f0b90b] bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded">
+            M
+          </span>
+        </div>
+      )}
+
       {/* Tabs Mở/Đóng */}
       <div className="flex bg-[#1a2332] rounded-lg p-1">
         <button
@@ -437,26 +544,16 @@ const ChartOrderForm: React.FC<Props> = ({
             </svg>
           </button>
         </div>
-        {minQuantity > 0 && (
-          <p className="text-xs text-[#6b7280] flex items-center gap-1">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
-              <path d="M12 16v-4M12 8h.01" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Tối thiểu: {minQuantity} {coinName}
-          </p>
-        )}
       </div>
 
-      {/* Buy/Sell Quantity Display */}
-      {percent > 0 && (
-        <div className="flex justify-between text-xs py-2">
-          <span className="text-[#6b7280]">
-            Long <span className="text-[#10b981] font-medium">{formatQty(buyQty)} {coinName}</span>
-          </span>
-          <span className="text-[#6b7280]">
-            Short <span className="text-[#ef4444] font-medium">{formatQty(sellQty)} {coinName}</span>
-          </span>
+      {/* Số lượng tối thiểu - Style nổi bật giống TradingForm */}
+      {minQuantity > 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-[#f0b90b] bg-[#f0b90b]/10 border border-[#f0b90b]/30 rounded-lg px-3 py-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
+            <path d="M12 16v-4M12 8h.01" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span>Số lượng tối thiểu là <span className="font-semibold text-white">{minQuantity.toLocaleString(undefined, { maximumFractionDigits: qtyDecimals })} {coinName}</span></span>
         </div>
       )}
 
@@ -526,13 +623,13 @@ const ChartOrderForm: React.FC<Props> = ({
         <div className="flex justify-between">
           <span className="text-[#6b7280]">Chi phí</span>
           <span className="text-white">
-            {est.fee.toFixed(4)} <span className="text-[#6b7280]">USDT</span>
+            {est.marginRequired.toFixed(2)} <span className="text-[#6b7280]">USDT</span>
           </span>
         </div>
         <div className="flex justify-between">
           <span className="text-[#6b7280]">Chi phí</span>
           <span className="text-white">
-            {est.fee.toFixed(4)} <span className="text-[#6b7280]">USDT</span>
+            {est.marginRequired.toFixed(2)} <span className="text-[#6b7280]">USDT</span>
           </span>
         </div>
         <div className="flex justify-between">

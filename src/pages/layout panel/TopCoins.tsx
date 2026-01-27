@@ -2,6 +2,33 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
 import "../../style/trading/top-coins.css";
 
+// Binance Icons CDN
+const getBinanceIconUrl = (base: string) => {
+  return `https://cdn.jsdelivr.net/gh/vadimmalykhin/binance-icons/crypto/${base.toLowerCase()}.svg`;
+};
+
+// CoinIcon component with fallback
+const CoinIcon: React.FC<{ base: string; className?: string }> = ({ base, className = "" }) => {
+  const [showLetter, setShowLetter] = useState(false);
+
+  if (showLetter) {
+    return (
+      <div className={`coin-icon-letter ${className}`}>
+        {base.substring(0, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={getBinanceIconUrl(base)}
+      alt={base}
+      className={`coin-icon-img ${className}`}
+      onError={() => setShowLetter(true)}
+    />
+  );
+};
+
 interface CoinData {
   symbol: string;
   price: string;
@@ -275,9 +302,6 @@ const TopCoins: React.FC<TopCoinsProps> = ({ onSymbolClick, market = "futures" }
           const displaySymbol = coin.symbol.replace("USDT", "");
           const price = parseFloat(coin.price);
 
-          // Determine icon color based on tab type
-          const iconClass = type === "losers" ? "loser" : "gainer";
-
           return (
             <div
               key={coin.symbol}
@@ -287,10 +311,8 @@ const TopCoins: React.FC<TopCoinsProps> = ({ onSymbolClick, market = "futures" }
               {/* 1. Rank */}
               <span className="coin-rank">{index + 1}</span>
 
-              {/* 2. Icon */}
-              <div className={`coin-icon ${iconClass}`}>
-                {displaySymbol.substring(0, 2)}
-              </div>
+              {/* 2. Icon - Using CoinIcon component */}
+              <CoinIcon base={displaySymbol} className={type === "losers" ? "loser" : "gainer"} />
 
               {/* 3. Symbol + Type */}
               <div className="coin-info">
@@ -363,11 +385,6 @@ const TopCoins: React.FC<TopCoinsProps> = ({ onSymbolClick, market = "futures" }
           {activeTab === "volume" && <div className="top-coins-tab-indicator" />}
         </button>
       </div>
-
-      {/* WebSocket Status Indicator (optional - có thể bỏ nếu không cần) */}
-      {/* <div className={`ws-status ${wsConnected ? 'connected' : 'disconnected'}`}>
-        {wsConnected ? '🟢' : '🔴'}
-      </div> */}
 
       {/* Content */}
       {renderCoinList(getActiveCoins(), activeTab)}

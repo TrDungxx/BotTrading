@@ -1,7 +1,11 @@
 import axiosInstance from './axiosInstance';
 
 export const API_BASE_URL = import.meta.env.VITE_REACT_APP_API_URL || 'http://45.77.33.141';
-
+import type { 
+  DailyPnLResponse, 
+  WeeklyPnLResponse, 
+  SymbolsHistoryResponse 
+} from './types';
 export interface ApiResponse<T = any> {
   message: string;
   status?: number;
@@ -427,6 +431,27 @@ export const binanceAccountApi = {
     apiRequest(`/binance/accounts/delete?id=${id}`, {
       method: 'DELETE',
     }),
+
+  // ==================== RISK CONFIG FOR ACCOUNTS ====================
+  
+  // Lấy risk config của account
+  getAccountRiskConfig: (accountId: number) =>
+    apiRequest(`/binance-accounts/${accountId}/risk-config`, {
+      method: 'GET',
+    }),
+
+  // Gán risk config cho account
+  assignRiskConfig: (accountId: number, riskConfigId: number) =>
+    apiRequest(`/binance-accounts/${accountId}/risk-config`, {
+      method: 'PUT',
+      body: { risk_id: riskConfigId },
+    }),
+
+  // Xóa risk config của account (quay về mặc định)
+  removeRiskConfig: (accountId: number) =>
+    apiRequest(`/binance-accounts/${accountId}/risk-config`, {
+      method: 'DELETE',
+    }),
 };
 
 
@@ -696,3 +721,79 @@ export const indicatorAnalyticsApi = {
     apiRequest('/trading-analytics/global/stats', { method: 'GET' }),
 };
 
+// Risk config
+
+export const riskConfigApi = {
+  // ========== ADMIN APIs ==========
+  
+  // Lấy tất cả risk configs
+  getAllRiskConfigs: () =>
+    apiRequest('/risk-config/getAll', { method: 'GET' }),
+
+  // Lấy risk config theo ID
+  getRiskConfigById: (id: number) =>
+    apiRequest(`/risk-config/getById?id=${id}`, { method: 'GET' }),
+
+  // Tạo risk config mới
+  createRiskConfig: (data: any) =>
+    apiRequest('/risk-config/create', {
+      method: 'POST',
+      body: data,
+    }),
+
+  // Cập nhật risk config
+  updateRiskConfig: (id: number, data: any) =>
+    apiRequest(`/risk-config/admin-update?id=${id}`, {
+      method: 'PUT',
+      body: data,
+    }),
+
+  // Bulk update nhiều risk configs
+  bulkUpdateRiskConfigs: (data: any) =>
+    apiRequest('/risk-config/bulk-update', {
+      method: 'PUT',
+      body: data,
+    }),
+
+  // ========== SUPER ADMIN APIs ==========
+  
+  // Xóa risk config (chỉ super admin)
+  deleteRiskConfig: (id: number) =>
+    apiRequest(`/risk-config/admin-delete?id=${id}`, {
+      method: 'DELETE',
+    }),
+
+  // ========== USER APIs (nếu cần sau này) ==========
+  
+  // User lấy danh sách risk configs có thể dùng
+  getAvailableConfigs: () =>
+    apiRequest('/risk-config/available', { method: 'GET' }),
+
+  // User load risk config vào TP/SL
+  loadRiskConfig: (configId: number) =>
+    apiRequest(`/risk-config/load?id=${configId}`, { method: 'GET' }),
+};
+
+// ===== PnL API =====
+export const pnlApi = {
+  // Lấy PnL hôm nay
+  getDailyPnl: (binanceAccountId: number) =>
+    apiRequest<DailyPnLResponse>('/m-sys/pnl/daily', {
+      method: 'GET',
+      params: { binanceAccountId },
+    }),
+
+  // Lấy PnL tuần (7 ngày gần nhất)
+  getWeeklyPnl: (binanceAccountId: number) =>
+    apiRequest<WeeklyPnLResponse>('/m-sys/pnl/weekly', {
+      method: 'GET',
+      params: { binanceAccountId },
+    }),
+
+  // Lấy lịch sử giao dịch theo symbol
+  getSymbolsHistory: (binanceAccountId: number) =>
+    apiRequest<SymbolsHistoryResponse>('/m-sys/pnl/symbols', {
+      method: 'GET',
+      params: { binanceAccountId },
+    }),
+};

@@ -102,7 +102,7 @@ export default function AdminSystem() {
     return `${d}d ${h}h`;
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-4">
       <h1 className="text-2xl font-bold">System Monitoring Dashboard</h1>
 
       <div className="flex gap-fluid-2 mt-4">

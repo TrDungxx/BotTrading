@@ -26,11 +26,14 @@ import AdminDashBoard from './pages/admin/AdminDashboard';
 import AccountStats from './pages/user/AccountStats';
 import SystemStats from './pages/admin/SystemStats';
 import DCABot from './pages/user/DCABot';
+import { RefreshNotification } from './pages/admin/RefreshNotification';
+import RiskConfigManagement from './pages/admin/RiskConfigManagement';
 import TerminalIndicatorLayout from './pages/admin/TerminalIndicator';
 function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
+        <RefreshNotification />
         <Routes>
           {/* Public auth routes */}
           <Route path="/login" element={<Login />} />
@@ -77,6 +80,7 @@ function App() {
             />
             {/* Admin routes - chỉ type 1 mới truy cập được */}
             <Route path="admin" element={<AdminSystem />} />
+            <Route path="admin/risk-config" element={<RiskConfigManagement />} />
             <Route path="admin/terminalindicator" element={<TerminalIndicatorLayout />} />
             <Route path="admin/users" element={<AdminSystem />} />
             <Route path="admin/settings" element={<AdminSystem />} />

@@ -32,6 +32,7 @@ interface ChartOrderModalProps {
   // Truyền từ parent để tính toán chính xác
   availableBalance?: number;
   leverage?: number;
+  marginMode?: 'cross' | 'isolated';
   // Callback đặt lệnh
   onPlaceOrder?: (params: PlaceOrderParams) => void;
   // Symbol info
@@ -47,6 +48,7 @@ const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
   defaultOrderType = 'limit',
   availableBalance = 0,
   leverage = 10,
+  marginMode = 'cross',
   onPlaceOrder,
   symbolInfo,
 }) => {
@@ -108,6 +110,7 @@ const ChartOrderModal: React.FC<ChartOrderModalProps> = ({
             onClose={onClose}
             availableBalance={availableBalance}
             leverage={leverage}
+            marginMode={marginMode}
             onPlaceOrder={onPlaceOrder}
             symbolInfo={symbolInfo}
           />

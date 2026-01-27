@@ -801,10 +801,12 @@ if (data.algoId && data.algoType === 'CONDITIONAL' && data.algoStatus) {
 const merged = positions; // (tuỳ bạn merge với lastPositions; tạm thời replace)
 writePositionsLS(merged);
             try {
-              const needBackfill = positions.some((x: any) => !(Number(x.leverage) > 0));
-              if (needBackfill) this.getFuturesAccount();
+              // ✅ FIX: Luôn gọi getFuturesAccount sau ACCOUNT_UPDATE để lấy positionInitialMargin mới
+              // Điều này cần thiết khi DCA vì ACCOUNT_UPDATE event KHÔNG gửi positionInitialMargin
+              // Nếu không có positionInitialMargin, ROI% sẽ bị tính sai
+              setTimeout(() => this.getFuturesAccount(), 200);
             } catch (e) {
-              console.warn('position backfill check err:', e);
+              console.warn('position backfill err:', e);
             }
           }
 

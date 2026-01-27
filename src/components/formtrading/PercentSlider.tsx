@@ -30,9 +30,9 @@ const PercentSlider: React.FC<PercentSliderProps> = ({
   const handleSelect = useCallback(
     (value: number) => {
       setPercent(value);
-      if (value > 0) setAmount("");
+      // Không clear amount ở đây nữa, để useEffect trong TradingForm xử lý
     },
-    [setPercent, setAmount]
+    [setPercent]
   );
 
   const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -68,29 +68,7 @@ const PercentSlider: React.FC<PercentSliderProps> = ({
 
   return (
     <div className="select-none">
-      {/* Mua/Bán Info */}
-      {percent > 0 && amount === "" && (
-        <div className="flex justify-between items-center mb-3 text-fluid-sm">
-          <span className="text-dark-400">
-            Mua{" "}
-            <span className="text-green-400 font-medium">
-              {buyQty.toLocaleString(undefined, {
-                maximumFractionDigits: qtyDecimals,
-              })}{" "}
-              {baseAsset}
-            </span>
-          </span>
-          <span className="text-dark-400">
-            Bán{" "}
-            <span className="text-red-400 font-medium">
-              {sellQty.toLocaleString(undefined, {
-                maximumFractionDigits: qtyDecimals,
-              })}{" "}
-              {baseAsset}
-            </span>
-          </span>
-        </div>
-      )}
+      {/* ĐÃ BỎ phần Mua/Bán Info - số lượng hiển thị trực tiếp trong input */}
 
       {/* Slider Track */}
       <div className="pt-2 pb-1">

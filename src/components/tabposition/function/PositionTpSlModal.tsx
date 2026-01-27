@@ -38,10 +38,30 @@ export interface PositionTpSlModalProps {
 const fmt = (n?: number, maxFrac = 8) =>
   n == null || Number.isNaN(n) ? "--" : n.toLocaleString(undefined, { maximumFractionDigits: maxFrac });
 
+// Smart decimals để tránh floating point precision errors
+// Phù hợp với Binance tickSize rules
+const getSmartDecimals = (price: number): number => {
+  if (price >= 10000) return 1;  // BTC ~100k → 1 decimal
+  if (price >= 1000) return 2;   // ETH ~3k → 2 decimals
+  if (price >= 100) return 2;    // SOL, BNB ~200-600 → 2 decimals
+  if (price >= 10) return 2;     // DASH ~70, LINK ~15 → 2 decimals
+  if (price >= 1) return 4;      // XRP ~2, ADA ~0.8 → 4 decimals
+  if (price >= 0.1) return 5;    // DOGE ~0.3 → 5 decimals
+  if (price >= 0.01) return 6;   // → 6 decimals
+  if (price >= 0.0001) return 7; // → 7 decimals
+  return 8;
+};
+
+// Format price với smart decimals để tránh floating point errors
+const formatPrice = (price: number): number => {
+  const decimals = getSmartDecimals(price);
+  return parseFloat(price.toFixed(decimals));
+};
+
 const clampStep = (val: number, step: number) => {
-  if (!step || step <= 0) return val;
-  const p = (step.toString().split(".")[1] || "").length;
-  return Number((Math.round(val / step) * step).toFixed(p));
+  if (!step || step <= 0) return formatPrice(val);
+  const rounded = Math.round(val / step) * step;
+  return formatPrice(rounded);
 };
 
 // ---------- helpers LS/event cho optimistic ----------
@@ -167,7 +187,7 @@ useEffect(() => {
     const roi = Math.abs((priceDiff / entryPrice) * lev * 100);
     
     // Nếu ROI > 500% thì có thể là order của position cũ
-    if (roi > 500) return false;
+    if (roi > 2000) return false;
     
     return true;
   };
@@ -247,7 +267,7 @@ useEffect(() => {
   const slEst = calcPnLAndROI(slPrice);
 
   // ---------- đặt lệnh + optimistic ----------
- const handleConfirm = () => {
+ const handleConfirm = async () => {
   // Lưu settings
   saveSettings(symbol, {
     trigger,
@@ -269,26 +289,61 @@ useEffect(() => {
 
   const sideForClose = isLong ? "SELL" : "BUY";
   
-  // ✅ THÊM: Check existing orders trước khi gửi
+  // ✅ Check existing orders
   const openOrders = readOpenOrdersLS();
   
-  const existingTP = openOrders.find((o: any) => 
+  // ✅ Tìm TẤT CẢ existing TP/SL (không check stopPrice)
+  const existingTPOrder = openOrders.find((o: any) => 
     o.symbol === symbol && 
     (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
     o.side === sideForClose &&
     o.status === 'NEW' &&
-    parseFloat(o.stopPrice) === tpPrice
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
   );
   
-  const existingSL = openOrders.find((o: any) => 
+  const existingSLOrder = openOrders.find((o: any) => 
     o.symbol === symbol && 
     (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
     o.side === sideForClose &&
     o.status === 'NEW' &&
-    parseFloat(o.stopPrice) === slPrice
+    !o._optimistic &&
+    !String(o.orderId || '').startsWith('tmp_')
   );
+
+  // ✅ CANCEL EXISTING TP NẾU GIÁ KHÁC
+  if (existingTPOrder && Number.isFinite(tpPrice as number)) {
+    const existingStopPrice = parseFloat(existingTPOrder.stopPrice || '0');
+    if (existingStopPrice !== tpPrice) {
+      console.log('🗑️ Cancelling existing TP:', existingTPOrder.orderId);
+      const algoId = existingTPOrder.algoId || existingTPOrder.orderId;
+      (binanceWS as any).sendAuthed({
+        action: 'cancelFuturesAlgoOrder',
+        symbol: symbol,
+        algoId: Number(algoId)
+      });
+      // Đợi cancel xong
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  // ✅ CANCEL EXISTING SL NẾU GIÁ KHÁC
+  if (existingSLOrder && Number.isFinite(slPrice as number)) {
+    const existingStopPrice = parseFloat(existingSLOrder.stopPrice || '0');
+    if (existingStopPrice !== slPrice) {
+      console.log('🗑️ Cancelling existing SL:', existingSLOrder.orderId);
+      const algoId = existingSLOrder.algoId || existingSLOrder.orderId;
+      (binanceWS as any).sendAuthed({
+        action: 'cancelFuturesAlgoOrder',
+        symbol: symbol,
+        algoId: Number(algoId)
+      });
+      // Đợi cancel xong
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
   
-  // ✅ THÊM: Lưu metadata ROI input của user
+  // ✅ Lưu metadata ROI input của user
   const tpslMetadata: Record<string, { tpInputRoi?: string; slInputRoi?: string }> = 
     JSON.parse(localStorage.getItem('tpsl_metadata') || '{}');
   
@@ -300,8 +355,19 @@ useEffect(() => {
   
   localStorage.setItem('tpsl_metadata', JSON.stringify(tpslMetadata));
 
-  // OPTIMISTIC + WS: TP - chỉ gửi nếu chưa có hoặc stopPrice khác
-  if (Number.isFinite(tpPrice as number) && !existingTP) {
+  // ✅ Check lại sau khi cancel - chỉ đặt nếu giá khác hoặc không có existing
+  const shouldPlaceTP = Number.isFinite(tpPrice as number) && (
+    !existingTPOrder || 
+    parseFloat(existingTPOrder.stopPrice || '0') !== tpPrice
+  );
+  
+  const shouldPlaceSL = Number.isFinite(slPrice as number) && (
+    !existingSLOrder || 
+    parseFloat(existingSLOrder.stopPrice || '0') !== slPrice
+  );
+
+  // OPTIMISTIC + WS: TP
+  if (shouldPlaceTP) {
     const optimisticRow = {
       orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       symbol,
@@ -325,10 +391,11 @@ useEffect(() => {
       type: "TAKE_PROFIT_MARKET",
       stopPrice: tpPrice!,
     });
+    console.log('✅ Placed new TP @', tpPrice);
   }
 
-  // OPTIMISTIC + WS: SL - chỉ gửi nếu chưa có hoặc stopPrice khác
-  if (Number.isFinite(slPrice as number) && !existingSL) {
+  // OPTIMISTIC + WS: SL
+  if (shouldPlaceSL) {
     const optimisticRow = {
       orderId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       symbol,
@@ -352,6 +419,7 @@ useEffect(() => {
       type: "STOP_MARKET",
       stopPrice: slPrice!,
     });
+    console.log('✅ Placed new SL @', slPrice);
   }
 
   onClose();

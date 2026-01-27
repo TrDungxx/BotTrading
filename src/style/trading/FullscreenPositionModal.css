@@ -276,12 +276,39 @@
   border-bottom: 1px solid #334155;
 }
 
+/* ✅ FIX: Không set color cứng, để Tailwind classes hoạt động */
 .fullscreen-position-content td {
   padding: var(--fs-space-sm) var(--fs-space-md);
   font-size: var(--fs-text-sm);
-  color: #e2e8f0;
+  /* color: #e2e8f0; ← XÓA DÒNG NÀY - đang override màu xanh/đỏ */
   white-space: nowrap;
   border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* ✅ THÊM: Đảm bảo màu xanh/đỏ từ Tailwind không bị override */
+.fullscreen-position-content td.text-\[\#0ecb81\],
+.fullscreen-position-content td .text-\[\#0ecb81\],
+.fullscreen-position-content .text-\[\#0ecb81\] {
+  color: #0ecb81 !important;
+}
+
+.fullscreen-position-content td.text-\[\#f6465d\],
+.fullscreen-position-content td .text-\[\#f6465d\],
+.fullscreen-position-content .text-\[\#f6465d\] {
+  color: #f6465d !important;
+}
+
+/* ✅ Giữ màu trắng mặc định cho text không có class màu */
+.fullscreen-position-content td.text-white,
+.fullscreen-position-content td .text-white,
+.fullscreen-position-content .text-white {
+  color: #ffffff !important;
+}
+
+/* ✅ Màu xám cho các element cần thiết */
+.fullscreen-position-content .text-gray-400,
+.fullscreen-position-content .text-dark-400 {
+  color: #9ca3af !important;
 }
 
 .fullscreen-position-content tbody tr {

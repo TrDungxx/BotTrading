@@ -105,6 +105,7 @@ interface ChartContextMenuProps {
   // Thêm props cho order form
   availableBalance?: number;
   leverage?: number;
+  marginMode?: 'cross' | 'isolated';
   // Callback đặt lệnh
   onPlaceOrder?: (params: PlaceOrderParams) => void;
   // Symbol info
@@ -131,16 +132,66 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
   snapToTick,
   availableBalance = 0,
   leverage = 10,
+  marginMode = 'cross',
   onPlaceOrder,
   symbolInfo,
 }) => {
   // State cho submenu đặt lệnh
   const [orderSubMenuOpen, setOrderSubMenuOpen] = React.useState(false);
+  // Ref để track timeout cho việc đóng submenu
+  const closeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   // State cho modal - chỉ có limit và stop-limit (không có market)
   const [orderModalOpen, setOrderModalOpen] = React.useState(false);
   const [orderModalType, setOrderModalType] = React.useState<'limit' | 'stop-limit'>('limit');
   // State lưu giá khi mở modal (không bị reset khi menu đóng)
   const [savedPrice, setSavedPrice] = React.useState<number | null>(null);
+
+  // Ref để track timeout cho submenu "Thêm cài đặt"
+  const settingsCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout khi unmount
+  React.useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+      if (settingsCloseTimeoutRef.current) {
+        clearTimeout(settingsCloseTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handlers cho submenu với delay
+  const handleOrderMenuEnter = () => {
+    // Clear any pending close timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setOrderSubMenuOpen(true);
+  };
+
+  const handleOrderMenuLeave = () => {
+    // Delay closing to allow mouse to travel to submenu
+    closeTimeoutRef.current = setTimeout(() => {
+      setOrderSubMenuOpen(false);
+    }, 150); // 150ms delay - đủ thời gian để di chuột sang submenu
+  };
+
+  // Handlers cho submenu "Thêm cài đặt" với delay
+  const handleSettingsMenuEnter = () => {
+    if (settingsCloseTimeoutRef.current) {
+      clearTimeout(settingsCloseTimeoutRef.current);
+      settingsCloseTimeoutRef.current = null;
+    }
+    onSubMenuOpen(true);
+  };
+
+  const handleSettingsMenuLeave = () => {
+    settingsCloseTimeoutRef.current = setTimeout(() => {
+      onSubMenuOpen(false);
+    }, 150);
+  };
 
   // Sử dụng giá tại thời điểm click, không thay đổi khi di chuột
   const displayPrice = ctxClickPrice ?? hoverPrice ?? lastCandleClose;
@@ -287,8 +338,8 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
       {/* Đặt lệnh mới - với submenu */}
       <div 
         className="relative"
-        onMouseEnter={() => setOrderSubMenuOpen(true)}
-        onMouseLeave={() => setOrderSubMenuOpen(false)}
+        onMouseEnter={handleOrderMenuEnter}
+        onMouseLeave={handleOrderMenuLeave}
       >
         <button
           className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between"
@@ -301,23 +352,32 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
         </button>
 
         {orderSubMenuOpen && (
-          <div 
-            className="absolute left-full top-0 ml-0.5 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
-            style={{ minWidth: 200 }}
-          >
-            <button 
-              className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
-              onClick={handleLimitOrder}
+          <>
+            {/* Hover bridge - vùng vô hình nối menu chính và submenu */}
+            <div 
+              className="absolute left-full top-0 w-3 h-full"
+              style={{ pointerEvents: 'auto' }}
+            />
+            <div 
+              className="absolute left-full top-0 ml-1 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
+              style={{ minWidth: 200 }}
+              onMouseEnter={handleOrderMenuEnter}
+              onMouseLeave={handleOrderMenuLeave}
             >
-              Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Limit
-            </button>
-            <button 
-              className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
-              onClick={handleStopOrder}
-            >
-              Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Dừng
-            </button>
-          </div>
+              <button 
+                className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
+                onClick={handleLimitOrder}
+              >
+                Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Limit
+              </button>
+              <button 
+                className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]"
+                onClick={handleStopOrder}
+              >
+                Giao dịch {selectedSymbol.replace('USDT', '')} @ {formatPrice(displayPrice)} Dừng
+              </button>
+            </div>
+          </>
         )}
       </div>
 
@@ -351,8 +411,8 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
       {/* Thêm cài đặt - với submenu */}
       <div
         className="relative"
-        onMouseEnter={() => onSubMenuOpen(true)}
-        onMouseLeave={() => onSubMenuOpen(false)}
+        onMouseEnter={handleSettingsMenuEnter}
+        onMouseLeave={handleSettingsMenuLeave}
       >
         <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139] flex items-center justify-between">
           <div className="flex items-center gap-fluid-3">
@@ -363,20 +423,29 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
         </button>
 
         {subMenuOpen && (
-          <div 
-            className="absolute left-full top-0 ml-0.5 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
-            style={{ minWidth: 160 }}
-          >
-            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
-              Ẩn thanh công cụ
-            </button>
-            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
-              Khóa bản vẽ
-            </button>
-            <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
-              Hiển thị lưới
-            </button>
-          </div>
+          <>
+            {/* Hover bridge */}
+            <div 
+              className="absolute left-full top-0 w-3 h-full"
+              style={{ pointerEvents: 'auto' }}
+            />
+            <div 
+              className="absolute left-full top-0 ml-1 py-2 rounded-fluid-md bg-[#1e2329] border border-[#2b3139]/50 shadow-xl" 
+              style={{ minWidth: 160 }}
+              onMouseEnter={handleSettingsMenuEnter}
+              onMouseLeave={handleSettingsMenuLeave}
+            >
+              <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
+                Ẩn thanh công cụ
+              </button>
+              <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
+                Khóa bản vẽ
+              </button>
+              <button className="w-full px-fluid-3 py-2 text-left text-fluid-sm text-[#eaecef] hover:bg-[#2b3139]">
+                Hiển thị lưới
+              </button>
+            </div>
+          </>
         )}
       </div>
 
@@ -428,6 +497,7 @@ const ChartContextMenu: React.FC<ChartContextMenuProps> = ({
       defaultOrderType={orderModalType}
       availableBalance={availableBalance}
       leverage={leverage}
+      marginMode={marginMode}
       onPlaceOrder={onPlaceOrder}
       symbolInfo={symbolInfo}
     />

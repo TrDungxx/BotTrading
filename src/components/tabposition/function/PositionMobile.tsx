@@ -1,225 +1,287 @@
-import React, { useState, useEffect } from "react";
-import { Edit3, TrendingUp, TrendingDown } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Edit3, TrendingUp, TrendingDown, ChevronDown, ChevronUp, X, Shield } from "lucide-react";
 import { PositionData } from "../../../utils/types";
 
 interface PositionMobileProps {
   positions?: PositionData[];
   market?: "spot" | "futures";
+  markPrices?: Record<string, number>;
+  openOrders?: any[];
   onTpSlClick?: (position: PositionData) => void;
   onAdvancedClick?: (position: PositionData) => void;
   onCloseMarket?: (position: PositionData) => void;
   onCloseLimit?: (position: PositionData) => void;
   onCloseAll?: () => void;
   onCloseByPnl?: () => void;
+  onSymbolClick?: (symbol: string) => void;
 }
 
 const PositionMobile: React.FC<PositionMobileProps> = ({
   positions = [],
   market = "futures",
+  markPrices = {},
+  openOrders = [],
   onTpSlClick,
   onAdvancedClick,
   onCloseMarket,
   onCloseLimit,
   onCloseAll,
   onCloseByPnl,
+  onSymbolClick,
 }) => {
-  // ✅ FIX 1: Track which cards are expanded using Set
-  // Default: all cards expanded (empty Set means all expanded)
-  const [collapsedCards, setCollapsedCards] = useState<Set<string>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
-  // Helper functions
+  // Get real-time mark price
+  const getMarkPrice = (pos: PositionData): number => {
+    return markPrices[pos.symbol] || Number(pos.markPrice || 0);
+  };
+
+  // Calculate PnL
   const calculatePnl = (pos: PositionData): number | undefined => {
     const entry = Number(pos.entryPrice || 0);
     const qty = Number(pos.positionAmt || 0);
-    const mark = Number(pos.markPrice || 0);
+    const mark = getMarkPrice(pos);
     if (!entry || !qty || !mark) return undefined;
     return qty * (mark - entry);
   };
 
-  const calculatePnlPercentage = (pos: PositionData): number | undefined => {
+  // Calculate ROI%
+  const calculateRoi = (pos: PositionData): number | undefined => {
     const pnl = calculatePnl(pos);
     const entry = Number(pos.entryPrice || 0);
     const qty = Math.abs(Number(pos.positionAmt || 0));
     const leverage = Number((pos as any).leverage || 1);
     
     if (pnl == null || !entry || !qty) return undefined;
-    const initialMargin = (qty * entry) / leverage;
-    return initialMargin ? (pnl / initialMargin) * 100 : 0;
+    const margin = (qty * entry) / leverage;
+    return margin ? (pnl / margin) * 100 : 0;
   };
 
-  const formatNumber = (num: number | undefined, decimals = 2): string => {
-    if (num == null) return "--";
-    return num.toLocaleString(undefined, { 
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals 
-    });
+  // Calculate Margin
+  const calculateMargin = (pos: PositionData): number => {
+    const isolatedWallet = Number((pos as any).isolatedWallet || 0);
+    if (isolatedWallet > 0) return isolatedWallet;
+
+    const posMargin = Number((pos as any).positionInitialMargin || 0);
+    if (posMargin > 0) return posMargin;
+
+    const entry = Number(pos.entryPrice || 0);
+    const qty = Math.abs(Number(pos.positionAmt || 0));
+    const leverage = Number((pos as any).leverage || 1);
+    
+    if (entry > 0 && qty > 0 && leverage > 0) {
+      return (qty * entry) / leverage;
+    }
+    return 0;
   };
 
-  // ✅ FIX 2: Filter active positions correctly
-  const activePositions = positions.filter(
-    (p) => Math.abs(Number(p.positionAmt || 0)) > 0.000001
-  );
+  // Get TP/SL orders
+  const getTpSlOrders = (pos: PositionData) => {
+    const isLong = Number(pos.positionAmt || 0) > 0;
+    const expectedSide = isLong ? "SELL" : "BUY";
+    
+    const tpOrder = openOrders.find((o: any) => 
+      o.symbol === pos.symbol && 
+      (o.type === 'TAKE_PROFIT_MARKET' || o.type === 'TAKE_PROFIT') &&
+      o.side === expectedSide && o.status === 'NEW'
+    );
+    
+    const slOrder = openOrders.find((o: any) => 
+      o.symbol === pos.symbol && 
+      (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+      o.side === expectedSide && o.status === 'NEW'
+    );
+    
+    return { tpOrder, slOrder };
+  };
 
-  // ✅ Debug log
-  useEffect(() => {
-    console.log("📊 PositionMobile - Active positions:", activePositions.length);
-    console.log("📊 All positions:", positions);
-    console.log("📊 Filtered active:", activePositions);
+  const fmt = (n: number | undefined, d = 2): string => {
+    if (n == null || !Number.isFinite(n)) return "--";
+    return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
+
+  const fmtPrice = (n: number | undefined): string => {
+    if (n == null || !Number.isFinite(n)) return "--";
+    const d = n >= 1000 ? 2 : n >= 1 ? 4 : 6;
+    return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+  };
+
+  const activePositions = useMemo(() => {
+    return positions.filter((p) => Math.abs(Number(p.positionAmt || 0)) > 0.000001);
   }, [positions]);
 
-  const toggleCard = (key: string) => {
-    setCollapsedCards(prev => {
+  const toggleExpand = (key: string) => {
+    setExpandedCards(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(key)) {
-        newSet.delete(key); // Expand
-      } else {
-        newSet.add(key); // Collapse
-      }
+      if (newSet.has(key)) newSet.delete(key);
+      else newSet.add(key);
       return newSet;
     });
   };
 
-  const renderPositionCard = (pos: PositionData) => {
+  // Total PnL
+  const totalPnl = useMemo(() => {
+    return activePositions.reduce((sum, pos) => sum + (calculatePnl(pos) || 0), 0);
+  }, [activePositions, markPrices]);
+
+  const renderCard = (pos: PositionData) => {
     const size = Number(pos.positionAmt || 0);
+    const mark = getMarkPrice(pos);
     const pnl = calculatePnl(pos);
-    const pnlPercent = calculatePnlPercentage(pos);
+    const roi = calculateRoi(pos);
+    const margin = calculateMargin(pos);
     const isLong = size > 0;
     const cardKey = `${pos.symbol}:${(pos as any).positionSide || "BOTH"}`;
-    
-    // ✅ FIX 1: Card is expanded if NOT in collapsedCards Set
-    const isExpanded = !collapsedCards.has(cardKey);
+    const isExpanded = expandedCards.has(cardKey);
+    const { tpOrder, slOrder } = getTpSlOrders(pos);
+    const marginType = ((pos as any).marginType || 'cross').toLowerCase();
 
-    const pnlColor = 
-      pnl == null ? "text-dark-300" :
-      pnl > 0 ? "text-success-500" :
-      pnl < 0 ? "text-danger-500" : "text-dark-300";
-
-    const sideColor = isLong ? "text-success-500" : "text-danger-500";
-    const sideBg = isLong ? "bg-success-500/10" : "bg-danger-500/10";
+    const pnlColor = pnl == null ? "text-gray-400" : pnl > 0 ? "text-green-400" : pnl < 0 ? "text-red-400" : "text-gray-400";
+    const sideColor = isLong ? "text-green-400" : "text-red-400";
+    const sideBg = isLong ? "bg-green-500/10 border-green-500/30" : "bg-red-500/10 border-red-500/30";
 
     return (
-      <div
-        key={cardKey}
-        className="bg-dark-800 rounded-lg border border-dark-700 overflow-hidden mb-3"
-      >
-        {/* Card Header - Always Visible */}
-        <div
-          className="p-fluid-4 cursor-pointer active:bg-dark-700"
-          
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-fluid-2">
-              <span className="font-semibold text-white text-fluid-base">
+      <div key={cardKey} className="bg-slate-800/80 rounded-xl border border-slate-700/50 mb-3 overflow-hidden">
+        {/* Header - Symbol + PnL */}
+        <div className="px-3 py-2.5 border-b border-slate-700/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span 
+                className="font-semibold text-white text-sm underline decoration-dotted cursor-pointer hover:text-primary-400"
+                onClick={() => onSymbolClick?.(pos.symbol)}
+              >
                 {pos.symbol}
               </span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded font-medium ${sideBg} ${sideColor}`}
-              >
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${sideBg} ${sideColor} font-medium`}>
                 {isLong ? "LONG" : "SHORT"}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                {(pos as any).leverage || 1}x
               </span>
             </div>
             <div className="text-right">
-              <div className={`font-bold text-fluid-base ${pnlColor}`}>
-                {pnl == null
-                  ? "--"
-                  : `${pnl > 0 ? "+" : ""}${formatNumber(pnl, 2)} USDT`}
+              <div className={`font-bold text-sm ${pnlColor}`}>
+                {pnl == null ? "--" : `${pnl >= 0 ? "+" : ""}${fmt(pnl)} USDT`}
               </div>
-              <div className={`text-xs ${pnlColor}`}>
-                {pnlPercent == null
-                  ? "--"
-                  : `(${pnlPercent > 0 ? "+" : ""}${formatNumber(pnlPercent, 2)}%)`}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Info Row */}
-          <div className="grid grid-cols-3 gap-fluid-2 text-xs">
-            <div>
-              <div className="text-dark-400 mb-0.5">Số lượng</div>
-              <div className={`font-medium ${sideColor}`}>
-                {formatNumber(Math.abs(size), 0)}
-              </div>
-            </div>
-            <div>
-              <div className="text-dark-400 mb-0.5">Entry</div>
-              <div className="text-white font-mono">
-                {formatNumber(Number(pos.entryPrice || 0), 4)}
-              </div>
-            </div>
-            <div>
-              <div className="text-dark-400 mb-0.5">Mark</div>
-              <div className="text-white font-mono">
-                {formatNumber(Number(pos.markPrice || 0), 4)}
+              <div className={`text-[10px] ${pnlColor}`}>
+                {roi == null ? "--" : `(${roi >= 0 ? "+" : ""}${fmt(roi)}%)`}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Expanded Content */}
-        {isExpanded && (
-          <div className="border-t border-dark-700 p-fluid-4 space-y-3">
-            {/* Additional Info */}
-            <div className="grid grid-cols-2 gap-fluid-3 text-xs">
-              <div>
-                <div className="text-dark-400 mb-1">Break Even</div>
-                <div className="text-white font-mono">
-                  {formatNumber(Number((pos as any).breakEvenPrice || pos.entryPrice || 0), 4)}
-                </div>
-              </div>
-              <div>
-                <div className="text-dark-400 mb-1">Leverage</div>
-                <div className="text-white font-medium">
-                  {(pos as any).leverage || 1}x
-                </div>
+        {/* Main Info Grid */}
+        <div className="px-3 py-2">
+          <div className="grid grid-cols-4 gap-2 text-[11px]">
+            <div>
+              <div className="text-slate-500 mb-0.5">Size</div>
+              <div className={`font-medium ${sideColor}`}>{fmt(Math.abs(size), 0)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Entry</div>
+              <div className="text-white font-mono">{fmtPrice(Number(pos.entryPrice))}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Mark</div>
+              <div className="text-white font-mono">{fmtPrice(mark)}</div>
+            </div>
+            <div>
+              <div className="text-slate-500 mb-0.5">Margin</div>
+              <div className="text-white">
+                {fmt(margin)}
+                <span className={`ml-1 text-[8px] ${marginType === 'isolated' ? 'text-yellow-400' : 'text-blue-400'}`}>
+                  {marginType === 'isolated' ? 'Iso' : 'Cross'}
+                </span>
               </div>
             </div>
+          </div>
 
-            {/* Action Buttons */}
-            <div className="gap-fluid-2 pt-2">
-              {/* TP/SL & Advanced */}
-              <div className="grid grid-cols-2 gap-fluid-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTpSlClick?.(pos);
-                  }}
-                  className="flex items-center justify-center gap-fluid-1.5 px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-dark-600 text-dark-200 hover:bg-dark-700 active:bg-dark-600 font-medium"
-                >
-                  <Edit3 size={16} />
-                  TP/SL
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAdvancedClick?.(pos);
-                  }}
-                  className="flex items-center justify-center gap-fluid-1.5 px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-primary-600 text-primary-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
-                >
-                  {isLong ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                  Nâng cao
-                </button>
+          {/* TP/SL Row */}
+          {(tpOrder || slOrder) && (
+            <div className="flex gap-3 mt-2 text-[10px]">
+              {tpOrder && (
+                <span className="text-green-400">
+                  TP: {fmtPrice(Number(tpOrder.stopPrice))}
+                </span>
+              )}
+              {slOrder && (
+                <span className="text-red-400">
+                  SL: {fmtPrice(Number(slOrder.stopPrice))}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons - ALWAYS VISIBLE */}
+        <div className="px-3 py-2 border-t border-slate-700/50 bg-slate-800/50">
+          <div className="grid grid-cols-4 gap-2">
+            <button
+              onClick={() => onTpSlClick?.(pos)}
+              className={`flex items-center justify-center gap-1 px-2 py-2 text-[11px] rounded-lg border font-medium ${
+                tpOrder || slOrder 
+                  ? 'border-green-500/50 text-green-400 bg-green-500/10' 
+                  : 'border-slate-600 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              <Edit3 size={12} />
+              <span className="hidden xs:inline">TP/SL</span>
+            </button>
+            
+            <button
+              onClick={() => onAdvancedClick?.(pos)}
+              className="flex items-center justify-center gap-1 px-2 py-2 text-[11px] rounded-lg border border-blue-500/50 text-blue-400 hover:bg-slate-700 font-medium"
+            >
+              <Shield size={12} />
+              <span className="hidden xs:inline">Risk</span>
+            </button>
+            
+            <button
+              onClick={() => onCloseMarket?.(pos)}
+              className="flex items-center justify-center gap-1 px-2 py-2 text-[11px] rounded-lg bg-red-500 hover:bg-red-600 text-white font-semibold"
+            >
+              <X size={12} />
+              Market
+            </button>
+            
+            <button
+              onClick={() => onCloseLimit?.(pos)}
+              className="flex items-center justify-center gap-1 px-2 py-2 text-[11px] rounded-lg border border-red-500 text-red-400 hover:bg-slate-700 font-medium"
+            >
+              Limit
+            </button>
+          </div>
+        </div>
+
+        {/* Expand Toggle */}
+        <div 
+          className="flex items-center justify-center py-1.5 cursor-pointer hover:bg-slate-700/50 border-t border-slate-700/30"
+          onClick={() => toggleExpand(cardKey)}
+        >
+          {isExpanded ? (
+            <ChevronUp size={16} className="text-slate-500" />
+          ) : (
+            <ChevronDown size={16} className="text-slate-500" />
+          )}
+        </div>
+
+        {/* Expanded Details */}
+        {isExpanded && (
+          <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-700/30">
+            <div className="grid grid-cols-3 gap-3 text-[11px]">
+              <div>
+                <div className="text-slate-500 mb-0.5">Break Even</div>
+                <div className="text-white font-mono">{fmtPrice(Number((pos as any).breakEvenPrice || pos.entryPrice))}</div>
               </div>
-
-              {/* Close Buttons */}
-              <div className="grid grid-cols-2 gap-fluid-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseMarket?.(pos);
-                  }}
-                  className="px-fluid-3 py-2.5 text-fluid-sm rounded-lg bg-danger-500 hover:bg-danger-600 active:bg-danger-700 text-white font-medium"
-                >
-                  Đóng Market
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCloseLimit?.(pos);
-                  }}
-                  className="px-fluid-3 py-2.5 text-fluid-sm rounded-lg border border-danger-500 text-danger-400 hover:bg-dark-700 active:bg-dark-600 font-medium"
-                >
-                  Đóng Limit
-                </button>
+              <div>
+                <div className="text-slate-500 mb-0.5">Notional</div>
+                <div className="text-white">{fmt(Math.abs(size) * mark)} USDT</div>
+              </div>
+              <div>
+                <div className="text-slate-500 mb-0.5">Liq. Price</div>
+                <div className="text-orange-400 font-mono">
+                  {fmtPrice(Number((pos as any).liquidationPrice || 0))}
+                </div>
               </div>
             </div>
           </div>
@@ -229,41 +291,57 @@ const PositionMobile: React.FC<PositionMobileProps> = ({
   };
 
   return (
-    <div className="position-mobile-container bg-dark-900 w-full p-fluid-4">
-      {/* Action Buttons */}
+    <div className="position-mobile-container w-full p-3">
+      {/* Top Actions */}
       {activePositions.length > 0 && (
-        <div className="flex items-center gap-fluid-2 mb-4">
-          <button
-            onClick={onCloseAll}
-            className="flex-1 px-fluid-4 py-2 text-fluid-sm rounded-lg border border-warning-500 text-warning-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
-          >
-            Đóng tất cả
-          </button>
-          <button
-            onClick={onCloseByPnl}
-            className="flex-1 px-fluid-4 py-2 text-fluid-sm rounded-lg border border-success-500 text-success-400 hover:bg-dark-800 active:bg-dark-700 font-medium"
-          >
-            Đóng theo PnL
-          </button>
-        </div>
+        <>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={onCloseAll}
+              className="flex-1 py-2 text-xs rounded-lg border border-yellow-500/50 text-yellow-400 hover:bg-slate-800 font-medium"
+            >
+              Đóng tất cả
+            </button>
+            <button
+              onClick={onCloseByPnl}
+              className="flex-1 py-2 text-xs rounded-lg border border-green-500/50 text-green-400 hover:bg-slate-800 font-medium"
+            >
+              Đóng theo PnL
+            </button>
+          </div>
+
+          {/* Summary */}
+          <div className="flex items-center justify-between px-3 py-2 mb-3 bg-slate-800/50 rounded-lg border border-slate-700/30 text-[11px]">
+            <div className="text-center">
+              <span className="text-slate-500">Positions: </span>
+              <span className="text-white font-medium">{activePositions.length}</span>
+            </div>
+            <div className="text-center">
+              <span className="text-slate-500">Total PnL: </span>
+              <span className={`font-medium ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {totalPnl >= 0 ? '+' : ''}{fmt(totalPnl)} USDT
+              </span>
+            </div>
+            <div className="text-center">
+              <span className="text-slate-500">Margin: </span>
+              <span className="text-white font-medium">
+                {fmt(activePositions.reduce((s, p) => s + calculateMargin(p), 0))}
+              </span>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Position Cards - ✅ FIX 2: Map all active positions */}
+      {/* Position Cards */}
       {activePositions.length > 0 ? (
-        <div className="space-y-0">
-          {activePositions.map((pos) => renderPositionCard(pos))}
-        </div>
+        <div>{activePositions.map(renderCard)}</div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-fluid-12 text-center">
-          <div className="w-16 h-16 mb-4 rounded-full bg-dark-800 flex items-center justify-center">
-            <TrendingUp className="w-8 h-fluid-input-sm text-dark-600" />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-14 h-14 mb-3 rounded-full bg-slate-800 flex items-center justify-center">
+            <TrendingUp className="w-7 h-7 text-slate-600" />
           </div>
-          <div className="text-dark-400 text-fluid-sm mb-1">
-            Không có vị thế nào
-          </div>
-          <div className="text-dark-500 text-xs">
-            Các vị thế của bạn sẽ hiển thị ở đây
-          </div>
+          <div className="text-slate-400 text-sm mb-1">Không có vị thế</div>
+          <div className="text-slate-500 text-xs">Các vị thế sẽ hiển thị ở đây</div>
         </div>
       )}
     </div>

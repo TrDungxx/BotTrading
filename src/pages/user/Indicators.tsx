@@ -311,7 +311,7 @@ const getExchangeLabel = (symbol: string): { icon: string; label: string } => {
 
   return (
     <div className="w-full max-w-full overflow-x-hidden">
-      <div className="space-y-6">
+      <div className="space-y-6 px-4 sm:px-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-fluid-4">
           <div>
             <h1 className="text-2xl font-bold">Indicators</h1>

@@ -1,16 +1,32 @@
 /* ============================================
    TRADING TERMINAL BASE - FLUID RESPONSIVE
+   Refactored: Position panel lớn hơn, Chart nhỏ hơn
    ============================================ */
+
+/* Footer height variables */
+:root {
+  --footer-height: 20px;
+}
+
+@media (min-width: 2400px) {
+  :root {
+    --footer-height: 22px;
+  }
+}
+
+@media (min-width: 3200px) {
+  :root {
+    --footer-height: 24px;
+  }
+}
 
 .trading-terminal {
   display: flex;
   flex-direction: column;
   height: calc(100dvh - 4rem);
-  width: 100%;
-  max-width: 100%;  /* Changed from 100vw to avoid scrollbar issues */
+  /* ✅ Không set width để tự động fill không gian của parent */
   background: var(--bg-workspace, #0b1426);
   overflow: hidden;
-  /* NO margin-left here - AppLayout handles it */
 }
 
 .trading-header {
@@ -26,11 +42,11 @@
    ============================================ */
 
 .trading-workspace {
-  flex: 1;
+  flex: 1 1 0;
   display: grid;
   grid-template-columns: 1fr var(--form-width, minmax(180px, 320px));
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
   width: 100%;
   max-width: 100%;
   gap: 0;
@@ -54,7 +70,7 @@
   background: rgba(100, 116, 139, 0.8);
 }
 
-/* ===== LEFT SECTION - FIXED LAYOUT ===== */
+/* ===== LEFT SECTION - FLEX COLUMN ===== */
 .workspace-left-columns {
   display: flex;
   flex-direction: column;
@@ -62,33 +78,41 @@
   overflow: hidden;
   background: var(--bg-panel, #1e293b);
   height: 100%;
+  min-height: 0;
 }
 
-/* Top Row: Chart + OrderBook - FLUID HEIGHT */
+/* ============================================
+   ✅ TOP ROW: Chart + OrderBook
+   Chiếm phần nhỏ hơn để Position panel có nhiều chỗ hơn
+   ============================================ */
 .workspace-chart-orderbook-row {
   display: grid;
   grid-template-columns: 1fr var(--orderbook-width, 320px);
-  height: clamp(300px, 55vh, 700px);
-  min-height: clamp(280px, 18.229vw, 450px);
-  max-height: clamp(500px, 36.458vw, 900px);
+  flex: 0 0 auto; /* ✅ KHÔNG GROW - chiều cao cố định */
+  height: 50vh; /* ✅ Mặc định 50% viewport */
+  min-height: 280px;
+  max-height: 55vh;
   gap: 0;
   overflow: hidden;
 }
 
-/* Position Panel - FILL REMAINING SPACE */
+/* ============================================
+   ✅ POSITION PANEL - FILL REMAINING SPACE
+   ============================================ */
 .positions-panel {
-  flex: 1 1 auto;
+  flex: 1 1 auto; /* ✅ GROW để fill không gian còn lại */
   min-height: var(--position-panel-collapsed, 44px);
   border-top: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-  border-bottom: 2px solid rgba(71, 85, 105, 0.6);
+  border-bottom: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .positions-panel.is-open {
-  flex: 1 1 auto;
-  min-height: clamp(120px, 9.375vw, 200px);
+  flex: 1 1 auto; /* ✅ Fill tất cả không gian còn lại */
+  min-height: 200px;
+  overflow: hidden;
 }
 
 /* ===== RIGHT COLUMN: Trading Form - STICKY ===== */
@@ -103,87 +127,16 @@
   overflow: hidden;
   position: sticky;
   top: 0;
-  height: 100vh;
-  max-height: calc(100dvh - 4rem - var(--ticker-height, 35px));
+  height: 100%;
 }
 
 .trading-form-content {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-height: 0;
-}
-
-/* ============================================
-   TICKER CAROUSEL PANEL - FLUID
-   Sync với AppLayout marginLeft values
-   ============================================ */
-
-.ticker-carousel-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--ticker-height, clamp(28px, 1.823vw, 48px));
-  z-index: var(--z-floating, 50);
-  background: var(--bg-panel, #1e293b);
-  border-top: 1px solid var(--border-panel, rgba(51, 65, 85, 0.5));
-  transition: left var(--transition-smooth, 0.3s ease);
-}
-
-/* Mobile (< 1024px): no offset */
-@media (max-width: 1023px) {
-  .ticker-carousel-panel {
-    left: 0;
-  }
-}
-
-/* Tablet/Small Desktop (1024px - 1279px): always collapsed = 60px */
-@media (min-width: 1024px) and (max-width: 1279px) {
-  .ticker-carousel-panel {
-    left: 60px;
-  }
-}
-
-/* Desktop (1280px - 2399px): respect sidebar state */
-@media (min-width: 1280px) and (max-width: 2399px) {
-  body.sidebar-collapsed .ticker-carousel-panel {
-    left: 60px;
-  }
-  
-  body.sidebar-expanded .ticker-carousel-panel {
-    left: 270px;
-  }
-}
-
-/* 2K (2400px - 3199px) */
-@media (min-width: 2400px) and (max-width: 3199px) {
-  body.sidebar-collapsed .ticker-carousel-panel {
-    left: 72px;
-  }
-  
-  body.sidebar-expanded .ticker-carousel-panel {
-    left: 320px;
-  }
-  
-  .ticker-carousel-panel {
-    height: 48px;
-  }
-}
-
-/* 4K (3200px+) */
-@media (min-width: 3200px) {
-  body.sidebar-collapsed .ticker-carousel-panel {
-    left: 88px;
-  }
-  
-  body.sidebar-expanded .ticker-carousel-panel {
-    left: 400px;
-  }
-  
-  .ticker-carousel-panel {
-    height: 56px;
-  }
+  max-height: 100%;
 }
 
 /* ============================================
@@ -194,16 +147,18 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  width: 100%;
   min-height: 0;
+  background: var(--bg-panel, #1e293b);
+  overflow: hidden;
 }
 
 .trading-positions-table-container {
   width: 100%;
   flex: 1;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: auto;
-  min-height: 0;
 }
 
 /* ✅ Sticky header cho table */
@@ -240,57 +195,13 @@
 }
 
 /* ============================================
-   HEIGHT-BASED RESPONSIVE - Chart height
-   ============================================ */
-
-/* Short screens (< 800px height) */
-@media (max-height: 799px) {
-  .workspace-chart-orderbook-row {
-    height: 50vh;
-    min-height: 280px;
-  }
-}
-
-/* Medium screens (800-999px) */
-@media (min-height: 800px) and (max-height: 999px) {
-  .workspace-chart-orderbook-row {
-    height: 52vh;
-    min-height: 320px;
-  }
-}
-
-/* Tall screens (1000px+) */
-@media (min-height: 1000px) {
-  .workspace-chart-orderbook-row {
-    height: 55vh;
-    min-height: 400px;
-  }
-}
-
-/* Very tall screens (1200px+) */
-@media (min-height: 1200px) {
-  .workspace-chart-orderbook-row {
-    height: 58vh;
-    min-height: 450px;
-  }
-}
-
-/* QHD+ (1440px+) */
-@media (min-height: 1440px) {
-  .workspace-chart-orderbook-row {
-    height: 60vh;
-    min-height: 500px;
-  }
-}
-
-/* ============================================
    WIDTH-BASED RESPONSIVE BREAKPOINTS
    ============================================ */
 
 /* Mobile (< 768px) */
 @media (max-width: 767px) {
   .trading-terminal {
-    padding-bottom: 32px;
+    padding-bottom: 52px;
   }
 
   .trading-workspace {
@@ -300,8 +211,9 @@
   
   .workspace-chart-orderbook-row {
     grid-template-columns: 1fr;
-    min-height: 400px;
-    flex: 1;
+    height: 45vh;
+    min-height: 280px;
+    max-height: 400px;
   }
   
   .orderbook-panel {
@@ -327,50 +239,79 @@
     transform: translateY(0) !important;
   }
   
+  /* ===== MOBILE HEADER STYLING ===== */
   .trading-form-mobile-header {
     display: flex !important;
+    position: relative;
+    min-height: 52px;
+    padding: 14px 16px !important;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95)) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border-bottom: 1px solid rgba(71, 85, 105, 0.3) !important;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease;
   }
   
-  .ticker-carousel-panel {
-    height: 32px;
-    left: 0 !important;
+  .trading-form-mobile-header::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 2px;
   }
   
-  .trading-positions-table-container {
-    max-height: 200px;
+  .trading-form-mobile-header svg {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .trading-form-panel.is-open .trading-form-mobile-header svg {
+    transform: rotate(180deg);
   }
 }
 
 /* Tablet (768px - 1023px) */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .trading-terminal {
-    padding-bottom: 34px;
-  }
-
   .trading-workspace {
-    grid-template-columns: 1fr minmax(220px, 260px);
+    grid-template-columns: 1fr minmax(160px, 200px);
   }
   
   .workspace-chart-orderbook-row {
     grid-template-columns: 1fr;
+    height: 42vh;
+    min-height: 280px;
+    max-height: 380px;
   }
   
   .orderbook-panel {
     display: none !important;
   }
   
+  .positions-panel.is-open {
+    min-height: 180px;
+  }
+  
   .trading-form-panel {
-    min-width: 220px;
-    max-width: 260px;
-    max-height: calc(100dvh - 4rem - 34px);
+    min-width: 160px;
+    max-width: 200px;
+  }
+}
+
+/* ✅ PORTRAIT MODE - Giữ đơn giản, chỉ ẩn orderbook */
+@media (orientation: portrait) and (min-width: 768px) {
+  .workspace-chart-orderbook-row {
+    grid-template-columns: 1fr !important;
   }
   
-  .trading-form-mobile-header {
+  .orderbook-panel {
     display: none !important;
-  }
-  
-  .ticker-carousel-panel {
-    height: 34px;
   }
 }
 
@@ -382,70 +323,119 @@
   
   .workspace-chart-orderbook-row {
     grid-template-columns: 1fr;
+    height: 44vh;
+    min-height: 300px;
+    max-height: 420px;
   }
   
   .orderbook-panel {
     display: none !important;
   }
   
+  .positions-panel.is-open {
+    min-height: 200px;
+  }
+  
   .trading-form-panel {
     min-width: 180px;
     max-width: 220px;
-    max-height: calc(100dvh - 4rem - 35px);
   }
 }
 
 /* Desktop Small-Medium (1200px - 1399px) */
 @media (min-width: 1200px) and (max-width: 1399px) {
   .trading-workspace {
-    grid-template-columns: 1fr minmax(180px, 240px);
+    grid-template-columns: 1fr minmax(200px, 260px);
   }
   
   .workspace-chart-orderbook-row {
     grid-template-columns: 1fr;
+    height: 45vh;
+    min-height: 320px;
+    max-height: 450px;
   }
   
   .orderbook-panel {
     display: none !important;
   }
   
+  .positions-panel.is-open {
+    min-height: 220px;
+  }
+  
   .trading-form-panel {
-    min-width: 180px;
-    max-width: 240px;
-    max-height: calc(100dvh - 4rem - 35px);
+    min-width: 200px;
+    max-width: 260px;
   }
 }
 
-/* Desktop Medium (1400px - 1535px) - +50px */
+/* Desktop Medium (1400px - 1535px) */
 @media (min-width: 1400px) and (max-width: 1535px) {
   .trading-workspace {
     grid-template-columns: 1fr minmax(220px, 280px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 290px;  /* 240 → 290 (+50) */
+    grid-template-columns: 1fr 280px;
+    height: 46vh;
+    min-height: 340px;
+    max-height: 480px;
   }
   
   .orderbook-panel {
-    width: 290px;      /* 240 → 290 (+50) */
-    min-width: 270px;  /* 220 → 270 (+50) */
+    width: 280px;
+    min-width: 260px;
+  }
+  
+  .positions-panel.is-open {
+    min-height: 240px;
   }
   
   .trading-form-panel {
     min-width: 220px;
     max-width: 280px;
-    max-height: calc(100dvh - 4rem - 35px);
   }
 }
 
-/* Desktop Large (1536px - 2399px) - ĐÃ SỬA */
-@media (min-width: 1536px) and (max-width: 2399px) {
+/* Desktop Large (1536px - 1919px) */
+@media (min-width: 1536px) and (max-width: 1919px) {
   .trading-workspace {
-    grid-template-columns: 1fr minmax(280px, 320px);
+    grid-template-columns: 1fr minmax(260px, 320px);
+  }
+  
+  .workspace-chart-orderbook-row {
+    grid-template-columns: 1fr 300px;
+    height: 48vh;
+    min-height: 360px;
+    max-height: 500px;
+  }
+  
+  .orderbook-panel {
+    width: 300px;
+    min-width: 280px;
+  }
+  
+  .positions-panel.is-open {
+    min-height: 260px;
+  }
+  
+  .trading-form-panel {
+    min-width: 260px;
+    max-width: 320px;
+  }
+}
+
+/* Full HD (1920px - 2399px) */
+@media (min-width: 1920px) and (max-width: 2399px) {
+  .trading-workspace {
+    grid-template-columns: 1fr minmax(280px, 340px);
   }
   
   .workspace-chart-orderbook-row {
     grid-template-columns: 1fr 320px;
+    height: 48vh;
+    min-height: 380px;
+    max-height: 520px;
   }
   
   .orderbook-panel {
@@ -453,58 +443,199 @@
     min-width: 300px;
   }
   
+  .positions-panel.is-open {
+    min-height: 280px;
+  }
+  
   .trading-form-panel {
     min-width: 280px;
-    max-width: 320px;
-    max-height: calc(100dvh - 4rem - 35px);
+    max-width: 340px;
   }
 }
 
-/* 2K (2400px - 3199px) - +50px */
+/* 2K / QHD (2400px - 3199px) */
 @media (min-width: 2400px) and (max-width: 3199px) {
   .trading-workspace {
-    grid-template-columns: 1fr minmax(340px, 400px);
+    grid-template-columns: 1fr minmax(320px, 400px);
   }
   
   .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 390px;  /* 340 → 390 (+50) */
+    grid-template-columns: 1fr 360px;
+    height: 45vh; /* ✅ Giảm xuống để Position có nhiều chỗ hơn */
+    min-height: 400px;
+    max-height: 550px;
   }
   
   .orderbook-panel {
-    width: 390px;      /* 340 → 390 (+50) */
-    min-width: 370px;  /* 320 → 370 (+50) */
-  }
-  
-  .trading-form-panel {
+    width: 360px;
     min-width: 340px;
-    max-width: 400px;
-    max-height: calc(100dvh - 4rem - 48px);
-  }
-}
-
-/* 4K (3200px+) - +50px */
-@media (min-width: 3200px) {
-  .trading-workspace {
-    grid-template-columns: 1fr minmax(400px, 500px);
-  }
-  
-  .workspace-chart-orderbook-row {
-    grid-template-columns: 1fr 450px;  /* 400 → 450 (+50) */
-  }
-  
-  .orderbook-panel {
-    width: 450px;      /* 400 → 450 (+50) */
-    min-width: 430px;  /* 380 → 430 (+50) */
-  }
-  
-  .trading-form-panel {
-    min-width: 400px;
-    max-width: 500px;
-    max-height: calc(100dvh - 4rem - 56px);
   }
   
   .positions-panel.is-open {
-    min-height: 250px;
+    min-height: 320px;
+  }
+  
+  .trading-form-panel {
+    min-width: 320px;
+    max-width: 400px;
+  }
+  
+  /* ✅ Font size nhỏ hơn cho 2K */
+  .positions-panel,
+  .position-panel-content {
+    font-size: 12px;
+  }
+  
+  .trading-positions table,
+  .position-table {
+    font-size: 11px;
+  }
+}
+
+/* ============================================
+   ✅ 4K (3200px+) - TỐI ƯU: Chart nhỏ, Position lớn
+   ============================================ */
+@media (min-width: 3200px) {
+  .trading-workspace {
+    grid-template-columns: 1fr minmax(380px, 480px);
+  }
+  
+  /* ✅ Chart + OrderBook: chiếm ít không gian hơn */
+  .workspace-chart-orderbook-row {
+    grid-template-columns: 1fr 420px;
+    height: 42vh; /* ✅ Giảm từ 55vh xuống 42vh */
+    min-height: 450px;
+    max-height: 600px;
+  }
+  
+  .orderbook-panel {
+    width: 420px;
+    min-width: 400px;
+  }
+  
+  /* ✅ Position panel: chiếm nhiều không gian hơn */
+  .positions-panel.is-open {
+    min-height: 400px;
+  }
+  
+  .trading-form-panel {
+    min-width: 380px;
+    max-width: 480px;
+  }
+  
+  /* ✅ Font size nhỏ hơn cho 4K - tránh quá to */
+  .positions-panel,
+  .position-panel-content {
+    font-size: 11px;
+  }
+  
+  .trading-positions table,
+  .position-table {
+    font-size: 10px;
+  }
+  
+  .trading-positions table th,
+  .position-table th {
+    font-size: 9px;
+    padding: 6px 8px;
+  }
+  
+  .trading-positions table td,
+  .position-table td {
+    padding: 5px 8px;
+  }
+}
+
+/* ============================================
+   ✅ 5K+ (3840px+) - ULTRA WIDE
+   ============================================ */
+@media (min-width: 3840px) {
+  .trading-workspace {
+    grid-template-columns: 1fr minmax(440px, 560px);
+  }
+  
+  .workspace-chart-orderbook-row {
+    grid-template-columns: 1fr 480px;
+    height: 40vh; /* ✅ Giảm thêm cho màn hình siêu lớn */
+    min-height: 500px;
+    max-height: 650px;
+  }
+  
+  .orderbook-panel {
+    width: 480px;
+    min-width: 460px;
+  }
+  
+  .positions-panel.is-open {
+    min-height: 500px;
+  }
+  
+  .trading-form-panel {
+    min-width: 440px;
+    max-width: 560px;
+  }
+  
+  /* ✅ Font size cho 5K */
+  .positions-panel,
+  .position-panel-content {
+    font-size: 10px;
+  }
+  
+  .trading-positions table,
+  .position-table {
+    font-size: 9px;
+  }
+  
+  .trading-positions table th,
+  .position-table th {
+    font-size: 8px;
+    padding: 5px 6px;
+  }
+  
+  .trading-positions table td,
+  .position-table td {
+    padding: 4px 6px;
+  }
+}
+
+/* ============================================
+   ✅ 8K (7680px+) - EXTREME RESOLUTION
+   ============================================ */
+@media (min-width: 7680px) {
+  .trading-workspace {
+    grid-template-columns: 1fr minmax(600px, 800px);
+  }
+  
+  .workspace-chart-orderbook-row {
+    grid-template-columns: 1fr 650px;
+    height: 38vh;
+    min-height: 600px;
+    max-height: 800px;
+  }
+  
+  .orderbook-panel {
+    width: 650px;
+    min-width: 620px;
+  }
+  
+  .positions-panel.is-open {
+    min-height: 650px;
+  }
+  
+  .trading-form-panel {
+    min-width: 600px;
+    max-width: 800px;
+  }
+  
+  /* ✅ Font size cho 8K */
+  .positions-panel,
+  .position-panel-content {
+    font-size: 9px;
+  }
+  
+  .trading-positions table,
+  .position-table {
+    font-size: 8px;
   }
 }
 
@@ -568,4 +699,81 @@
   height: 100% !important;
   min-width: 0;
   min-height: 0;
+}
+
+/* ============================================
+   MOBILE SCROLL OVERRIDE
+   ============================================ */
+@media (max-width: 767px) {
+  .trading-terminal {
+    height: auto !important;
+    min-height: calc(100dvh - 4rem);
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .trading-workspace {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .workspace-left-columns {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .workspace-chart-orderbook-row {
+    flex-shrink: 0 !important;
+    flex: 0 0 auto !important;
+  }
+
+  .positions-panel {
+    flex: none !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .positions-panel.is-open {
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .position-panel-content {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .position-mobile-wrapper,
+  .position-mobile-content {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .position-mobile-container {
+    padding-bottom: 160px !important;
+  }
+}
+
+/* iOS Safari fix */
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 767px) {
+    .trading-terminal {
+      min-height: -webkit-fill-available;
+    }
+  }
+}
+
+/* Safe area cho iPhone */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  @media (max-width: 767px) {
+    .position-mobile-container {
+      padding-bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+    }
+  }
 }

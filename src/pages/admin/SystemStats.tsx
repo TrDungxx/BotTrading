@@ -44,7 +44,7 @@ export default function SystemStats() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 sm:px-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">System Statistics</h1>
         <button onClick={fetchStats} className="btn btn-outline" disabled={loading}>

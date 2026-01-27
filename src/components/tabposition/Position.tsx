@@ -4,12 +4,14 @@ import { binanceWS,OPEN_ORDERS_LS_KEY,POSITIONS_LS_KEY } from "../binancewebsock
 import PopupPosition from "../popupposition/PopupPosition";
 import { PositionData } from "../../utils/types";
 import PositionTpSlModal from "./function/PositionTpSlModal";
-import { Edit3 } from "lucide-react";
+import { Edit3, Shield } from "lucide-react";
+import RiskConfigAutoModal from "./dropdownfilter/RiskConfigAutoModal";
 import ClosePositionModal from "../popupposition/ClosePositionConfirmModal";
 import { createPortal } from 'react-dom';
 import CloseAllPositionsModal from "../popupposition/CloseAllPositionsModal";
 import SymbolFilterDropdown, {PositionFilter} from "./dropdownfilter/SymbolFilterDropdown";
 import { StandardSortHeader, SortConfig } from "./dropdownfilter/ColumnSortHeader";
+import { riskConfigApi } from "../../utils/api";
 // ===== Helper đọc TP/SL settings từ localStorage =====
 interface TpSlSettings {
   trigger: "MARK_PRICE" | "LAST";
@@ -18,7 +20,13 @@ interface TpSlSettings {
   slInput: string;
   entryPrice: number;
 }
+export const HIDE_OTHER_SYMBOLS_EVENT = 'hide-other-symbols-changed';
 
+// ✅ THÊM: Interface cho event detail
+export interface HideOtherSymbolsEventDetail {
+  hideOtherSymbols: boolean;
+  currentSymbol: string;
+}
 function loadPositionTpSlSettings(symbol: string): Partial<TpSlSettings> | null {
   try {
     const saved = localStorage.getItem(`position_tpsl_settings_${symbol}`);
@@ -65,6 +73,7 @@ type PositionCalc = PositionData & {
 
 interface PositionProps {
   positions?: PositionData[];
+  
   market?: "spot" | "futures";
   onPositionCountChange?: (n: number) => void;
   onFloatingInfoChange?: (
@@ -76,8 +85,34 @@ interface PositionProps {
       positionAmt: number;
     } | null
   ) => void;
+  // ✅ THÊM: Props để sync hideOtherSymbols với parent
+  hideOtherSymbols?: boolean;
+  onHideOtherSymbolsChange?: (value: boolean) => void;
 }
-
+// ===== Helper check SL status =====
+const getSlStatus = (pos: PositionCalc, openOrders: any[]): { hasSL: boolean; isAuto: boolean } => {
+  const positionSide = parseFloat(pos.positionAmt || "0") > 0 ? "LONG" : "SHORT";
+  const expectedSide = positionSide === "LONG" ? "SELL" : "BUY";
+  
+  const hasSL = openOrders.some((o: any) => 
+    o.symbol === pos.symbol && 
+    (o.type === 'STOP_MARKET' || o.type === 'STOP') &&
+    o.side === expectedSide &&
+    o.status === 'NEW'
+  );
+  
+  // Check if SL was set via Auto Risk
+  let isAuto = false;
+  if (hasSL) {
+    try {
+      const metadata = JSON.parse(localStorage.getItem('tpsl_metadata') || '{}');
+      const metaKey = `${pos.symbol}:${positionSide}`;
+      isAuto = metadata[metaKey]?.isAuto === true;
+    } catch {}
+  }
+  
+  return { hasSL, isAuto };
+};
 // number hợp lệ > 0 => number, else undefined
 const toNumUndef = (v: any) => {
   const n = Number(v);
@@ -90,7 +125,18 @@ const fmt = (n?: number, maxFrac = 8) =>
 const getMark = (p: PositionCalc) => toNumUndef(p.markPrice);
 const nearZero = (v: number | undefined, eps = 1e-6) =>
   v != null && Math.abs(v) < eps;
-
+// Format price thông minh - giữ đủ decimals có nghĩa
+const formatPrice = (price: string | number | undefined): string => {
+  if (price == null || price === "") return "--";
+  const num = typeof price === "string" ? parseFloat(price) : price;
+  if (!Number.isFinite(num)) return "--";
+  
+  // Tự động xác định số decimal dựa trên giá trị
+  if (num >= 1000) return num.toFixed(2);
+  if (num >= 1) return num.toFixed(4);
+  if (num >= 0.01) return num.toFixed(6);
+  return num.toFixed(8); // Coin giá nhỏ như PEPE
+};
 const fmtShort = (x: number) => {
   if (!Number.isFinite(x)) return "0.00";
   return x.toFixed(2);
@@ -104,14 +150,34 @@ const Position: React.FC<PositionProps> = ({
   market = "futures",
   onPositionCountChange,
   onFloatingInfoChange,
+  hideOtherSymbols: hideOtherSymbolsProp,
+  onHideOtherSymbolsChange: onHideOtherSymbolsChangeProp,
 }) => {
   // Store Map + view state
   const posStoreRef = React.useRef<Map<string, PositionCalc>>(new Map());
   const latestVersionRef = React.useRef<number>(0);
   const refreshingRef = React.useRef<boolean>(false);
   const deltaQueueRef = React.useRef<PositionCalc[]>([]);
-  // ✅ STATE cho hide other symbols
-const [hideOtherSymbols, setHideOtherSymbols] = useState(false);
+  const openOrders = JSON.parse(localStorage.getItem(OPEN_ORDERS_LS_KEY) || '[]');
+  // ✅ STATE cho hide other symbols - dùng props nếu có, fallback local state
+  const [hideOtherSymbolsLocal, setHideOtherSymbolsLocal] = useState(false);
+  
+  // Dùng props từ parent nếu có, không thì dùng local state
+  const hideOtherSymbols = hideOtherSymbolsProp ?? hideOtherSymbolsLocal;
+  
+  const handleHideOtherSymbolsChange = React.useCallback((value: boolean) => {
+    // Nếu parent truyền callback thì gọi callback
+    if (onHideOtherSymbolsChangeProp) {
+      onHideOtherSymbolsChangeProp(value);
+    } else {
+      // Fallback: dùng local state
+      setHideOtherSymbolsLocal(value);
+    }
+    
+    const currentSymbol = localStorage.getItem('selectedSymbol') || '';
+    console.log('📤 [Position] hideOtherSymbols changed:', value, 'symbol:', currentSymbol);
+  }, [onHideOtherSymbolsChangeProp]);
+
 const [showCloseAllModal, setShowCloseAllModal] = useState(false);
   const [positionsView, setPositionsView] = useState<PositionCalc[]>([]);
 // ✅ STATE cho filter Long/Short/All
@@ -120,6 +186,70 @@ const [positionFilter, setPositionFilter] = useState<PositionFilter>('all');
 const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   // ✅ State để force re-render khi TP/SL settings thay đổi
   const [tpslVersion, setTpslVersion] = useState(0);
+
+const [wsRiskConfig, setWsRiskConfig] = useState<any>(() => {
+  try {
+    const saved = localStorage.getItem('riskConfig');
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+});
+
+const [loadingRiskConfig, setLoadingRiskConfig] = useState(false);
+
+// ✅ Lắng nghe WebSocket + lưu localStorage
+useEffect(() => {
+  const handleRiskConfig = (msg: any) => {
+    if (msg?.type === 'riskConfigLoaded' && msg.riskConfig) {
+      console.log("📥 [Position] Risk Config Loaded:", msg.riskConfig.name);
+      const riskData = {
+        ...msg.riskConfig,
+        dailyStartBalance: msg.dailyStartBalance,
+        currentBalance: msg.currentBalance,
+        timestamp: msg.timestamp,
+      };
+      setWsRiskConfig(riskData);
+      // ✅ Cache vào localStorage
+      localStorage.setItem('riskConfig', JSON.stringify(riskData));
+    }
+  };
+
+  binanceWS.onMessage(handleRiskConfig);
+  return () => binanceWS.removeMessageHandler(handleRiskConfig);
+}, []);
+
+// ✅ Hàm load RiskConfig từ API (gọi khi click nút)
+const handleLoadRiskConfig = async (pos: PositionCalc) => {
+  setRiskConfigPos(pos);
+  
+  // Nếu đã có data trong state, mở modal luôn
+  if (wsRiskConfig) {
+    setShowRiskConfig(true);
+    return;
+  }
+  
+  // Nếu chưa có, gọi API để load
+  setLoadingRiskConfig(true);
+  try {
+    console.log('📡 Loading risk configs from API...');
+    const response = await riskConfigApi.getAvailableConfigs();
+    
+    if (response?.data && response.data.length > 0) {
+      // Lấy config đầu tiên hoặc config active
+      const activeConfig = response.data.find((c: any) => c.isActive) || response.data[0];
+      
+      console.log('✅ Loaded risk config:', activeConfig.name);
+      setWsRiskConfig(activeConfig);
+      localStorage.setItem('riskConfig', JSON.stringify(activeConfig));
+    }
+  } catch (err) {
+    console.error('❌ Failed to load risk config:', err);
+  } finally {
+    setLoadingRiskConfig(false);
+    setShowRiskConfig(true);
+  }
+};
 
   // ✅ Lắng nghe storage event để cập nhật khi TP/SL thay đổi
   useEffect(() => {
@@ -443,6 +573,10 @@ useEffect(() => {
   const [currentPnl, setCurrentPnl] = useState(0);
   const [showTpSl, setShowTpSl] = useState(false);
   const [activePos, setActivePos] = useState<PositionData | null>(null);
+  
+  // ✅ State cho Risk Config Modal
+  const [showRiskConfig, setShowRiskConfig] = useState(false);
+  const [riskConfigPos, setRiskConfigPos] = useState<PositionCalc | null>(null);
 
   const rowKey = (p: PositionCalc) => `${p.symbol}:${p.positionSide ?? "BOTH"}`;
   const [closeBy, setCloseBy] = useState<
@@ -730,11 +864,16 @@ useEffect(() => {
           if (!cur) continue;
           const lev = Number(row.leverage ?? row.l);
           const iw = Number(row.isolatedWallet ?? row.iw ?? row.isolatedMargin);
+          // ✅ FIX: Lấy positionInitialMargin từ Binance API để tính ROI% chính xác khi DCA
+          const pim = Number(row.positionInitialMargin ?? row.initialMargin);
           posStoreRef.current.set(k, {
             ...cur,
             leverage: Number.isFinite(lev) && lev > 0 ? lev : cur.leverage,
             isolatedWallet:
               Number.isFinite(iw) && iw >= 0 ? iw : cur.isolatedWallet,
+            // ✅ FIX: Merge positionInitialMargin - quan trọng để tính ROI% đúng sau DCA
+            positionInitialMargin:
+              Number.isFinite(pim) && pim > 0 ? pim : cur.positionInitialMargin,
           });
         }
         scheduleFlush();
@@ -953,7 +1092,7 @@ const renderTpSlCell = (pos: PositionCalc) => {
     const roi = Math.abs((priceDiff / entryPrice) * leverage * 100);
     
     // Nếu ROI > 500% thì chắc chắn là order của position cũ
-    if (roi > 500) return false;
+    if (roi > 2000) return false;
     
     return true;
   };
@@ -1117,26 +1256,25 @@ const sortedPositions = React.useMemo(() => {
 
 
   return (
-  <div className="w-full max-w-full overflow-hidden">
-    {/* ✅ WRAPPER CHO TABLE */}
-    <div className="trading-positions-table-container w-full max-w-full">
-      {/* ✅ CHANGED: min-w-[1000px] → style với CSS variable */}
-      <table 
-        className="position-table w-full"
-        style={{ minWidth: 'clamp(800px, 52.083vw, 1200px)' }}
-      >
+    <div className="trading-positions h-full flex flex-col overflow-hidden">
+    {/* ✅ FIX: Table container với overflow-y-auto và flex-1 min-h-0 */}
+    <div className="trading-positions-table-container flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+      <table className="position-table w-full">
         <thead>
           <tr className="border-b border-dark-700 text-left uppercase tracking-wider text-dark-300"
-              style={{ fontSize: 'var(--stats-font-xs)' }}>
+              style={{ 
+                fontSize: 'var(--stats-font-xs)',
+                background: 'var(--bg-panel, #1e293b)'  /* ✅ Background để che content khi scroll */
+              }}>
             
             {/* Symbol với Filter dropdown */}
             <th className="px-3 py-1.5">
   <SymbolFilterDropdown
-    value={positionFilter}
-    onChange={setPositionFilter}
-    hideOtherSymbols={hideOtherSymbols}
-    onHideOtherSymbolsChange={setHideOtherSymbols}
-  />
+  value={positionFilter}
+  onChange={setPositionFilter}
+  hideOtherSymbols={hideOtherSymbols}
+  onHideOtherSymbolsChange={handleHideOtherSymbolsChange}  // ← Thay đổi ở đây
+/>
 </th>
             
             {/* Size với Sort */}
@@ -1227,6 +1365,11 @@ const sortedPositions = React.useMemo(() => {
                   Close by PnL
                 </button>
               </div>
+            </th>
+
+            {/* ✅ Actions column header - để thead khớp với tbody */}
+            <th className="trading-px-sm trading-py-sm text-right" style={{ minWidth: 'clamp(140px, 9vw, 200px)' }}>
+              {/* Empty header hoặc có thể thêm text */}
             </th>
           </tr>
         </thead>
@@ -1349,7 +1492,7 @@ const sortedPositions = React.useMemo(() => {
                       fontFamily: "'IBM Plex Mono', monospace"
                     }}
                   >
-                    {pos.entryPrice}
+                    {formatPrice(pos.entryPrice)}
                   </td>
 
                   {/* Mark Price */}
@@ -1496,56 +1639,77 @@ const sortedPositions = React.useMemo(() => {
                         <Edit3 style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} /> TP/SL
                       </button>
 
-                      <button
-                        onClick={() => {
-                          const size = parseFloat(pos.positionAmt || "0");
-                          if (!size) return;
-                          const side = (size > 0 ? "LONG" : "SHORT") as
-                            | "LONG"
-                            | "SHORT";
-                          const payload = {
-                            positionId: `${pos.symbol}:${
-                              pos.positionSide ?? side
-                            }`,
-                            symbol: pos.symbol,
-                            side,
-                            entry: parseFloat(pos.entryPrice || "0"),
-                          };
-                          try {
-                            localStorage.setItem(
-                              "activeTool",
-                              JSON.stringify(payload)
-                            );
-                          } catch {}
-                          window.dispatchEvent(
-                            new CustomEvent("chart-symbol-change-request", {
-                              detail: { symbol: pos.symbol },
-                            })
-                          );
-                          setTimeout(() => {
-                            window.dispatchEvent(
-                              new CustomEvent("active-tool-changed", {
-                                detail: payload,
-                              })
-                            );
-                          }, 300);
-                        }}
-                        className="inline-flex items-center rounded border border-primary/60 text-primary hover:bg-dark-700"
-                        style={{ 
-                          gap: 'var(--trading-gap-xs)',
-                          fontSize: 'var(--stats-font-sm)',
-                          padding: 'var(--trading-gap-xs) var(--trading-gap-sm)'
-                        }}
-                        title="Bật Tool nâng cao để kéo vùng TP/SL trên chart"
-                      >
-                        Nâng cao
-                      </button>
+                    {/* Auto TP/SL Button với Shield màu động + checkmark */}
+{(() => {
+  const { hasSL, isAuto } = getSlStatus(pos, openOrders);
+  return (
+    <button
+      onClick={() => handleLoadRiskConfig(pos)}
+      disabled={loadingRiskConfig}
+      className={`inline-flex items-center rounded border hover:bg-dark-700 disabled:opacity-50 ${
+        hasSL 
+          ? 'border-[#0ecb81]/60 text-[#0ecb81]' 
+          : 'border-[#f6465d]/60 text-[#f6465d]'
+      }`}
+      style={{ 
+        gap: 'var(--trading-gap-xs)',
+        fontSize: 'var(--stats-font-sm)',
+        padding: 'var(--trading-gap-xs) var(--trading-gap-sm)'
+      }}
+      title={
+        hasSL 
+          ? isAuto 
+            ? "✓ Auto Risk đang bảo vệ - Click để chỉnh sửa" 
+            : "✓ Đã có Stop Loss - Click để chỉnh sửa"
+          : "⚠ Chưa có Stop Loss - Click để đặt TP/SL tự động"
+      }
+    >
+      {loadingRiskConfig ? (
+        <>
+          <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full" />
+          Đang tải...
+        </>
+      ) : (
+        <>
+          {/* Shield với checkmark khi isAuto */}
+          <div className="relative" style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }}>
+            <Shield 
+              style={{ width: '100%', height: '100%' }} 
+              fill={hasSL ? 'currentColor' : 'none'}
+            />
+            {hasSL && isAuto && (
+              <svg 
+                className="absolute"
+                style={{ 
+                  width: '55%', 
+                  height: '55%', 
+                  top: '28%', 
+                  left: '22%',
+                }}
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke={hasSL ? '#0a0a0a' : 'currentColor'}
+                strokeWidth="3.5"
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+          AutoTp/Sl
+        </>
+      )}
+    </button>
+  );
+})()}
                     </div>
                   </td>
                 </tr>
               );
             })
           )}
+          
         </tbody>
       </table>
 
@@ -1657,6 +1821,36 @@ const sortedPositions = React.useMemo(() => {
         />,
         document.body
       )}
+
+      {/* Risk Config Auto Modal - NEW! */}
+{showRiskConfig && riskConfigPos && createPortal(
+  <RiskConfigAutoModal
+    isOpen={showRiskConfig}
+    onClose={() => {
+      setShowRiskConfig(false);
+      setRiskConfigPos(null);
+    }}
+    riskConfig={wsRiskConfig}
+    symbol={riskConfigPos.symbol}
+    entryPrice={parseFloat(riskConfigPos.entryPrice || "0")}
+    markPrice={getMark(riskConfigPos) ?? 0}
+    positionAmt={parseFloat(riskConfigPos.positionAmt || "0")}
+     openOrders={openOrders} 
+    leverage={
+      Number(riskConfigPos.leverage) ||
+      loadLeverageLS(
+        (riskConfigPos as any)?.internalAccountId ??
+          (riskConfigPos as any)?.accountId ??
+          null,
+        market,
+        riskConfigPos.symbol
+      ) ||
+      10
+    }
+    getPriceTick={getPriceTick}
+  />,
+  document.body
+)}
     </div>
   </div>
 );
